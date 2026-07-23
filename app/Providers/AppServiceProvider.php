@@ -9,6 +9,7 @@ use App\Services\ReferralService; // ADDED
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -23,6 +24,9 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Fix "Specified key was too long" on MySQL/MariaDB < 5.7.7
+        Schema::defaultStringLength(191);
+
         // API rate limiter: 60 requests per minute per user (or IP for guests)
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by(
