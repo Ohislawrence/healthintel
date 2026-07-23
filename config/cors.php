@@ -10,7 +10,12 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => [
+        'https://healthintel.app', // ⚠️ Must match production frontend EXACTLY (including https://)
+        'http://localhost:3000', // ⚠️ Must match local frontend EXACTLY (including http://)
+        'http://127.0.0.1:8000',
+        'http://localhost',
+    ],
 
     'allowed_origins_patterns' => [],
 

@@ -12,14 +12,14 @@ class RegisterRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'consent_ndpr' => ['required', 'accepted'],
+            'consent_ndpr' => ['nullable', 'boolean'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'consent_ndpr.accepted' => 'You must consent to data processing to create an account.',
+            'consent_ndpr.required' => 'You must consent to data processing to create an account.',
         ];
     }
 }

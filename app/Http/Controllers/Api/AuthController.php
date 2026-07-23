@@ -90,16 +90,27 @@ class AuthController extends BaseController
     {
         $request->validate(['email' => 'required|email']);
 
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
+        // Don't reveal whether the email exists
+        $message = 'If that email exists, a password reset token has been generated.';
 
-        if ($status === Password::RESET_LINK_SENT) {
-            return $this->success(null, 'If that email exists, a password reset link has been sent.');
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return $this->success(null, $message);
         }
 
-        // Don't reveal whether the email exists — return same message
-        return $this->success(null, 'If that email exists, a password reset link has been sent.');
+        // Generate a 6-digit token (mobile-friendly)
+        $token = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        // Store token in password_reset_tokens table
+        \DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $user->email],
+            ['token' => $token, 'created_at' => now()]
+        );
+
+        return $this->success([
+            'token' => $token,
+        ], $message);
     }
 
     /**
