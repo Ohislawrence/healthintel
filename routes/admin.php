@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\AdminController;
+use App\Http\Controllers\Api\Admin\AdminSettingController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
@@ -59,5 +60,10 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // Audit Log
     Route::get('/audit-log', [AdminController::class, 'auditLog']);
+
+    // Settings
+    Route::get('/settings', [AdminSettingController::class, 'index']);
+    Route::put('/settings/{setting}', [AdminSettingController::class, 'update']);
+    Route::post('/settings/bulk', [AdminSettingController::class, 'bulkUpdate']);
 });
 

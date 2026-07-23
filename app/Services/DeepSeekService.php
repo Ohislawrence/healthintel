@@ -13,7 +13,7 @@ class DeepSeekService
      */
     public function interpret(AiInterpretation $interpretation, array $flags): ?string
     {
-        $apiKey = config('services.deepseek.api_key');
+        $apiKey = \App\Models\Setting::getValue('api.deepseek_key') ?: config('services.deepseek.api_key');
 
         if (empty($apiKey)) {
             $interpretation->update([
@@ -24,7 +24,7 @@ class DeepSeekService
         }
 
         $prompt = $interpretation->prompt_input;
-        $model = config('services.deepseek.model', 'deepseek-chat');
+        $model = \App\Models\Setting::getValue('api.deepseek_model') ?: config('services.deepseek.model', 'deepseek-chat');
         $baseUrl = config('services.deepseek.base_url', 'https://api.deepseek.com');
 
         try {
@@ -37,8 +37,8 @@ class DeepSeekService
                     ['role' => 'system', 'content' => $this->systemPrompt()],
                     ['role' => 'user', 'content' => $prompt],
                 ],
-                'max_tokens' => (int) config('services.deepseek.max_tokens', 2048),
-                'temperature' => (float) config('services.deepseek.temperature', 0.3),
+                'max_tokens' => (int) (\App\Models\Setting::getValue('api.deepseek_max_tokens') ?: config('services.deepseek.max_tokens', 2048)),
+                'temperature' => (float) (\App\Models\Setting::getValue('api.deepseek_temperature') ?: config('services.deepseek.temperature', 0.3)),
             ]);
 
             if (!$response->successful()) {

@@ -11,8 +11,7 @@ class CreditService
 
     public function __construct()
     {
-        // Readable from admin panel later; hardcoded default for now.
-        $this->signupCredits = (int) config('credits.signup_bonus', 3);
+        $this->signupCredits = \App\Models\Setting::getValue('credits.signup_bonus', 3);
     }
 
     /**

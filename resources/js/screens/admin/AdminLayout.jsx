@@ -18,6 +18,7 @@ export default function AdminLayout() {
         { to: '/admin/partners', label: 'Partners', icon: '🤝' },
         { to: '/admin/credit-packages', label: 'Prices', icon: '₦' },
         { to: '/admin/notifications', label: 'Notifications', icon: '🔔' },
+        { to: '/admin/settings', label: 'Settings', icon: '⚙' },
     ];
 
     const isActive = (path) => location.pathname === path;

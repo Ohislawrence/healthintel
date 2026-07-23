@@ -37,6 +37,7 @@ import AdminSubmissions from './screens/admin/AdminSubmissions';
 import AdminPartners from './screens/admin/AdminPartners';
 import AdminNotifications from './screens/admin/AdminNotifications';
 import AdminAuditLog from './screens/admin/AdminAuditLog';
+import AdminSettings from './screens/admin/AdminSettings';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -152,6 +153,7 @@ function App() {
                         <Route path="credit-packages" element={<AdminCreditPackages />} />
                         <Route path="notifications" element={<AdminNotifications />} />
                         <Route path="audit-log" element={<AdminAuditLog />} />
+                        <Route path="settings" element={<AdminSettings />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />
