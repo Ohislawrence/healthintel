@@ -15,6 +15,7 @@ return [
         'http://localhost:3000', // ⚠️ Must match local frontend EXACTLY (including http://)
         'http://127.0.0.1:8000',
         'http://localhost',
+        'http://localhost:8081/',
     ],
 
     'allowed_origins_patterns' => [],
