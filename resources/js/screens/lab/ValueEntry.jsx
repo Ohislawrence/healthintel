@@ -15,7 +15,7 @@ export default function ValueEntry() {
         queryKey: ['panel', slug],
         queryFn: () => api.get(`/panels/${slug}`),
     });
-    const panel = panelData?.data || {};
+    const panel = panelData?.data?.panel || {};
     const tests = panel.tests || [];
 
     useEffect(() => {

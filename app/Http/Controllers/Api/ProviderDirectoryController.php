@@ -98,13 +98,15 @@ class ProviderDirectoryController extends BaseController
             ->where('is_active', true)
             ->firstOrFail();
 
-        $this->referralService->log(
-            $request->user(),
-            $provider,
-            'view',
-            'directory',
-            ['slug' => $slug],
-        );
+        if ($request->user()) {
+            $this->referralService->log(
+                $request->user(),
+                $provider,
+                'view',
+                'directory',
+                ['slug' => $slug],
+            );
+        }
 
         return $this->success(['provider' => $provider]);
     }

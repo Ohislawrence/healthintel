@@ -11,7 +11,7 @@ export default function ProviderDetail() {
         queryKey: ['provider', slug],
         queryFn: () => api.get(`/providers/${slug}`),
     });
-    const provider = data?.data || {};
+    const provider = data?.data?.provider || {};
 
     if (isLoading) {
         return (

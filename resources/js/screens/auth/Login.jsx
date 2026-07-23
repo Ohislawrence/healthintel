@@ -5,6 +5,7 @@ import useAuthStore from '../../stores/authStore';
 export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
     const login = useAuthStore((s) => s.login);
@@ -62,18 +63,32 @@ export default function Login() {
                             />
                         </div>
 
-                        <div>
-                            <label htmlFor="password" className="text-sm font-semibold text-neutral-700">Password</label>
+                    <div>
+                        <label htmlFor="password" className="text-sm font-semibold text-neutral-700">Password</label>
+                        <div className="relative mt-1.5">
                             <input
                                 id="password"
-                                type="password"
+                                type={showPassword ? 'text' : 'password'}
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="input-base mt-1.5"
+                                className="input-base pr-12"
                                 placeholder="••••••••"
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-lg text-neutral-400 hover:text-neutral-600"
+                            >
+                                {showPassword ? '🙈' : '👁'}
+                            </button>
                         </div>
+                        <div className="text-right mt-1.5">
+                            <Link to="/forgot-password" className="text-xs font-semibold text-teal-600 hover:text-teal-700">
+                                Forgot password?
+                            </Link>
+                        </div>
+                    </div>
 
                         <button
                             type="submit"

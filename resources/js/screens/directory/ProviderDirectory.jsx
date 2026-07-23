@@ -19,14 +19,14 @@ export default function ProviderDirectory() {
         queryFn: () => api.get('/providers/specialties'),
         staleTime: 60000,
     });
-    const specialties = specialtiesData?.data || [];
+    const specialties = specialtiesData?.data?.specialties || [];
 
     const { data: statesData } = useQuery({
         queryKey: ['states'],
         queryFn: () => api.get('/providers/states'),
         staleTime: 60000,
     });
-    const states = statesData?.data || [];
+    const states = statesData?.data?.states || [];
 
     return (
         <div className="space-y-5">

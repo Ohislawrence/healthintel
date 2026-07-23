@@ -6,7 +6,7 @@ import useAuthStore from '../../stores/authStore';
 
 export default function BuyCredits() {
     const navigate = useNavigate();
-    const { user, fetchUser } = useAuthStore();
+    const { user } = useAuthStore();
     const [selectedPackage, setSelectedPackage] = useState(null);
     const [error, setError] = useState(null);
 
@@ -14,13 +14,18 @@ export default function BuyCredits() {
         queryKey: ['packages'],
         queryFn: () => api.get('/payment/packages'),
     });
-    const packages = data?.data || [];
+    const packages = data?.data?.packages || [];
 
     const initMutation = useMutation({
         mutationFn: (pkgId) => api.post('/payment/initialize', { package_id: pkgId }),
         onSuccess: async (res) => {
-            await fetchUser();
-            navigate(`/payment/callback?ref=${res.data.reference}`);
+            const authUrl = res?.data?.authorization_url || res?.authorization_url;
+            if (authUrl) {
+                // Redirect user to Paystack's payment page
+                window.location.href = authUrl;
+            } else {
+                setError('Could not start payment. The payment gateway may not be configured.');
+            }
         },
         onError: (err) => setError(err?.message || 'Payment initialization failed.'),
     });
@@ -77,7 +82,7 @@ export default function BuyCredits() {
                 disabled={!selectedPackage || initMutation.isPending}
                 className="btn btn-primary w-full"
             >
-                {initMutation.isPending ? 'Initializing...' : 'Pay with Paystack'}
+                {initMutation.isPending ? 'Redirecting to Paystack...' : 'Pay with Paystack'}
             </button>
         </div>
     );

@@ -9,7 +9,7 @@ export default function InsuranceComparison() {
         queryKey: ['hmos'],
         queryFn: () => api.get('/insurance/hmos'),
     });
-    const hmos = data?.data || [];
+    const hmos = data?.data?.hmo_list || [];
 
     const filtered = hmos.filter(h =>
         h.name?.toLowerCase().includes(search.toLowerCase())

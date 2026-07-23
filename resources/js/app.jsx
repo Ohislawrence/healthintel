@@ -8,6 +8,8 @@ import AppLayout from './layouts/AppLayout';
 import Home from './screens/Home';
 import Login from './screens/auth/Login';
 import Register from './screens/auth/Register';
+import ForgotPassword from './screens/auth/ForgotPassword';
+import ResetPassword from './screens/auth/ResetPassword';
 import VerifyPhone from './screens/auth/VerifyPhone';
 import Dashboard from './screens/Dashboard';
 import HealthProfileOnboarding from './screens/onboarding/HealthProfile';
@@ -21,7 +23,6 @@ import CreditHistory from './screens/credits/CreditHistory';
 import SymptomChecker from './screens/symptoms/SymptomChecker';
 import ProviderDirectory from './screens/directory/ProviderDirectory';
 import ProviderDetail from './screens/directory/ProviderDetail';
-import SymptomResult from './screens/symptoms/SymptomResult';
 import InsuranceComparison from './screens/insurance/InsuranceComparison';
 import AdminLayout from './screens/admin/AdminLayout';
 import AdminDashboard from './screens/admin/AdminDashboard';
@@ -122,6 +123,8 @@ function App() {
                     <Route path="/" element={<Home />} />
                     <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
                     <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+                    <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
+                    <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
                     <Route path="/verify-phone" element={<GuestRoute><VerifyPhone /></GuestRoute>} />
                     <Route path="/onboarding" element={<ProtectedRoute><HealthProfileOnboarding /></ProtectedRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
@@ -133,7 +136,6 @@ function App() {
                     <Route path="/credits/buy" element={<ProtectedRoute><AppLayout><BuyCredits /></AppLayout></ProtectedRoute>} />
                     <Route path="/payment/callback" element={<PaymentCallback />} />
                     <Route path="/symptom-checker" element={<ProtectedRoute><AppLayout><SymptomChecker /></AppLayout></ProtectedRoute>} />
-                    <Route path="/symptom-checker/results" element={<ProtectedRoute><SymptomResult /></ProtectedRoute>} />
                     <Route path="/directory" element={<ProtectedRoute><AppLayout><ProviderDirectory /></AppLayout></ProtectedRoute>} />
                     <Route path="/providers/:slug" element={<ProtectedRoute><AppLayout><ProviderDetail /></AppLayout></ProtectedRoute>} />
                     <Route path="/insurance" element={<ProtectedRoute><AppLayout><InsuranceComparison /></AppLayout></ProtectedRoute>} />

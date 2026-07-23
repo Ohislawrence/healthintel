@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Services\CreditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 class AuthController extends BaseController
 {
@@ -79,6 +81,53 @@ class AuthController extends BaseController
         $request->user()->currentAccessToken()->delete();
 
         return $this->success(null, 'Logged out');
+    }
+
+    /**
+     * Send password reset link (forgot password).
+     */
+    public function forgotPassword(Request $request)
+    {
+        $request->validate(['email' => 'required|email']);
+
+        $status = Password::sendResetLink(
+            $request->only('email')
+        );
+
+        if ($status === Password::RESET_LINK_SENT) {
+            return $this->success(null, 'If that email exists, a password reset link has been sent.');
+        }
+
+        // Don't reveal whether the email exists — return same message
+        return $this->success(null, 'If that email exists, a password reset link has been sent.');
+    }
+
+    /**
+     * Reset password using token.
+     */
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => 'required|min:8|confirmed',
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                    'remember_token' => Str::random(60),
+                ])->save();
+            }
+        );
+
+        if ($status === Password::PASSWORD_RESET) {
+            return $this->success(null, 'Password has been reset successfully. You can now log in.');
+        }
+
+        return $this->error('Invalid or expired reset token.', 422);
     }
 
     private function formatUser(User $user): array

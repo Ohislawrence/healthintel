@@ -10,8 +10,8 @@ export default function CreditHistory() {
         queryKey: ['credit-ledger'],
         queryFn: () => api.get('/payment/summary'),
     });
-    const summary = data?.data || {};
-    const transactions = summary.transactions || [];
+    const summary = data?.data?.summary || {};
+    const transactions = summary?.transactions || [];
 
     return (
         <div className="space-y-5">
