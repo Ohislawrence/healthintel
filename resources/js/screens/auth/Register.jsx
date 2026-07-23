@@ -23,17 +23,14 @@ export default function Register() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(null);
-
         if (form.password !== form.password_confirmation) {
             setError('Passwords do not match.');
             return;
         }
-
         if (!form.consent_ndpr) {
             setError('You must consent to data processing to create an account.');
             return;
         }
-
         setLoading(true);
         try {
             await register(form);
@@ -49,114 +46,112 @@ export default function Register() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10">
-            <div className="w-full max-w-sm">
-                <Link to="/" className="block text-center text-2xl font-bold text-teal-600">
-                    Lab<span className="text-gray-800">Doc</span>
+        <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 py-10">
+            <div className="w-full max-w-sm animate-fade-in-up">
+                <Link to="/" className="block text-center">
+                    <span className="text-2xl font-extrabold tracking-tight text-teal-700">Health</span>
+                    <span className="text-2xl font-extrabold tracking-tight text-neutral-900">Intel</span>
                 </Link>
 
-                <h2 className="mt-8 text-center text-xl font-semibold text-gray-900">
-                    Create your account
-                </h2>
-                <p className="mt-2 text-center text-sm text-gray-500">
-                    Get 3 free credits to interpret your lab results.
-                </p>
+                <div className="mt-8 card p-6">
+                    <h2 className="text-xl font-bold text-neutral-900 text-center">Create your account</h2>
+                    <div className="mt-2 flex items-center justify-center">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-3 py-1 text-xs font-semibold text-teal-700">
+                            ✨ Get 3 free credits
+                        </span>
+                    </div>
 
-                <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                    {error && (
-                        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                            {error}
+                    <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+                        {error && (
+                            <div className="rounded-xl bg-danger-50 border border-danger-200 px-4 py-3 text-sm text-danger-700 font-medium">
+                                {error}
+                            </div>
+                        )}
+
+                        <div>
+                            <label htmlFor="name" className="text-sm font-semibold text-neutral-700">Full name</label>
+                            <input
+                                id="name"
+                                name="name"
+                                type="text"
+                                required
+                                value={form.name}
+                                onChange={handleChange}
+                                className="input-base mt-1.5"
+                                placeholder="John Doe"
+                            />
                         </div>
-                    )}
 
-                    <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                            Full name
-                        </label>
-                        <input
-                            id="name"
-                            name="name"
-                            type="text"
-                            required
-                            value={form.name}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
-                        />
-                    </div>
+                        <div>
+                            <label htmlFor="email" className="text-sm font-semibold text-neutral-700">Email</label>
+                            <input
+                                id="email"
+                                name="email"
+                                type="email"
+                                required
+                                value={form.email}
+                                onChange={handleChange}
+                                className="input-base mt-1.5"
+                                placeholder="you@example.com"
+                            />
+                        </div>
 
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                            Email
-                        </label>
-                        <input
-                            id="email"
-                            name="email"
-                            type="email"
-                            required
-                            value={form.email}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
-                        />
-                    </div>
+                        <div>
+                            <label htmlFor="password" className="text-sm font-semibold text-neutral-700">Password</label>
+                            <input
+                                id="password"
+                                name="password"
+                                type="password"
+                                required
+                                minLength={8}
+                                value={form.password}
+                                onChange={handleChange}
+                                className="input-base mt-1.5"
+                                placeholder="Min. 8 characters"
+                            />
+                        </div>
 
-                    <div>
-                        <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                            Password
-                        </label>
-                        <input
-                            id="password"
-                            name="password"
-                            type="password"
-                            required
-                            minLength={8}
-                            value={form.password}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
-                        />
-                    </div>
+                        <div>
+                            <label htmlFor="password_confirmation" className="text-sm font-semibold text-neutral-700">Confirm password</label>
+                            <input
+                                id="password_confirmation"
+                                name="password_confirmation"
+                                type="password"
+                                required
+                                value={form.password_confirmation}
+                                onChange={handleChange}
+                                className="input-base mt-1.5"
+                                placeholder="Repeat your password"
+                            />
+                        </div>
 
-                    <div>
-                        <label htmlFor="password_confirmation" className="block text-sm font-medium text-gray-700">
-                            Confirm password
-                        </label>
-                        <input
-                            id="password_confirmation"
-                            name="password_confirmation"
-                            type="password"
-                            required
-                            value={form.password_confirmation}
-                            onChange={handleChange}
-                            className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
-                        />
-                    </div>
+                        <div className="flex items-start gap-2.5">
+                            <input
+                                id="consent_ndpr"
+                                name="consent_ndpr"
+                                type="checkbox"
+                                checked={form.consent_ndpr}
+                                onChange={handleChange}
+                                className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-teal-600 focus:ring-teal-500"
+                            />
+                            <label htmlFor="consent_ndpr" className="text-xs text-neutral-500 leading-relaxed">
+                                I consent to HealthIntel processing my health-related data in accordance with the Nigeria Data Protection Regulation (NDPR).
+                            </label>
+                        </div>
 
-                    <div className="flex items-start gap-2">
-                        <input
-                            id="consent_ndpr"
-                            name="consent_ndpr"
-                            type="checkbox"
-                            checked={form.consent_ndpr}
-                            onChange={handleChange}
-                            className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                        />
-                        <label htmlFor="consent_ndpr" className="text-xs text-gray-500">
-                            I consent to LabDoc processing my health-related data in accordance with
-                            the Nigeria Data Protection Regulation (NDPR).
-                        </label>
-                    </div>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="btn btn-primary w-full"
+                        >
+                            {loading ? 'Creating account...' : 'Create account'}
+                        </button>
+                    </form>
+                </div>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
-                    >
-                        {loading ? 'Creating account...' : 'Create account'}
-                    </button>
-                </form>
-
-                <p className="mt-6 text-center text-sm text-gray-600">
+                <p className="mt-6 text-center text-sm text-neutral-500">
                     Already have an account?{' '}
-                    <Link to="/login" className="font-semibold text-teal-600 hover:text-teal-700">
+                    <Link to="/login" className="font-bold text-teal-700 hover:text-teal-800">
                         Sign in
                     </Link>
                 </p>

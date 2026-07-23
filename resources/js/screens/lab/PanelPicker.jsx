@@ -1,73 +1,59 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../lib/api';
 
 export default function PanelPicker() {
-    const navigate = useNavigate();
-    const [search, setSearch] = useState('');
-
     const { data, isLoading } = useQuery({
         queryKey: ['panels'],
         queryFn: () => api.get('/panels'),
     });
-
-    const panels = data?.data?.panels || [];
-
-    const filtered = panels.filter((p) =>
-        p.name.toLowerCase().includes(search.toLowerCase()),
-    );
+    const panels = data?.data || [];
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-5">
             <div>
-                <h2 className="text-xl font-semibold text-gray-900">
-                    Choose a Lab Panel
-                </h2>
-                <p className="mt-1 text-sm text-gray-500">
-                    Select a test panel to submit your results.
-                </p>
+                <p className="text-2xl font-extrabold text-neutral-900 tracking-tight">Lab Results</p>
+                <p className="text-sm font-medium text-neutral-500 mt-0.5">Choose a test panel or upload a PDF</p>
             </div>
 
-            <input
-                type="text"
-                placeholder="Search panels..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
-            />
-
-            {isLoading ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                    {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-100" />
-                    ))}
+            {/* PDF Upload Card */}
+            <Link to="/lab-results" className="card p-5 flex items-center gap-4 hover:shadow-md hover:border-teal-200 transition-all border-dashed">
+                <div className="w-12 h-12 rounded-xl gradient-teal flex items-center justify-center text-xl text-white">⇧</div>
+                <div className="flex-1">
+                    <p className="text-sm font-bold text-neutral-900">Upload a PDF Report</p>
+                    <p className="text-xs text-neutral-500 mt-0.5">We'll extract and interpret your lab values</p>
                 </div>
-            ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                    {filtered.map((panel) => (
-                        <button
-                            key={panel.id}
-                            onClick={() => navigate(`/lab-results/${panel.slug}`)}
-                            className="text-left rounded-xl border border-gray-200 bg-white p-5 hover:border-teal-300 hover:shadow-sm transition-all"
-                        >
-                            <h3 className="font-semibold text-gray-900">{panel.name}</h3>
-                            <p className="mt-1 text-sm text-gray-500 line-clamp-2">
-                                {panel.description}
-                            </p>
-                            <span className="mt-2 inline-block text-xs text-teal-600">
-                                {panel.tests?.length || 0} tests
-                            </span>
-                        </button>
-                    ))}
-                </div>
-            )}
+                <span className="text-xl text-neutral-300 font-bold">›</span>
+            </Link>
 
-            {!isLoading && filtered.length === 0 && (
-                <p className="text-center text-sm text-gray-500 py-10">
-                    No panels match your search.
-                </p>
-            )}
+            {/* Panel Grid */}
+            <div>
+                <p className="text-sm font-bold text-neutral-900 mb-3">Or pick a test panel</p>
+                {isLoading ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[1,2,3,4].map(i => (
+                            <div key={i} className="card p-4 skeleton h-24 rounded-xl" />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {panels.map((panel) => (
+                            <Link
+                                key={panel.slug}
+                                to={`/lab-results/${panel.slug}`}
+                                className="card p-4 hover:shadow-md hover:border-teal-200 transition-all"
+                            >
+                                <p className="text-sm font-bold text-neutral-900">{panel.name}</p>
+                                <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{panel.description || `Enter your ${panel.name} values for instant interpretation.`}</p>
+                                <p className="text-[10px] font-bold text-teal-700 mt-2 uppercase tracking-wider">
+                                    {panel.test_count || 'Multiple'} tests →
+                                </p>
+                            </Link>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

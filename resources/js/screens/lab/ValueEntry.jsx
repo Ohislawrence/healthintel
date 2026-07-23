@@ -1,112 +1,88 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../../lib/api';
-import Disclaimer from '../../components/ui/Disclaimer';
+import useAuthStore from '../../stores/authStore';
 
 export default function ValueEntry() {
     const { slug } = useParams();
     const navigate = useNavigate();
+    const { fetchUser } = useAuthStore();
     const [values, setValues] = useState({});
     const [error, setError] = useState(null);
 
-    const { data, isLoading } = useQuery({
+    const { data: panelData, isLoading } = useQuery({
         queryKey: ['panel', slug],
         queryFn: () => api.get(`/panels/${slug}`),
-        enabled: !!slug,
     });
+    const panel = panelData?.data || {};
+    const tests = panel.tests || [];
 
-    const panel = data?.data?.panel;
-    const tests = panel?.tests || [];
+    useEffect(() => {
+        if (tests.length > 0) {
+            const initial = {};
+            tests.forEach(t => { initial[t.slug] = ''; });
+            setValues(initial);
+        }
+    }, [tests.length]);
 
     const submitMutation = useMutation({
-        mutationFn: (payload) => api.post('/lab-submit', payload),
-        onSuccess: (res) => {
-            navigate(`/lab-results/${res.data.submission.id}`);
+        mutationFn: (data) => api.post('/submissions', data),
+        onSuccess: async (res) => {
+            await fetchUser();
+            navigate(`/lab-results/submission/${res.data.submission.id}`);
         },
-        onError: (err) => {
-            setError(err?.message || 'Submission failed. Please try again.');
-        },
+        onError: (err) => setError(err?.message || 'Submission failed.'),
     });
-
-    const handleChange = (testSlug, value) => {
-        setValues((prev) => ({ ...prev, [testSlug]: value }));
-    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
         setError(null);
-
-        const payload = {
-            panel_slug: slug,
-            values: Object.entries(values).map(([test_slug, value]) => ({
-                test_slug,
-                value: parseFloat(value),
-            })),
-        };
-
-        submitMutation.mutate(payload);
+        const testValues = Object.entries(values).map(([testSlug, val]) => ({
+            test_slug: testSlug,
+            value: parseFloat(val),
+        }));
+        submitMutation.mutate({
+            test_panel_slug: slug,
+            test_values: testValues,
+        });
     };
 
-    const isComplete = tests.length > 0 && tests.every((t) => values[t.slug] !== undefined && values[t.slug] !== '');
-
     if (isLoading) {
-        return (
-            <div className="space-y-4 animate-pulse">
-                <div className="h-8 w-48 rounded bg-gray-100" />
-                <div className="h-6 w-72 rounded bg-gray-100" />
-                {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="h-16 rounded-xl bg-gray-100" />
-                ))}
-            </div>
-        );
+        return <div className="card p-8 text-center"><div className="skeleton h-6 w-48 mx-auto rounded" /></div>;
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-5 max-w-lg mx-auto">
             <div>
-                <h2 className="text-xl font-semibold text-gray-900">{panel?.name}</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                    Enter your test values below. All fields are required.
-                </p>
+                <button onClick={() => navigate('/lab-results')} className="text-sm font-semibold text-neutral-400 hover:text-neutral-600 mb-3 block">‹ Back</button>
+                <p className="text-2xl font-extrabold text-neutral-900 tracking-tight">{panel.name}</p>
+                <p className="text-sm text-neutral-500 mt-0.5">Enter your lab values below</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
-                    <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+                    <div className="rounded-xl bg-danger-50 border border-danger-200 px-4 py-3 text-sm text-danger-700 font-medium">{error}</div>
                 )}
-
                 {tests.map((test) => (
-                    <div key={test.slug} className="rounded-xl border border-gray-200 bg-white p-4">
-                        <label htmlFor={test.slug} className="block text-sm font-medium text-gray-700">
-                            {test.name}
-                        </label>
-                        <div className="mt-1 flex items-center gap-2">
-                            <input
-                                id={test.slug}
-                                type="number"
-                                step="any"
-                                required
-                                value={values[test.slug] || ''}
-                                onChange={(e) => handleChange(test.slug, e.target.value)}
-                                className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
-                                placeholder={`Enter value`}
-                            />
-                            <span className="text-sm text-gray-500 w-20">{test.unit}</span>
-                        </div>
+                    <div key={test.slug} className="card p-4">
+                        <label className="text-sm font-bold text-neutral-900">{test.name}</label>
+                        <p className="text-xs text-neutral-400 mt-0.5 mb-2">{test.unit && `Unit: ${test.unit}`}</p>
+                        <input
+                            type="number"
+                            step="any"
+                            value={values[test.slug] || ''}
+                            onChange={(e) => setValues({ ...values, [test.slug]: e.target.value })}
+                            className="input-base"
+                            placeholder={`Enter ${test.name} value`}
+                            required
+                        />
                     </div>
                 ))}
-
-                <button
-                    type="submit"
-                    disabled={!isComplete || submitMutation.isPending}
-                    className="w-full rounded-lg bg-teal-600 px-4 py-3 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
-                >
-                    {submitMutation.isPending ? 'Submitting...' : 'Submit for interpretation (2 credits)'}
+                <button type="submit" disabled={submitMutation.isPending} className="btn btn-primary w-full">
+                    {submitMutation.isPending ? 'Submitting...' : `Submit Results (Costs ${panel.credits_per_submission || 3} credits)`}
                 </button>
             </form>
-
-            <Disclaimer />
         </div>
     );
 }

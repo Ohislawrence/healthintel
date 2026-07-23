@@ -1,89 +1,84 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../../lib/api';
 import useAuthStore from '../../stores/authStore';
 
 export default function BuyCredits() {
+    const navigate = useNavigate();
     const { user, fetchUser } = useAuthStore();
-    const [loading, setLoading] = useState(null); // package id being purchased
+    const [selectedPackage, setSelectedPackage] = useState(null);
     const [error, setError] = useState(null);
 
     const { data, isLoading } = useQuery({
-        queryKey: ['credit-packages'],
+        queryKey: ['packages'],
         queryFn: () => api.get('/payment/packages'),
     });
+    const packages = data?.data || [];
 
-    const packages = data?.data?.packages || [];
-
-    const handleBuy = async (pkg) => {
-        setLoading(pkg.id);
-        setError(null);
-
-        try {
-            const res = await api.post('/payment/initialize', { package_id: pkg.id });
-            const authUrl = res.data.authorization_url;
-
-            if (authUrl) {
-                window.location.href = authUrl;
-            } else {
-                setError('Could not start payment. Please try again.');
-            }
-        } catch (err) {
-            setError(err?.message || 'Payment initialization failed.');
-        } finally {
-            setLoading(null);
-        }
-    };
+    const initMutation = useMutation({
+        mutationFn: (pkgId) => api.post('/payment/initialize', { package_id: pkgId }),
+        onSuccess: async (res) => {
+            await fetchUser();
+            navigate(`/payment/callback?ref=${res.data.reference}`);
+        },
+        onError: (err) => setError(err?.message || 'Payment initialization failed.'),
+    });
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-5 max-w-lg mx-auto">
+            <button onClick={() => navigate('/credits')} className="text-sm font-semibold text-neutral-400 hover:text-neutral-600 block">‹ Back</button>
+
             <div>
-                <h2 className="text-xl font-semibold text-gray-900">Buy Credits</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                    Credits are used for lab result interpretations and other features. Your balance:{' '}
-                    <span className="font-semibold text-teal-600">{user?.credits ?? 0}</span>
-                </p>
+                <p className="text-2xl font-extrabold text-neutral-900 tracking-tight">Buy Credits</p>
+                <p className="text-sm text-neutral-500 mt-0.5">Top up your account to interpret lab results</p>
+            </div>
+
+            {/* Current Balance */}
+            <div className="card p-4 text-center bg-teal-50 border-teal-100">
+                <span className="text-xs font-bold text-teal-600 uppercase tracking-wider">Current Balance</span>
+                <p className="text-3xl font-extrabold text-teal-700 mt-1">{user?.credits ?? 0}</p>
             </div>
 
             {error && (
-                <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+                <div className="rounded-xl bg-danger-50 border border-danger-200 px-4 py-3 text-sm text-danger-700 font-medium">{error}</div>
             )}
 
             {isLoading ? (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="h-40 animate-pulse rounded-xl bg-gray-100" />
-                    ))}
+                <div className="space-y-3">
+                    {[1,2,3].map(i => <div key={i} className="card p-4 skeleton h-20 rounded-xl" />)}
                 </div>
             ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-3">
                     {packages.map((pkg) => (
-                        <div
+                        <button
                             key={pkg.id}
-                            className="rounded-xl border border-gray-200 bg-white p-6 text-center"
+                            onClick={() => setSelectedPackage(pkg.id)}
+                            className={`w-full card p-4 text-left hover:shadow-md transition-all ${
+                                selectedPackage === pkg.id ? 'border-teal-700 ring-2 ring-teal-100' : ''
+                            }`}
                         >
-                            <p className="text-3xl font-bold text-teal-600">{pkg.credits}</p>
-                            <p className="mt-1 text-sm text-gray-500">Credits</p>
-                            <p className="mt-3 text-2xl font-bold text-gray-900">
-                                {pkg.price_naira
-                                    ? `₦${pkg.price_naira.toLocaleString()}`
-                                    : pkg.price_formatted || `₦${(pkg.price_kobo / 100).toLocaleString()}`}
-                            </p>
-                            <button
-                                onClick={() => handleBuy(pkg)}
-                                disabled={loading === pkg.id}
-                                className="mt-4 w-full rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
-                            >
-                                {loading === pkg.id ? 'Starting...' : 'Buy now'}
-                            </button>
-                        </div>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-bold text-neutral-900">{pkg.name}</p>
+                                    <p className="text-xs text-neutral-500 mt-0.5">{pkg.description || `${pkg.credits} credits`}</p>
+                                </div>
+                                <span className="text-xl font-extrabold text-teal-700">
+                                    ₦{parseFloat(pkg.price_ngn || 0).toLocaleString()}
+                                </span>
+                            </div>
+                        </button>
                     ))}
                 </div>
             )}
 
-            <p className="text-center text-xs text-gray-400">
-                Payments are processed securely via Paystack. Your card details are never stored on our servers.
-            </p>
+            <button
+                onClick={() => selectedPackage && initMutation.mutate(selectedPackage)}
+                disabled={!selectedPackage || initMutation.isPending}
+                className="btn btn-primary w-full"
+            >
+                {initMutation.isPending ? 'Initializing...' : 'Pay with Paystack'}
+            </button>
         </div>
     );
 }

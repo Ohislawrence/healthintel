@@ -1,165 +1,158 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useAuthStore from '../../stores/authStore';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import api from '../../lib/api';
+import useAuthStore from '../../stores/authStore';
 
-export default function HealthProfileOnboarding() {
-    const { user, fetchUser } = useAuthStore();
+export default function HealthProfile() {
     const navigate = useNavigate();
+    const { user, fetchUser } = useAuthStore();
+    const existing = user?.health_profile || {};
+
     const [form, setForm] = useState({
-        date_of_birth: user?.health_profile?.date_of_birth || '',
-        sex: user?.health_profile?.sex || '',
-        is_pregnant: user?.health_profile?.is_pregnant || false,
+        date_of_birth: existing.date_of_birth || '',
+        sex: existing.sex || '',
+        is_pregnant: existing.is_pregnant || false,
+        height_cm: existing.height_cm || '',
+        weight_kg: existing.weight_kg || '',
+        blood_type: existing.blood_type || '',
+        medical_conditions: existing.medical_conditions || '',
+        current_medications: existing.current_medications || '',
     });
+    const [step, setStep] = useState(1);
     const [error, setError] = useState(null);
-    const [loading, setLoading] = useState(false);
+
+    const updateMutation = useMutation({
+        mutationFn: (data) => api.put('/profile', data),
+        onSuccess: async () => {
+            await fetchUser();
+            navigate('/dashboard');
+        },
+        onError: (err) => setError(err?.message || 'Failed to save profile.'),
+    });
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
-        setForm({ ...form, [name]: type === 'checkbox' ? checked : value });
+        setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = (e) => {
         e.preventDefault();
         setError(null);
-        setLoading(true);
-
-        try {
-            await api.put('/health-profile', {
-                ...form,
-                profile_completed: !!form.date_of_birth && !!form.sex,
-            });
-            await fetchUser();
-            navigate('/dashboard');
-        } catch (err) {
-            setError(err?.message || 'Failed to save profile');
-        } finally {
-            setLoading(false);
-        }
+        updateMutation.mutate(form);
     };
 
-    const handleSkip = async () => {
-        // Save partial profile as incomplete
-        try {
-            await api.put('/health-profile', {
-                date_of_birth: form.date_of_birth || null,
-                sex: form.sex || null,
-                is_pregnant: form.sex === 'female' ? form.is_pregnant : false,
-                profile_completed: false,
-            });
-        } catch {
-            // silent
-        }
-        await fetchUser();
-        navigate('/dashboard');
-    };
+    const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10">
-            <div className="w-full max-w-sm">
-                <h2 className="text-center text-2xl font-bold text-teal-600">
-                    Lab<span className="text-gray-800">Doc</span>
-                </h2>
-
-                <div className="mt-8">
-                    <h3 className="text-xl font-semibold text-gray-900">
-                        Help us personalise your results
-                    </h3>
-                    <p className="mt-2 text-sm text-gray-500">
-                        Reference ranges for lab tests vary by age, sex, and pregnancy status.
-                        This helps us show you more accurate interpretations.
-                    </p>
-                </div>
-
-                <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                    {error && (
-                        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                            {error}
-                        </div>
-                    )}
-
-                    <div>
-                        <label htmlFor="date_of_birth" className="block text-sm font-medium text-gray-700">
-                            Date of birth
-                        </label>
-                        <input
-                            id="date_of_birth"
-                            name="date_of_birth"
-                            type="date"
-                            value={form.date_of_birth}
-                            onChange={handleChange}
-                            max={new Date().toISOString().split('T')[0]}
-                            className="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Sex
-                        </label>
-                        <div className="flex gap-4">
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="radio"
-                                    name="sex"
-                                    value="male"
-                                    checked={form.sex === 'male'}
-                                    onChange={handleChange}
-                                    className="text-teal-600 focus:ring-teal-500"
-                                />
-                                <span className="text-sm text-gray-700">Male</span>
-                            </label>
-                            <label className="flex items-center gap-2">
-                                <input
-                                    type="radio"
-                                    name="sex"
-                                    value="female"
-                                    checked={form.sex === 'female'}
-                                    onChange={handleChange}
-                                    className="text-teal-600 focus:ring-teal-500"
-                                />
-                                <span className="text-sm text-gray-700">Female</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    {form.sex === 'female' && (
-                        <div className="flex items-center gap-2">
-                            <input
-                                id="is_pregnant"
-                                name="is_pregnant"
-                                type="checkbox"
-                                checked={form.is_pregnant}
-                                onChange={handleChange}
-                                className="h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                            />
-                            <label htmlFor="is_pregnant" className="text-sm text-gray-700">
-                                I am currently pregnant
-                            </label>
-                        </div>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
-                    >
-                        {loading ? 'Saving...' : 'Save & continue'}
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={handleSkip}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                    >
-                        Skip for now
-                    </button>
-
-                    <p className="text-center text-xs text-gray-400">
-                        You can update this later from your dashboard.
-                    </p>
-                </form>
+        <div className="max-w-lg mx-auto space-y-5">
+            <div>
+                <p className="text-2xl font-extrabold text-neutral-900 tracking-tight">
+                    {existing.profile_completed ? 'Health Profile' : 'Complete Your Profile'}
+                </p>
+                <p className="text-sm text-neutral-500 mt-0.5">
+                    This helps us provide more accurate lab result interpretations
+                </p>
             </div>
+
+            {/* Progress Steps */}
+            <div className="flex gap-2">
+                {[1, 2, 3].map((s) => (
+                    <div key={s} className={`flex-1 h-1 rounded-full transition-all ${s <= step ? 'bg-teal-700' : 'bg-neutral-200'}`} />
+                ))}
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                    <div className="rounded-xl bg-danger-50 border border-danger-200 px-4 py-3 text-sm text-danger-700 font-medium">{error}</div>
+                )}
+
+                {step === 1 && (
+                    <div className="card p-5 space-y-4">
+                        <p className="text-sm font-bold text-neutral-900">Basic Information</p>
+                        <div>
+                            <label className="text-sm font-semibold text-neutral-700">Date of Birth</label>
+                            <input type="date" name="date_of_birth" value={form.date_of_birth} onChange={handleChange} className="input-base mt-1.5" />
+                        </div>
+                        <div>
+                            <label className="text-sm font-semibold text-neutral-700">Sex</label>
+                            <select name="sex" value={form.sex} onChange={handleChange} className="input-base mt-1.5">
+                                <option value="">Select...</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                            </select>
+                        </div>
+                        {form.sex === 'female' && (
+                            <div className="flex items-center gap-2.5">
+                                <input type="checkbox" id="is_pregnant" name="is_pregnant" checked={form.is_pregnant} onChange={handleChange} className="h-4 w-4 rounded border-neutral-300 text-teal-600" />
+                                <label htmlFor="is_pregnant" className="text-sm text-neutral-600">I am pregnant</label>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {step === 2 && (
+                    <div className="card p-5 space-y-4">
+                        <p className="text-sm font-bold text-neutral-900">Body Measurements</p>
+                        <div>
+                            <label className="text-sm font-semibold text-neutral-700">Height (cm)</label>
+                            <input type="number" name="height_cm" value={form.height_cm} onChange={handleChange} step="0.1" className="input-base mt-1.5" placeholder="e.g. 170" />
+                        </div>
+                        <div>
+                            <label className="text-sm font-semibold text-neutral-700">Weight (kg)</label>
+                            <input type="number" name="weight_kg" value={form.weight_kg} onChange={handleChange} step="0.1" className="input-base mt-1.5" placeholder="e.g. 65" />
+                        </div>
+                        <div>
+                            <label className="text-sm font-semibold text-neutral-700">Blood Type</label>
+                            <div className="grid grid-cols-4 gap-2 mt-1.5">
+                                {bloodTypes.map(bt => (
+                                    <button
+                                        key={bt}
+                                        type="button"
+                                        onClick={() => setForm(prev => ({ ...prev, blood_type: bt }))}
+                                        className={`p-2 rounded-lg text-sm font-bold border transition-all ${
+                                            form.blood_type === bt ? 'bg-teal-50 border-teal-300 text-teal-700' : 'bg-neutral-50 border-neutral-200 text-neutral-500 hover:border-teal-200'
+                                        }`}
+                                    >
+                                        {bt}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {step === 3 && (
+                    <div className="card p-5 space-y-4">
+                        <p className="text-sm font-bold text-neutral-900">Medical History</p>
+                        <div>
+                            <label className="text-sm font-semibold text-neutral-700">Medical Conditions</label>
+                            <textarea name="medical_conditions" value={form.medical_conditions} onChange={handleChange} rows={3} className="input-base mt-1.5" placeholder="e.g. Diabetes, Hypertension..." />
+                        </div>
+                        <div>
+                            <label className="text-sm font-semibold text-neutral-700">Current Medications</label>
+                            <textarea name="current_medications" value={form.current_medications} onChange={handleChange} rows={3} className="input-base mt-1.5" placeholder="e.g. Metformin 500mg..." />
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex gap-3">
+                    {step > 1 && (
+                        <button type="button" onClick={() => setStep(s => s - 1)} className="btn btn-outline flex-1">
+                            Back
+                        </button>
+                    )}
+                    {step < 3 ? (
+                        <button type="button" onClick={() => setStep(s => s + 1)} className="btn btn-primary flex-1">
+                            Continue
+                        </button>
+                    ) : (
+                        <button type="submit" disabled={updateMutation.isPending} className="btn btn-primary flex-1">
+                            {updateMutation.isPending ? 'Saving...' : 'Save Profile'}
+                        </button>
+                    )}
+                </div>
+            </form>
         </div>
     );
 }
