@@ -15,6 +15,7 @@ class DeepSeekService
     {
         $apiKey = config('services.deepseek.api_key')
             ?: ($_ENV['DEEPSEEK_API_KEY'] ?? getenv('DEEPSEEK_API_KEY'))
+            ?: $this->readEnvFile('DEEPSEEK_API_KEY')
             ?: null;
 
         if (empty($apiKey)) {

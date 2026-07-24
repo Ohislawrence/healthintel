@@ -15,8 +15,38 @@ class PaystackService
     {
         $this->secretKey = config('services.paystack.secret_key')
             ?: ($_ENV['PAYSTACK_SECRET_KEY'] ?? getenv('PAYSTACK_SECRET_KEY'))
+            ?: $this->readEnvFile('PAYSTACK_SECRET_KEY')
             ?: null;
         $this->baseUrl = config('services.paystack.base_url', 'https://api.paystack.co');
+    }
+
+    /**
+     * Read a value directly from the .env file as a last resort.
+     * Needed when config:cache is active (Laravel stops loading .env completely).
+     */
+    private function readEnvFile(string $key): ?string
+    {
+        $path = base_path('.env');
+        if (!file_exists($path)) {
+            return null;
+        }
+        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            if (str_starts_with($line, $key . '=')) {
+                $value = trim(substr($line, strlen($key) + 1));
+                // Remove surrounding quotes
+                if ((str_starts_with($value, '"') && str_ends_with($value, '"')) ||
+                    (str_starts_with($value, "'") && str_ends_with($value, "'"))) {
+                    $value = substr($value, 1, -1);
+                }
+                return $value !== '' ? $value : null;
+            }
+        }
+        return null;
     }
 
     /**
