@@ -22,3 +22,4 @@ Route::get('/admin/{any?}', function () {
 Route::get('/{any?}', function () {
     return view('app');
 })->where('any', '^(?!api).*$');
+

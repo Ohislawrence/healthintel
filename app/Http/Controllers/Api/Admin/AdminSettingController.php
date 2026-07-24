@@ -39,14 +39,8 @@ class AdminSettingController extends BaseController
         // 1. config() — works when config cache was created AFTER keys existed
         // 2. $_ENV / getenv() — works if server sets them as real env vars
         // 3. Read .env file directly — always works as last resort
-        $paystackKey = config('services.paystack.secret_key')
-            ?: ($_ENV['PAYSTACK_SECRET_KEY'] ?? getenv('PAYSTACK_SECRET_KEY'))
-            ?: $this->readEnvFile('PAYSTACK_SECRET_KEY')
-            ?: null;
-        $flutterwaveKey = config('services.flutterwave.secret_key')
-            ?: ($_ENV['FLUTTERWAVE_SECRET_KEY'] ?? getenv('FLUTTERWAVE_SECRET_KEY'))
-            ?: $this->readEnvFile('FLUTTERWAVE_SECRET_KEY')
-            ?: null;
+        $paystackKey = config('services.paystack.secret_key');
+        $flutterwaveKey = config('services.flutterwave.secret_key');
 
         $paystackConfigured = !empty($paystackKey);
         $flutterwaveConfigured = !empty($flutterwaveKey);

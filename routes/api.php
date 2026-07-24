@@ -124,3 +124,5 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::put('/partner/listing', [PartnerPortalController::class, 'updateListing']);
     Route::post('/partner/regenerate-code', [PartnerPortalController::class, 'regenerateAccessCode']);
 });
+
+

@@ -14,10 +14,7 @@ class FlutterwaveService
 
     public function __construct()
     {
-        $this->secretKey = config('services.flutterwave.secret_key')
-            ?: ($_ENV['FLUTTERWAVE_SECRET_KEY'] ?? getenv('FLUTTERWAVE_SECRET_KEY'))
-            ?: $this->readEnvFile('FLUTTERWAVE_SECRET_KEY')
-            ?: null;
+        $this->secretKey = config('services.flutterwave.secret_key');
         $this->baseUrl = config('services.flutterwave.base_url', 'https://api.flutterwave.com/v3');
     }
 
