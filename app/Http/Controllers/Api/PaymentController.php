@@ -77,15 +77,50 @@ class PaymentController extends BaseController
         $payload = $request->getContent();
 
         // Verify Paystack signature
-        $paystack = app(\App\Services\PaystackService::class);
         if (!hash_equals(hash_hmac('sha512', $payload, config('services.paystack.secret_key')), $signature ?? '')) {
             return response()->json(['status' => 'invalid_signature'], 401);
         }
 
         $data = json_decode($payload, true);
-        $this->paymentService->handleWebhook($data);
+        $this->paymentService->handleWebhook($data, 'paystack');
 
         return response()->json(['status' => 'received']);
+    }
+
+    /**
+     * Handle Flutterwave webhook.
+     */
+    public function flutterwaveWebhook(Request $request)
+    {
+        $signature = $request->header('verif-hash');
+        $payload = $request->getContent();
+
+        // Verify Flutterwave signature using secret hash
+        $flutterwave = app(\App\Services\FlutterwaveService::class);
+        $secretHash = config('services.flutterwave.secret_hash');
+
+        if ($secretHash && !hash_equals($secretHash, $signature ?? '')) {
+            return response()->json(['status' => 'invalid_signature'], 401);
+        }
+
+        $data = json_decode($payload, true);
+        $this->paymentService->handleWebhook($data, 'flutterwave');
+
+        return response()->json(['status' => 'received']);
+    }
+
+    /**
+     * Get active payment gateway (for mobile app to know which provider to display).
+     */
+    public function gateway(Request $request)
+    {
+        $gateway = $this->paymentService->getActiveGateway();
+
+        return $this->success([
+            'gateway' => $gateway,
+            'is_flutterwave' => $gateway === 'flutterwave',
+            'is_paystack' => $gateway === 'paystack',
+        ]);
     }
 
     /**

@@ -29,6 +29,47 @@ class AdminSettingController extends BaseController
     }
 
     /**
+     * Get payment gateway configuration info.
+     */
+    public function paymentGatewayInfo()
+    {
+        $activeGateway = Setting::getValue('payment.gateway', 'paystack');
+
+        $paystackConfigured = !empty(config('services.paystack.secret_key'));
+        $flutterwaveConfigured = !empty(config('services.flutterwave.secret_key'));
+
+        return $this->success([
+            'active_gateway' => $activeGateway,
+            'gateways' => [
+                'paystack' => [
+                    'name' => 'Paystack',
+                    'configured' => $paystackConfigured,
+                ],
+                'flutterwave' => [
+                    'name' => 'Flutterwave',
+                    'configured' => $flutterwaveConfigured,
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Set the active payment gateway.
+     */
+    public function setPaymentGateway(Request $request)
+    {
+        $validated = $request->validate([
+            'gateway' => ['required', 'string', 'in:paystack,flutterwave'],
+        ]);
+
+        Setting::setValue('payment.gateway', $validated['gateway']);
+
+        return $this->success([
+            'gateway' => $validated['gateway'],
+        ], 'Payment gateway updated successfully');
+    }
+
+    /**
      * Update a single setting.
      */
     public function update(Request $request, Setting $setting)

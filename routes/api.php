@@ -48,8 +48,9 @@ Route::get('/panels/{slug}', [LabSubmissionController::class, 'panelShow']);
 // Symptoms (public listing)
 Route::get('/symptoms', [SymptomCheckerController::class, 'index']);
 
-// Payments (Paystack webhook is public, require no auth)
+// Payments (Paystack & Flutterwave webhooks are public, require no auth)
 Route::post('/payment/webhook', [PaymentController::class, 'webhook']);
+Route::post('/payment/webhook/flutterwave', [PaymentController::class, 'flutterwaveWebhook']);
 
 // Partner portal login (public, access-code based)
 Route::post('/partner/login', [PartnerPortalController::class, 'login'])
@@ -104,6 +105,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('/payment/initialize', [PaymentController::class, 'initialize']);
     Route::get('/payment/verify', [PaymentController::class, 'verify']);
     Route::get('/payment/summary', [PaymentController::class, 'summary']);
+    Route::get('/payment/gateway', [PaymentController::class, 'gateway']);
 
     // User Feedback
     Route::post('/feedback', [FeedbackController::class, 'store']);

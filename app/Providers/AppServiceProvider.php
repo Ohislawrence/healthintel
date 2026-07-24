@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\CreditService;
 use App\Services\PaymentService;
 use App\Services\PaystackService;
+use App\Services\FlutterwaveService;
 use App\Services\ReferralService; // ADDED
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(CreditService::class);
         $this->app->singleton(PaystackService::class);
+        $this->app->singleton(FlutterwaveService::class);
         $this->app->singleton(PaymentService::class);
         $this->app->singleton(ReferralService::class); // ADDED
     }

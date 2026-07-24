@@ -10,35 +10,59 @@ class PaymentService
 {
     public function __construct(
         private PaystackService $paystack,
+        private FlutterwaveService $flutterwave,
         private CreditService $credits,
     ) {}
 
     /**
-     * Create a payment record, initialize with Paystack, return auth URL.
+     * Get the active payment gateway based on admin setting.
+     */
+    public function getActiveGateway(): string
+    {
+        return \App\Models\Setting::getValue('payment.gateway', 'paystack');
+    }
+
+    /**
+     * Create a payment record, initialize with the active gateway, return auth URL.
      */
     public function initialize(User $user, CreditPackage $package, string $callbackUrl): ?string
     {
-        if (!$this->paystack->isConfigured()) {
-            \Illuminate\Support\Facades\Log::warning('Paystack not configured — skipping payment initialization.');
-            return null;
-        }
+        $gateway = $this->getActiveGateway();
+
+        $providerName = $gateway === 'flutterwave' ? 'flutterwave' : 'paystack';
 
         $payment = Payment::create([
             'user_id' => $user->id,
             'purchasable_type' => CreditPackage::class,
             'purchasable_id' => $package->id,
-            'provider' => 'paystack',
+            'provider' => $providerName,
             'reference' => 'LD-' . now()->format('YmdHis') . '-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8)),
             'amount_kobo' => $package->price_kobo,
             'currency' => $package->currency,
             'status' => 'pending',
         ]);
 
+        if ($gateway === 'flutterwave') {
+            if (!$this->flutterwave->isConfigured()) {
+                \Illuminate\Support\Facades\Log::warning('Flutterwave not configured — skipping payment initialization.');
+                $payment->update(['status' => 'failed']);
+                return null;
+            }
+            return $this->flutterwave->initialize($payment, $user, $callbackUrl);
+        }
+
+        // Default: Paystack
+        if (!$this->paystack->isConfigured()) {
+            \Illuminate\Support\Facades\Log::warning('Paystack not configured — skipping payment initialization.');
+            $payment->update(['status' => 'failed']);
+            return null;
+        }
         return $this->paystack->initialize($payment, $user, $callbackUrl);
     }
 
     /**
      * Verify a payment and grant credits on success.
+     * Works for both Paystack and Flutterwave.
      */
     public function verify(string $reference): Payment
     {
@@ -49,14 +73,25 @@ class PaymentService
             return $payment;
         }
 
-        $result = $this->paystack->verify($reference);
+        // Use the correct provider to verify
+        $result = match ($payment->provider) {
+            'flutterwave' => $this->flutterwave->verify($reference),
+            default => $this->paystack->verify($reference),
+        };
 
         $payment->update([
             'provider_response' => array_merge($payment->provider_response ?? [], $result),
             'webhook_log' => $result,
         ]);
 
-        if (($result['data']['status'] ?? null) === 'success') {
+        // Detect success status from the provider response
+        $isSuccess = match ($payment->provider) {
+            'flutterwave' => ($result['data']['status'] ?? null) === 'successful'
+                || ($result['status'] ?? null) === 'success',
+            default => ($result['data']['status'] ?? null) === 'success',
+        };
+
+        if ($isSuccess) {
             $payment->update([
                 'status' => 'success',
                 'paid_at' => now(),
@@ -72,9 +107,22 @@ class PaymentService
     }
 
     /**
+     * Handle webhook event from either Paystack or Flutterwave.
+     */
+    public function handleWebhook(array $payload, string $provider = 'paystack'): void
+    {
+        if ($provider === 'flutterwave') {
+            $this->handleFlutterwaveWebhook($payload);
+            return;
+        }
+
+        $this->handlePaystackWebhook($payload);
+    }
+
+    /**
      * Handle Paystack webhook event.
      */
-    public function handleWebhook(array $payload): void
+    private function handlePaystackWebhook(array $payload): void
     {
         $event = $payload['event'] ?? null;
         $data = $payload['data'] ?? [];
@@ -85,6 +133,30 @@ class PaymentService
         }
 
         if ($event === 'charge.success') {
+            $this->verify($reference);
+        }
+
+        // Log webhook to the payment record
+        $payment = Payment::where('reference', $reference)->first();
+        if ($payment) {
+            $payment->update(['webhook_log' => $payload]);
+        }
+    }
+
+    /**
+     * Handle Flutterwave webhook event.
+     */
+    private function handleFlutterwaveWebhook(array $payload): void
+    {
+        $event = $payload['event'] ?? null;
+        $data = $payload['data'] ?? [];
+        $reference = $data['tx_ref'] ?? null;
+
+        if (!$reference) {
+            return;
+        }
+
+        if ($event === 'charge.completed' || ($data['status'] ?? null) === 'successful') {
             $this->verify($reference);
         }
 
@@ -125,4 +197,3 @@ class PaymentService
         );
     }
 }
-
