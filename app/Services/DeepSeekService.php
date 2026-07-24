@@ -13,8 +13,7 @@ class DeepSeekService
      */
     public function interpret(AiInterpretation $interpretation, array $flags): ?string
     {
-        $apiKey = \App\Models\Setting::getValue('api.deepseek_key')
-            ?: config('services.deepseek.api_key')
+        $apiKey = config('services.deepseek.api_key')
             ?: ($_ENV['DEEPSEEK_API_KEY'] ?? getenv('DEEPSEEK_API_KEY'))
             ?: null;
 
@@ -27,8 +26,7 @@ class DeepSeekService
         }
 
         $prompt = $interpretation->prompt_input;
-        $model = \App\Models\Setting::getValue('api.deepseek_model')
-            ?: config('services.deepseek.model')
+        $model = config('services.deepseek.model')
             ?: ($_ENV['DEEPSEEK_MODEL'] ?? getenv('DEEPSEEK_MODEL'))
             ?: 'deepseek-v4-flash';
         $baseUrl = config('services.deepseek.base_url', 'https://api.deepseek.com');
@@ -43,8 +41,8 @@ class DeepSeekService
                     ['role' => 'system', 'content' => $this->systemPrompt()],
                     ['role' => 'user', 'content' => $prompt],
                 ],
-                'max_tokens' => (int) (\App\Models\Setting::getValue('api.deepseek_max_tokens') ?: config('services.deepseek.max_tokens', 2048)),
-                'temperature' => (float) (\App\Models\Setting::getValue('api.deepseek_temperature') ?: config('services.deepseek.temperature', 0.3)),
+                'max_tokens' => (int) config('services.deepseek.max_tokens', 2048),
+                'temperature' => (float) config('services.deepseek.temperature', 0.3),
             ]);
 
             if (!$response->successful()) {
@@ -89,8 +87,7 @@ class DeepSeekService
      */
     public function interpretPdf(AiInterpretation $interpretation, string $pdfText): ?string
     {
-        $apiKey = \App\Models\Setting::getValue('api.deepseek_key')
-            ?: config('services.deepseek.api_key')
+        $apiKey = config('services.deepseek.api_key')
             ?: ($_ENV['DEEPSEEK_API_KEY'] ?? getenv('DEEPSEEK_API_KEY'))
             ?: null;
 
@@ -103,7 +100,9 @@ class DeepSeekService
         }
 
         $prompt = "Here is the raw text extracted from a lab report PDF. Analyze it and provide a patient-friendly interpretation:\n\n" . $pdfText;
-        $model = config('services.deepseek.model', 'deepseek-chat');
+        $model = config('services.deepseek.model')
+            ?: ($_ENV['DEEPSEEK_MODEL'] ?? getenv('DEEPSEEK_MODEL'))
+            ?: 'deepseek-v4-flash';
         $baseUrl = config('services.deepseek.base_url', 'https://api.deepseek.com');
 
         try {
