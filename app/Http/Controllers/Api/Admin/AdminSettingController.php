@@ -203,6 +203,78 @@ class AdminSettingController extends BaseController
     }
 
     /**
+     * Diagnostic endpoint — debug why config/env isn't loading.
+     */
+    public function configDiagnostic()
+    {
+        $envPath = base_path('.env');
+        $envExists = file_exists($envPath);
+        $envSize = $envExists ? filesize($envPath) : 0;
+        $envReadable = $envExists && is_readable($envPath);
+
+        // Read raw .env lines
+        $rawKeys = [];
+        if ($envReadable) {
+            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach (['PAYSTACK_SECRET_KEY', 'FLUTTERWAVE_SECRET_KEY', 'DEEPSEEK_API_KEY'] as $k) {
+                foreach ($lines as $line) {
+                    if (str_starts_with(trim($line), $k . '=')) {
+                        $v = trim(substr(trim($line), strlen($k) + 1));
+                        $rawKeys[$k] = strlen($v) . ' chars, starts with: ' . substr($v, 0, 6) . '...';
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Check if config cache exists
+        $configCachePath = base_path('bootstrap/cache/config.php');
+        $configCacheExists = file_exists($configCachePath);
+        $configCacheTime = $configCacheExists ? date('Y-m-d H:i:s', filemtime($configCachePath)) : null;
+
+        return $this->success([
+            'env_file' => [
+                'exists' => $envExists,
+                'path' => $envPath,
+                'size_bytes' => $envSize,
+                'readable' => $envReadable,
+            ],
+            'raw_keys_from_env' => $rawKeys,
+            'config_cache' => [
+                'exists' => $configCacheExists,
+                'last_built' => $configCacheTime,
+                'note' => $configCacheExists ? 'Config cache exists. If built before keys were added, config() will return null. Our fallback reads .env directly.' : 'No config cache — .env is read at runtime.',
+            ],
+            'config_values' => [
+                'paystack_secret_key' => config('services.paystack.secret_key') ? 'SET' : 'null',
+                'flutterwave_secret_key' => config('services.flutterwave.secret_key') ? 'SET' : 'null',
+                'deepseek_api_key' => config('services.deepseek.api_key') ? 'SET' : 'null',
+            ],
+            'via_readEnvFile' => [
+                'paystack_secret_key' => $this->readEnvFile('PAYSTACK_SECRET_KEY') ? 'SET' : 'null',
+                'flutterwave_secret_key' => $this->readEnvFile('FLUTTERWAVE_SECRET_KEY') ? 'SET' : 'null',
+            ],
+        ]);
+    }
+
+    /**
+     * Rebuild config cache from admin panel.
+     */
+    public function rebuildConfigCache()
+    {
+        try {
+            \Artisan::call('config:cache');
+            $output = \Artisan::output();
+
+            return $this->success([
+                'output' => trim($output),
+            ], 'Config cache rebuilt successfully. Keys added after the last cache build will now be visible via config().');
+        } catch (\Throwable $e) {
+            return $this->error('Failed to rebuild config cache: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Set the active payment gateway.
      */
     public function setPaymentGateway(Request $request)
