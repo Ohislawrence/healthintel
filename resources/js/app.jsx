@@ -24,6 +24,7 @@ import SymptomChecker from './screens/symptoms/SymptomChecker';
 import ProviderDirectory from './screens/directory/ProviderDirectory';
 import ProviderDetail from './screens/directory/ProviderDetail';
 import InsuranceComparison from './screens/insurance/InsuranceComparison';
+import HealthTools from './screens/tools/HealthTools';
 import AdminLayout from './screens/admin/AdminLayout';
 import AdminDashboard from './screens/admin/AdminDashboard';
 import AdminPanels from './screens/admin/AdminPanels';
@@ -139,6 +140,7 @@ function App() {
                     <Route path="/directory" element={<ProtectedRoute><AppLayout><ProviderDirectory /></AppLayout></ProtectedRoute>} />
                     <Route path="/providers/:slug" element={<ProtectedRoute><AppLayout><ProviderDetail /></AppLayout></ProtectedRoute>} />
                     <Route path="/insurance" element={<ProtectedRoute><AppLayout><InsuranceComparison /></AppLayout></ProtectedRoute>} />
+<Route path="/health-tools" element={<ProtectedRoute><AppLayout><HealthTools /></AppLayout></ProtectedRoute>} />
 
                     {/* Admin Routes */}
                     <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>

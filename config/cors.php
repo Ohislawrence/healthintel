@@ -10,7 +10,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => [env('APP_URL', 'https://healthintel.app'), 'https://www.healthintel.app'],
 
     'allowed_origins_patterns' => [],
 

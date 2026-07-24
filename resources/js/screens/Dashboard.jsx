@@ -101,7 +101,7 @@ export default function Dashboard() {
         { icon: '⚛', color: '#0F766E', title: 'Lab Results', subtitle: 'Upload or enter lab values', to: '/lab-results' },
         { icon: '♡', color: '#4F46E5', title: 'Symptom Check', subtitle: 'AI-powered health guidance', to: '/symptom-checker' },
         { icon: '⚕', color: '#7C3AED', title: 'Find Providers', subtitle: 'Labs & hospitals near you', to: '/directory' },
-        { icon: '◉', color: '#16A34A', title: 'Health Tools', subtitle: 'Calculators & trackers', to: '/dashboard' },
+        { icon: '◉', color: '#16A34A', title: 'Health Tools', subtitle: 'Calculators & trackers', to: '/health-tools' },
     ];
 
     return (
