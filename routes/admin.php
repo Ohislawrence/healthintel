@@ -67,5 +67,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('/settings/bulk', [AdminSettingController::class, 'bulkUpdate']);
     Route::get('/settings/payment-gateway', [AdminSettingController::class, 'paymentGatewayInfo']);
     Route::post('/settings/payment-gateway', [AdminSettingController::class, 'setPaymentGateway']);
+    Route::get('/settings/env-keys', [AdminSettingController::class, 'envKeys']);
+    Route::post('/settings/env-keys', [AdminSettingController::class, 'updateEnvKey']);
 });
 

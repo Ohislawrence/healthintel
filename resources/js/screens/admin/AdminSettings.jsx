@@ -67,6 +67,31 @@ export default function AdminSettings() {
         },
     });
 
+    // .env Key Editor — for editing API keys directly
+    const { data: envKeysData, isLoading: envKeysLoading, refetch: refetchEnvKeys } = useQuery({
+        queryKey: ['admin-env-keys'],
+        queryFn: () => api.get('/admin/settings/env-keys'),
+    });
+    const envKeys = envKeysData?.data?.keys || [];
+
+    const [editingEnvKey, setEditingEnvKey] = useState(null);
+    const [envKeyValue, setEnvKeyValue] = useState('');
+
+    const envKeyMutation = useMutation({
+        mutationFn: ({ key, value }) => api.post('/admin/settings/env-keys', { key, value }),
+        onSuccess: (res) => {
+            setMessage({ type: 'success', text: res?.message || 'Key saved!' });
+            setEditingEnvKey(null);
+            refetchEnvKeys();
+            refetchGateway(); // refresh gateway cards too
+            setTimeout(() => setMessage(null), 3000);
+        },
+        onError: (err) => {
+            setMessage({ type: 'error', text: err?.message || 'Failed to save key' });
+            setTimeout(() => setMessage(null), 3000);
+        },
+    });
+
     const startEdit = (setting) => {
         setEditingKey(setting.key);
         setEditValue(setting.type === 'boolean' ? String(setting.value) : String(setting.value ?? ''));
@@ -218,6 +243,78 @@ export default function AdminSettings() {
                             <li>Paystack: <code className="bg-neutral-200 px-1 rounded">https://healthintel.app/api/payment/webhook</code></li>
                             <li>Flutterwave: <code className="bg-neutral-200 px-1 rounded">https://healthintel.app/api/payment/webhook/flutterwave</code></li>
                         </ul>
+                    </div>
+                </div>
+            )}
+
+            {/* ── .env Key Editor (visible when payment tab selected) ── */}
+            {activeGroup === 'payment' && (
+                <div className="card p-6 space-y-4">
+                    <div>
+                        <h3 className="text-base font-bold text-neutral-900 mb-1">API Keys</h3>
+                        <p className="text-sm text-neutral-500">Manage API keys directly in your <code className="bg-neutral-200 px-1 rounded">.env</code> file. Keys are masked for security.</p>
+                    </div>
+
+                    {envKeysLoading ? (
+                        <div className="skeleton h-20 rounded-lg" />
+                    ) : (
+                        <div className="space-y-3">
+                            {/* Group by provider */}
+                            {['Paystack', 'Flutterwave', 'AI / DeepSeek', 'Communication'].map(providerGroup => {
+                                const providerKeys = envKeys.filter(k => k.group === providerGroup);
+                                if (providerKeys.length === 0) return null;
+                                return (
+                                    <div key={providerGroup} className="space-y-2">
+                                        <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider">{providerGroup}</p>
+                                        {providerKeys.map(pk => (
+                                            <div key={pk.key} className="flex items-center justify-between bg-neutral-50 rounded-lg px-3 py-2 gap-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-neutral-700 truncate">{pk.label}</p>
+                                                    <p className="text-xs text-neutral-400 font-mono">
+                                                        {pk.isSet ? pk.value : <span className="text-amber-500">(not set)</span>}
+                                                    </p>
+                                                </div>
+                                                {editingEnvKey === pk.key ? (
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        <input
+                                                            type="text"
+                                                            value={envKeyValue}
+                                                            onChange={(e) => setEnvKeyValue(e.target.value)}
+                                                            className="input-base w-48 text-sm font-mono"
+                                                            placeholder="sk_live_..."
+                                                            autoFocus
+                                                        />
+                                                        <button
+                                                            onClick={() => envKeyMutation.mutate({ key: pk.key, value: envKeyValue })}
+                                                            disabled={envKeyMutation.isPending}
+                                                            className="btn btn-primary text-xs px-3 py-2"
+                                                        >✓</button>
+                                                        <button
+                                                            onClick={() => setEditingEnvKey(null)}
+                                                            className="text-neutral-400 hover:text-neutral-600 px-1"
+                                                        >×</button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingEnvKey(pk.key);
+                                                            setEnvKeyValue('');
+                                                        }}
+                                                        className="text-xs font-semibold text-teal-600 hover:text-teal-800 transition-colors shrink-0"
+                                                    >
+                                                        {pk.isSet ? 'Edit' : 'Add Key'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+                        ⚠️ <strong>Security note:</strong> API keys are sensitive credentials. Keys saved here are written directly to the <code className="bg-amber-100 px-1 rounded">.env</code> file on your server. Only use this if you trust your admin users. Keys take effect on the next request.
                     </div>
                 </div>
             )}
