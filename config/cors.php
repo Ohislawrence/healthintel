@@ -12,7 +12,10 @@ return [
 
     'allowed_origins' => [env('APP_URL', 'https://healthintel.app'), 'https://www.healthintel.app'],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '/^http:\/\/localhost:\d+$/',
+        '/^http:\/\/127\.0\.0\.1:\d+$/',
+    ],
 
     'allowed_headers' => ['Content-Type', 'X-Requested-With', 'Authorization', 'Accept', 'Origin'],
 
