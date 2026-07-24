@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../../lib/api';
 
@@ -7,6 +7,7 @@ const groupLabels = {
     credits: 'Credit System',
     api: 'API Configuration',
     features: 'Feature Toggles',
+    payment: 'Payment Gateway',
 };
 
 const groupIcons = {
@@ -14,6 +15,7 @@ const groupIcons = {
     credits: '◆',
     api: '⚡',
     features: '🔧',
+    payment: '💳',
 };
 
 export default function AdminSettings() {
@@ -27,6 +29,29 @@ export default function AdminSettings() {
         queryFn: () => api.get('/admin/settings'),
     });
     const groups = data?.data?.groups || {};
+
+    // Payment Gateway — separate query
+    const { data: gatewayData, isLoading: gatewayLoading, refetch: refetchGateway } = useQuery({
+        queryKey: ['admin-payment-gateway'],
+        queryFn: () => api.get('/admin/settings/payment-gateway'),
+    });
+    const gatewayInfo = gatewayData?.data || {};
+    const activeGateway = gatewayInfo.active_gateway || 'paystack';
+    const paystackConfigured = gatewayInfo.gateways?.paystack?.configured || false;
+    const flutterwaveConfigured = gatewayInfo.gateways?.flutterwave?.configured || false;
+
+    const gatewayMutation = useMutation({
+        mutationFn: (gateway) => api.post('/admin/settings/payment-gateway', { gateway }),
+        onSuccess: (res) => {
+            setMessage({ type: 'success', text: res?.message || `Switched to ${res.data?.gateway}` });
+            refetchGateway();
+            setTimeout(() => setMessage(null), 3000);
+        },
+        onError: (err) => {
+            setMessage({ type: 'error', text: err?.message || 'Failed to switch gateway' });
+            setTimeout(() => setMessage(null), 3000);
+        },
+    });
 
     const updateMutation = useMutation({
         mutationFn: ({ id, value }) => api.put(`/admin/settings/${id}`, { value }),
@@ -65,6 +90,10 @@ export default function AdminSettings() {
     };
 
     const groupKeys = Object.keys(groups).filter(g => groups[g]?.length > 0);
+    // Always show payment gateway tab even if no settings records exist for it
+    if (!groupKeys.includes('payment')) {
+        groupKeys.push('payment');
+    }
     const currentGroup = groups[activeGroup] || [];
 
     return (
@@ -101,9 +130,107 @@ export default function AdminSettings() {
                 ))}
             </div>
 
+            {/* Payment Gateway Section — dedicated UI when "payment" tab is active */}
+            {activeGroup === 'payment' && (
+                <div className="card p-6 space-y-5">
+                    <div>
+                        <h3 className="text-base font-bold text-neutral-900 mb-1">Active Payment Processor</h3>
+                        <p className="text-sm text-neutral-500">Choose which provider processes credit purchases. Changes take effect immediately for all new transactions.</p>
+                    </div>
+
+                    {gatewayLoading ? (
+                        <div className="skeleton h-20 rounded-lg" />
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Paystack */}
+                            <button
+                                onClick={() => gatewayMutation.mutate('paystack')}
+                                disabled={gatewayMutation.isPending || !paystackConfigured}
+                                className={`relative rounded-xl border-2 p-4 text-left transition-all ${
+                                    activeGateway === 'paystack'
+                                        ? 'border-teal-600 bg-teal-50 shadow-md'
+                                        : !paystackConfigured
+                                            ? 'border-neutral-200 bg-neutral-50 opacity-50 cursor-not-allowed'
+                                            : 'border-neutral-200 bg-white hover:border-teal-300 hover:bg-teal-50/30'
+                                }`}
+                            >
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-2xl">🇳🇬</span>
+                                    <div>
+                                        <p className="font-bold text-neutral-900">Paystack</p>
+                                        <p className="text-xs text-neutral-400">paystack.com</p>
+                                    </div>
+                                    {activeGateway === 'paystack' && (
+                                        <span className="ml-auto bg-teal-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">Active</span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-neutral-500">Nigerian payment gateway. PCI-DSS Level 1 certified.</p>
+                                {!paystackConfigured && (
+                                    <p className="text-xs text-amber-600 mt-2 font-medium">⚠️ Not configured — add PAYSTACK_SECRET_KEY to .env</p>
+                                )}
+                                {gatewayMutation.isPending && gatewayMutation.variables === 'paystack' && (
+                                    <div className="mt-2 flex items-center gap-2 text-xs text-teal-700 font-medium">
+                                        <span className="animate-spin">⟳</span> Switching...
+                                    </div>
+                                )}
+                            </button>
+
+                            {/* Flutterwave */}
+                            <button
+                                onClick={() => gatewayMutation.mutate('flutterwave')}
+                                disabled={gatewayMutation.isPending || !flutterwaveConfigured}
+                                className={`relative rounded-xl border-2 p-4 text-left transition-all ${
+                                    activeGateway === 'flutterwave'
+                                        ? 'border-teal-600 bg-teal-50 shadow-md'
+                                        : !flutterwaveConfigured
+                                            ? 'border-neutral-200 bg-neutral-50 opacity-50 cursor-not-allowed'
+                                            : 'border-neutral-200 bg-white hover:border-teal-300 hover:bg-teal-50/30'
+                                }`}
+                            >
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-2xl">🌍</span>
+                                    <div>
+                                        <p className="font-bold text-neutral-900">Flutterwave</p>
+                                        <p className="text-xs text-neutral-400">flutterwave.com</p>
+                                    </div>
+                                    {activeGateway === 'flutterwave' && (
+                                        <span className="ml-auto bg-teal-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">Active</span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-neutral-500">Pan-African payment gateway. Supports cards, bank transfers, USSD.</p>
+                                {!flutterwaveConfigured && (
+                                    <p className="text-xs text-amber-600 mt-2 font-medium">⚠️ Not configured — add FLUTTERWAVE_SECRET_KEY to .env</p>
+                                )}
+                                {gatewayMutation.isPending && gatewayMutation.variables === 'flutterwave' && (
+                                    <div className="mt-2 flex items-center gap-2 text-xs text-teal-700 font-medium">
+                                        <span className="animate-spin">⟳</span> Switching...
+                                    </div>
+                                )}
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="bg-neutral-50 rounded-lg p-4 text-xs text-neutral-500 space-y-1">
+                        <p><strong>How it works:</strong> Selecting a provider changes which payment gateway is used for all new credit purchases. Existing transactions are not affected.</p>
+                        <p><strong>Configuration:</strong> Set API keys in your <code className="bg-neutral-200 px-1 rounded">.env</code> file — PAYSTACK_SECRET_KEY and FLUTTERWAVE_SECRET_KEY. Unconfigured providers are disabled.</p>
+                        <p><strong>Webhook URLs:</strong> Update your webhook URLs in the provider dashboard:</p>
+                        <ul className="list-disc list-inside ml-2 mt-1 space-y-0.5">
+                            <li>Paystack: <code className="bg-neutral-200 px-1 rounded">https://healthintel.app/api/payment/webhook</code></li>
+                            <li>Flutterwave: <code className="bg-neutral-200 px-1 rounded">https://healthintel.app/api/payment/webhook/flutterwave</code></li>
+                        </ul>
+                    </div>
+                </div>
+            )}
+
             {isLoading ? (
                 <div className="card p-8 text-center">
                     <div className="skeleton h-6 w-48 mx-auto rounded" />
+                </div>
+            ) : activeGroup === 'payment' ? (
+                /* Payment tab shows its own UI above — hide the empty settings list */
+                <div className="card p-6 text-center">
+                    <span className="text-3xl block mb-2">💳</span>
+                    <p className="text-sm text-neutral-500">Configure your payment gateway settings in the <code className="bg-neutral-200 px-1 rounded">.env</code> file, then select the active provider above.</p>
                 </div>
             ) : currentGroup.length === 0 ? (
                 <div className="card p-8 text-center">
