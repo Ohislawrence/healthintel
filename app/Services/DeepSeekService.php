@@ -13,7 +13,10 @@ class DeepSeekService
      */
     public function interpret(AiInterpretation $interpretation, array $flags): ?string
     {
-        $apiKey = \App\Models\Setting::getValue('api.deepseek_key') ?: config('services.deepseek.api_key');
+        $apiKey = \App\Models\Setting::getValue('api.deepseek_key')
+            ?: config('services.deepseek.api_key')
+            ?: ($_ENV['DEEPSEEK_API_KEY'] ?? getenv('DEEPSEEK_API_KEY'))
+            ?: null;
 
         if (empty($apiKey)) {
             $interpretation->update([
@@ -24,7 +27,10 @@ class DeepSeekService
         }
 
         $prompt = $interpretation->prompt_input;
-        $model = \App\Models\Setting::getValue('api.deepseek_model') ?: config('services.deepseek.model', 'deepseek-chat');
+        $model = \App\Models\Setting::getValue('api.deepseek_model')
+            ?: config('services.deepseek.model')
+            ?: ($_ENV['DEEPSEEK_MODEL'] ?? getenv('DEEPSEEK_MODEL'))
+            ?: 'deepseek-v4-flash';
         $baseUrl = config('services.deepseek.base_url', 'https://api.deepseek.com');
 
         try {
@@ -83,7 +89,10 @@ class DeepSeekService
      */
     public function interpretPdf(AiInterpretation $interpretation, string $pdfText): ?string
     {
-        $apiKey = config('services.deepseek.api_key');
+        $apiKey = \App\Models\Setting::getValue('api.deepseek_key')
+            ?: config('services.deepseek.api_key')
+            ?: ($_ENV['DEEPSEEK_API_KEY'] ?? getenv('DEEPSEEK_API_KEY'))
+            ?: null;
 
         if (empty($apiKey)) {
             $interpretation->update([

@@ -13,7 +13,10 @@ class PaystackService
 
     public function __construct()
     {
-        $this->secretKey = \App\Models\Setting::getValue('api.paystack_secret') ?: config('services.paystack.secret_key') ?: null;
+        $this->secretKey = \App\Models\Setting::getValue('api.paystack_secret')
+            ?: config('services.paystack.secret_key')
+            ?: ($_ENV['PAYSTACK_SECRET_KEY'] ?? getenv('PAYSTACK_SECRET_KEY'))
+            ?: null;
         $this->baseUrl = config('services.paystack.base_url', 'https://api.paystack.co');
     }
 
