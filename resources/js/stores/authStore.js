@@ -36,6 +36,11 @@ const useAuthStore = create((set, get) => ({
     register: async (data) => {
         await axios.get('/sanctum/csrf-cookie');
         const res = await api.post('/auth/register', data);
+        return res?.data || {};
+    },
+
+    verifyEmail: async (userId, code) => {
+        const res = await api.post('/auth/verify-email', { user_id: userId, code });
         const token = res.data.token;
         if (token) {
             localStorage.setItem(TOKEN_KEY, token);

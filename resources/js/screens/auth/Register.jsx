@@ -33,8 +33,9 @@ export default function Register() {
         }
         setLoading(true);
         try {
-            await register(form);
-            navigate('/onboarding');
+            const res = await register(form);
+            // Navigate to email verification
+            navigate('/verify-email', { state: { user_id: res?.user_id } });
         } catch (err) {
             const msg = err?.message || err?.errors
                 ? Object.values(err.errors).flat().join(', ')

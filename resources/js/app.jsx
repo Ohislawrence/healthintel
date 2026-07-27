@@ -11,6 +11,7 @@ import Register from './screens/auth/Register';
 import ForgotPassword from './screens/auth/ForgotPassword';
 import ResetPassword from './screens/auth/ResetPassword';
 import VerifyPhone from './screens/auth/VerifyPhone';
+import VerifyEmail from './screens/auth/VerifyEmail';
 import Dashboard from './screens/Dashboard';
 import HealthProfileOnboarding from './screens/onboarding/HealthProfile';
 import PanelPicker from './screens/lab/PanelPicker';
@@ -130,6 +131,7 @@ function App() {
                     <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
                     <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
                     <Route path="/verify-phone" element={<GuestRoute><VerifyPhone /></GuestRoute>} />
+                    <Route path="/verify-email" element={<VerifyEmail />} />
                     <Route path="/onboarding" element={<ProtectedRoute><HealthProfileOnboarding /></ProtectedRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
                     <Route path="/lab-results" element={<ProtectedRoute><AppLayout><PanelPicker /></AppLayout></ProtectedRoute>} />

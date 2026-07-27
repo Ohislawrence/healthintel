@@ -30,6 +30,10 @@ Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])
     ->middleware('throttle:6,1');
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:6,1');
+Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail'])
+    ->middleware('throttle:10,1');
+Route::post('/auth/resend-verification', [AuthController::class, 'resendVerificationCode'])
+    ->middleware('throttle:6,1');
 
     // Blog (public)
 Route::get('/blog/posts', [BlogController::class, 'index']);
