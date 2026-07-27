@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../stores/authStore';
+import GoogleSignInButton from '../../components/GoogleSignInButton';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -98,6 +99,17 @@ export default function Login() {
                             {loading ? 'Signing in...' : 'Sign in'}
                         </button>
                     </form>
+
+                    {/* Divider + Google Sign-In */}
+                    <div className="mt-5 flex items-center gap-3">
+                        <div className="flex-1 h-px bg-neutral-200" />
+                        <span className="text-xs text-neutral-400 font-medium">or continue with</span>
+                        <div className="flex-1 h-px bg-neutral-200" />
+                    </div>
+
+                    <div className="mt-4">
+                        <GoogleSignInButton text="Sign in with Google" />
+                    </div>
                 </div>
 
                 <p className="mt-6 text-center text-sm text-neutral-500">

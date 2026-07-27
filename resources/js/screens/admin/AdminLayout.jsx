@@ -16,7 +16,9 @@ export default function AdminLayout() {
         { to: '/admin/symptom-mappings', label: 'Symptom Links', icon: '🔗' },
         { to: '/admin/providers', label: 'Providers', icon: '🏥' },
         { to: '/admin/partners', label: 'Partners', icon: '🤝' },
-        { to: '/admin/credit-packages', label: 'Prices', icon: '₦' },
+        { to: '/admin/credit-packages', label: 'Credit Packages', icon: '₦' },
+        { to: '/admin/blog/posts', label: 'Blog Posts', icon: '📝' },
+        { to: '/admin/blog/categories', label: 'Blog Categories', icon: '📂' },
         { to: '/admin/notifications', label: 'Notifications', icon: '🔔' },
         { to: '/admin/settings', label: 'Settings', icon: '⚙' },
     ];

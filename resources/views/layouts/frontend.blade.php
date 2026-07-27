@@ -1162,7 +1162,7 @@
             <nav class="nav-links" aria-label="Main navigation">
                 <a href="{{ route('features') }}">Features</a>
                 <a href="{{ route('how-it-works') }}">How it works</a>
-                <a href="{{ route('pricing') }}">Pricing</a>
+                <a href="/blog">Blog</a>
                 <a href="{{ route('about') }}">About</a>
                 <a href="{{ route('contact') }}">Contact</a>
             </nav>
@@ -1184,7 +1184,7 @@
     <div class="mobile-menu" id="mobileMenu" role="dialog" aria-label="Mobile navigation">
         <a href="{{ route('features') }}">Features</a>
         <a href="{{ route('how-it-works') }}">How it works</a>
-        <a href="{{ route('pricing') }}">Pricing</a>
+        <a href="/blog">Blog</a>
         <a href="{{ route('about') }}">About</a>
         <a href="{{ route('contact') }}">Contact</a>
         

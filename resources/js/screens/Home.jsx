@@ -1,9 +1,22 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import useAuthStore from '../stores/authStore';
+import api from '../lib/api';
 
 export default function Home() {
     const { user } = useAuthStore();
+    const [blogPosts, setBlogPosts] = useState([]);
+    const [blogLoaded, setBlogLoaded] = useState(false);
+
+    useEffect(() => {
+        api.get('/blog/posts', { params: { page: 1 } })
+            .then(res => {
+                const data = res.data.posts?.data || res.data.posts || [];
+                setBlogPosts(data.slice(0, 3));
+            })
+            .catch(() => {})
+            .finally(() => setBlogLoaded(true));
+    }, []);
 
     const features = [
         {
@@ -46,6 +59,12 @@ export default function Home() {
                         <span className="text-gray-900">Intel</span>
                     </Link>
                     <div className="flex items-center gap-3">
+                        <Link
+                            to="/blog"
+                            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                        >
+                            Blog
+                        </Link>
                         {user ? (
                             <Link
                                 to="/dashboard"
@@ -154,6 +173,80 @@ export default function Home() {
                         </div>
                     ))}
                 </div>
+            </section>
+
+            {/* Blog Section */}
+            <section className="mx-auto max-w-6xl px-4 py-20">
+                <div className="text-center mb-12">
+                    <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">
+                        Latest from Our Blog
+                    </h2>
+                    <p className="mt-3 text-lg text-gray-600">
+                        Health tips, insights, and guides to help you stay informed.
+                    </p>
+                </div>
+                {blogLoaded && blogPosts.length > 0 ? (
+                    <>
+                        <div className="grid gap-8 md:grid-cols-3">
+                            {blogPosts.map((post) => (
+                                <Link
+                                    key={post.id}
+                                    to={`/blog/${post.slug}`}
+                                    className="group rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all"
+                                >
+                                    {post.featured_image && (
+                                        <img
+                                            src={post.featured_image}
+                                            alt={post.title}
+                                            className="w-full h-44 object-cover"
+                                            loading="lazy"
+                                        />
+                                    )}
+                                    <div className="p-6">
+                                        {post.category && (
+                                            <span className="inline-block rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-medium text-teal-700 mb-3">
+                                                {post.category.name}
+                                            </span>
+                                        )}
+                                        <h3 className="font-semibold text-gray-900 group-hover:text-teal-600 transition-colors line-clamp-2">
+                                            {post.title}
+                                        </h3>
+                                        {post.excerpt && (
+                                            <p className="mt-2 text-sm text-gray-600 line-clamp-2">{post.excerpt}</p>
+                                        )}
+                                        <div className="mt-4 flex items-center justify-between text-xs text-gray-400">
+                                            <span>
+                                                {new Date(post.published_at).toLocaleDateString('en-US', {
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    year: 'numeric',
+                                                })}
+                                            </span>
+                                            <span className="text-teal-600 font-medium group-hover:text-teal-700">
+                                                Read more →
+                                            </span>
+                                        </div>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                        <div className="mt-10 text-center">
+                            <Link
+                                to="/blog"
+                                className="inline-flex items-center gap-1 text-sm font-semibold text-teal-600 hover:text-teal-700 transition-colors"
+                            >
+                                View all articles →
+                            </Link>
+                        </div>
+                    </>
+                ) : (
+                    <div className="text-center py-10 bg-gray-50 rounded-2xl border border-gray-200">
+                        <p className="text-gray-500 text-lg mb-2">Articles coming soon</p>
+                        <p className="text-sm text-gray-400">
+                            Our team is working on helpful health guides. Check back soon!
+                        </p>
+                    </div>
+                )}
             </section>
 
             {/* How it works */}

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BlogController;
 use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\HealthProfileController;
 use App\Http\Controllers\Api\HealthScoreController;
@@ -23,12 +24,19 @@ Route::post('/auth/register', [AuthController::class, 'register'])
     ->middleware('throttle:6,1');
 Route::post('/auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1');
+Route::post('/auth/google', [AuthController::class, 'googleAuth'])
+    ->middleware('throttle:10,1');
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])
     ->middleware('throttle:6,1');
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:6,1');
 
-    // Provider directory (public read-only)
+    // Blog (public)
+Route::get('/blog/posts', [BlogController::class, 'index']);
+Route::get('/blog/posts/{slug}', [BlogController::class, 'show']);
+Route::get('/blog/categories', [BlogController::class, 'categories']);
+
+// Provider directory (public read-only)
     Route::get('/providers', [ProviderDirectoryController::class, 'index']);
     Route::get('/providers/sponsored-banners', [ProviderDirectoryController::class, 'sponsoredBanners']);
 // Specific routes must come BEFORE the wildcard {slug} route

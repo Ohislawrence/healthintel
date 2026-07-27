@@ -40,6 +40,9 @@ import AdminPartners from './screens/admin/AdminPartners';
 import AdminNotifications from './screens/admin/AdminNotifications';
 import AdminAuditLog from './screens/admin/AdminAuditLog';
 import AdminSettings from './screens/admin/AdminSettings';
+import AdminBlogPosts from './screens/admin/AdminBlogPosts';
+import AdminBlogEditor from './screens/admin/AdminBlogEditor';
+import AdminBlogCategories from './screens/admin/AdminBlogCategories';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -158,6 +161,10 @@ function App() {
                         <Route path="notifications" element={<AdminNotifications />} />
                         <Route path="audit-log" element={<AdminAuditLog />} />
                         <Route path="settings" element={<AdminSettings />} />
+                        <Route path="blog/posts" element={<AdminBlogPosts />} />
+                        <Route path="blog/posts/new" element={<AdminBlogEditor />} />
+                        <Route path="blog/posts/:id/edit" element={<AdminBlogEditor />} />
+                        <Route path="blog/categories" element={<AdminBlogCategories />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />

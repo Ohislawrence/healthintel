@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\CreditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 
@@ -40,6 +41,79 @@ class AuthController extends BaseController
             'user' => $this->formatUser($user),
             'token' => $token,
         ], 'Account created successfully', 201);
+    }
+
+    /**
+     * Google Sign-In / Sign-Up.
+     * Validates the Google ID token, creates or finds the user,
+     * and returns a Sanctum token.
+     */
+    public function googleAuth(Request $request)
+    {
+        $request->validate(['id_token' => 'required|string']);
+
+        $idToken = $request->id_token;
+
+        // Verify the Google ID token via Google's HTTP endpoint (no extra packages needed)
+        // https://developers.google.com/identity/sign-in/web/backend-auth
+        $response = Http::get('https://oauth2.googleapis.com/tokeninfo', [
+            'id_token' => $idToken,
+        ]);
+
+        if (!$response->successful()) {
+            return $this->error('Invalid Google ID token', 401);
+        }
+
+        $payload = $response->json();
+
+        // Validate the audience (must match our Google Client ID)
+        $expectedAudience = config('services.google.client_id');
+        if ($payload['aud'] !== $expectedAudience) {
+            return $this->error('Invalid Google token audience', 401);
+        }
+
+        $googleId = $payload['sub'];
+        $email = $payload['email'] ?? null;
+        $name = $payload['name'] ?? $payload['email'] ?? 'Google User';
+
+        if (!$email) {
+            return $this->error('Google account does not have an email address', 400);
+        }
+
+        // Also verify the email is verified by Google
+        if (($payload['email_verified'] ?? 'false') !== 'true') {
+            return $this->error('Google email is not verified', 400);
+        }
+
+        // Find existing user by google_id or email
+        $user = User::where('google_id', $googleId)->orWhere('email', $email)->first();
+
+        if ($user) {
+            // Existing user — link google_id if not already set
+            if (!$user->google_id) {
+                $user->update(['google_id' => $googleId]);
+            }
+        } else {
+            // New user — register with Google
+            $user = User::create([
+                'name' => $name,
+                'email' => $email,
+                'google_id' => $googleId,
+                'password' => Hash::make(Str::random(32)),
+            ]);
+
+            $user->assignRole('user');
+
+            // Grant free signup credits
+            $this->creditService->grantSignupCredits($user);
+        }
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return $this->success([
+            'user' => $this->formatUser($user),
+            'token' => $token,
+        ], $user->wasRecentlyCreated ? 'Account created successfully' : 'Login successful');
     }
 
     /**

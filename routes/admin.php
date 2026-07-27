@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AdminBlogController;
 use App\Http\Controllers\Api\Admin\AdminController;
 use App\Http\Controllers\Api\Admin\AdminSettingController;
 use Illuminate\Support\Facades\Route;
@@ -60,6 +61,22 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // Audit Log
     Route::get('/audit-log', [AdminController::class, 'auditLog']);
+
+    // Uploads
+    Route::post('/upload', [AdminBlogController::class, 'uploadImage']);
+
+    // Blog Posts
+    Route::get('/blog/posts', [AdminBlogController::class, 'posts']);
+    Route::get('/blog/posts/{id}', [AdminBlogController::class, 'postShow']);
+    Route::post('/blog/posts', [AdminBlogController::class, 'postStore']);
+    Route::put('/blog/posts/{id}', [AdminBlogController::class, 'postUpdate']);
+    Route::delete('/blog/posts/{id}', [AdminBlogController::class, 'postDelete']);
+
+    // Blog Categories
+    Route::get('/blog/categories', [AdminBlogController::class, 'categories']);
+    Route::post('/blog/categories', [AdminBlogController::class, 'categoryStore']);
+    Route::put('/blog/categories/{id}', [AdminBlogController::class, 'categoryUpdate']);
+    Route::delete('/blog/categories/{id}', [AdminBlogController::class, 'categoryDelete']);
 
     // Settings
     Route::get('/settings', [AdminSettingController::class, 'index']);
