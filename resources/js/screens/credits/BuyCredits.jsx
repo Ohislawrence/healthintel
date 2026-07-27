@@ -69,7 +69,7 @@ export default function BuyCredits() {
                                     <p className="text-xs text-neutral-500 mt-0.5">{pkg.description || `${pkg.credits} credits`}</p>
                                 </div>
                                 <span className="text-xl font-extrabold text-teal-700">
-                                    ₦{parseFloat(pkg.price_ngn || 0).toLocaleString()}
+                                    {pkg.price_formatted || '₦' + parseFloat(pkg.price_naira || 0).toLocaleString()}
                                 </span>
                             </div>
                         </button>

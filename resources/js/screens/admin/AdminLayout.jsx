@@ -28,15 +28,15 @@ export default function AdminLayout() {
     return (
         <div className="flex min-h-screen bg-gray-50">
             {/* Sidebar */}
-            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform lg:relative lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100">
+            <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transform transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100 flex-shrink-0">
                     <span className="text-2xl">⚕️</span>
                     <div>
                         <h1 className="font-bold text-gray-900">HealthIntel Admin</h1>
                         <p className="text-xs text-gray-500">Management Panel</p>
                     </div>
                 </div>
-                <nav className="p-4 space-y-1">
+                <nav className="flex-1 overflow-y-auto p-4 space-y-1">
                     {links.map((link) => (
                         <Link
                             key={link.to}
@@ -49,7 +49,7 @@ export default function AdminLayout() {
                         </Link>
                     ))}
                 </nav>
-                <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100">
+                <div className="p-4 border-t border-gray-100 flex-shrink-0">
                     <Link to="/" className="block text-sm text-gray-500 hover:text-teal-600">
                         ← Back to app
                     </Link>

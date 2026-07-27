@@ -33,17 +33,6 @@ const useAuthStore = create((set, get) => ({
         await get().fetchUser();
     },
 
-    loginWithGoogle: async (idToken) => {
-        await axios.get('/sanctum/csrf-cookie');
-        const res = await api.post('/auth/google', { id_token: idToken });
-        const token = res.data.token;
-        if (token) {
-            localStorage.setItem(TOKEN_KEY, token);
-            set({ token });
-        }
-        await get().fetchUser();
-    },
-
     register: async (data) => {
         await axios.get('/sanctum/csrf-cookie');
         const res = await api.post('/auth/register', data);
