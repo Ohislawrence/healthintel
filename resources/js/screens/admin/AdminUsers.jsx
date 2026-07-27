@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import api from '../../lib/api';
 
 export default function AdminUsers() {
@@ -61,7 +62,9 @@ export default function AdminUsers() {
                         <tbody className="divide-y divide-gray-100">
                             {users.map((u) => (
                                 <tr key={u.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 font-medium text-gray-900">{u.name}</td>
+                                    <td className="px-4 py-3 font-medium text-teal-700 hover:text-teal-800">
+                                        <Link to={`/admin/users/${u.id}`}>{u.name}</Link>
+                                    </td>
                                     <td className="px-4 py-3 text-gray-500">{u.email}</td>
                                     <td className="px-4 py-3">
                                         <span className="inline-flex gap-1">

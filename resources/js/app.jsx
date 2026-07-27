@@ -33,6 +33,7 @@ import AdminSymptomMappings from './screens/admin/AdminSymptomMappings';
 import AdminProviders from './screens/admin/AdminProviders';
 import AdminCreditPackages from './screens/admin/AdminCreditPackages';
 import AdminUsers from './screens/admin/AdminUsers';
+import AdminUserDetail from './screens/admin/AdminUserDetail';
 import AdminAnalytics from './screens/admin/AdminAnalytics';
 import AdminAppointments from './screens/admin/AdminAppointments';
 import AdminFeedback from './screens/admin/AdminFeedback';
@@ -152,6 +153,7 @@ function App() {
                         <Route index element={<AdminDashboard />} />
                         <Route path="analytics" element={<AdminAnalytics />} />
                         <Route path="users" element={<AdminUsers />} />
+                        <Route path="users/:id" element={<AdminUserDetail />} />
                         <Route path="appointments" element={<AdminAppointments />} />
                         <Route path="feedback" element={<AdminFeedback />} />
                         <Route path="submissions" element={<AdminSubmissions />} />

@@ -403,13 +403,101 @@ class AdminController extends BaseController
 
     public function userShow(int $id)
     {
-        $user = User::with(['roles', 'healthProfile', 'labSubmissions' => fn($q) => $q->with('testPanel')->latest()->take(10)])
-            ->findOrFail($id);
+        $user = User::with([
+            'roles',
+            'healthProfile',
+            'labSubmissions' => function ($q) { $q->with('testPanel', 'interpretation')->latest()->take(10); },
+        ])->findOrFail($id);
 
         $creditService = app(\App\Services\CreditService::class);
         $user->credits = $creditService->getBalance($user);
 
-        return $this->success(['user' => $user]);
+        // 360° activity data — built safely with individual queries
+        $creditLedger = [];
+        $payments = [];
+        $appointments = [];
+        $feedback = [];
+        $auditLogs = [];
+        $interpretations = [];
+        $healthMetrics = [];
+        $referrals = [];
+
+        try { $creditLedger = \App\Models\CreditLedger::where('user_id', $id)->latest()->take(20)->get()->map(function ($e) {
+            return ['id' => $e->id, 'amount' => $e->amount, 'type' => $e->type, 'description' => $e->description, 'created_at' => $e->created_at->toISOString()];
+        })->toArray(); } catch (\Throwable) {}
+
+        try { $payments = \App\Models\Payment::where('user_id', $id)->latest()->take(10)->get()->map(function ($p) {
+            return ['id' => $p->id, 'reference' => $p->reference, 'amount_kobo' => $p->amount_kobo, 'amount_naira' => ($p->amount_kobo ?? 0) / 100, 'status' => $p->status, 'gateway' => $p->gateway, 'created_at' => $p->created_at?->toISOString()];
+        })->toArray(); } catch (\Throwable) {}
+
+        try { $appointments = \App\Models\Appointment::where('user_id', $id)->latest('appointment_date')->take(10)->get()->map(function ($a) {
+            return ['id' => $a->id, 'title' => $a->title, 'doctor_name' => $a->doctor_name, 'facility_name' => $a->facility_name, 'appointment_date' => $a->appointment_date, 'status' => $a->status];
+        })->toArray(); } catch (\Throwable) {}
+
+        try { $feedback = \App\Models\UserFeedback::where('user_id', $id)->latest()->take(10)->get()->map(function ($f) {
+            return ['id' => $f->id, 'content' => $f->content, 'rating' => $f->rating ?? null, 'status' => $f->status, 'created_at' => $f->created_at->toISOString()];
+        })->toArray(); } catch (\Throwable) {}
+
+        try {
+            $auditLogs = \Illuminate\Support\Facades\DB::table('admin_audit_log')
+                ->where('target_type', 'user')->where('target_id', $id)
+                ->leftJoin('users', 'users.id', '=', 'admin_audit_log.admin_id')
+                ->select('admin_audit_log.*', 'users.name as admin_name')
+                ->latest('admin_audit_log.created_at')->take(20)->get()
+                ->map(function ($l) {
+                    return ['id' => $l->id, 'action' => $l->action, 'admin_name' => $l->admin_name ?? 'System', 'metadata' => json_decode($l->metadata), 'created_at' => $l->created_at];
+                })->toArray();
+        } catch (\Throwable) {}
+
+        try {
+            $interpretations = \App\Models\LabSubmission::where('user_id', $id)->whereHas('interpretation')
+                ->with(['testPanel', 'interpretation'])->latest()->take(10)->get()->map(function ($s) {
+                    return ['id' => $s->interpretation->id ?? $s->id, 'panel_name' => $s->testPanel?->name ?? 'PDF Upload', 'status' => $s->interpretation->status ?? 'pending', 'created_at' => $s->created_at->toISOString()];
+                })->toArray();
+        } catch (\Throwable) {}
+
+        try { $healthMetrics = \App\Models\UserHealthMetric::where('user_id', $id)->latest()->take(10)->get()->map(function ($m) {
+            return ['id' => $m->id, 'tracker_type' => $m->tracker_type, 'tracker_label' => $m->tracker_label ?? $m->tracker_type, 'value' => $m->value, 'unit' => $m->unit, 'created_at' => $m->created_at?->toISOString()];
+        })->toArray(); } catch (\Throwable) {}
+
+        try { $referrals = \App\Models\ReferralEvent::where('referrer_id', $id)->latest()->take(10)->get()->map(function ($r) {
+            return ['id' => $r->id, 'event_type' => $r->event_type, 'metadata' => $r->metadata, 'created_at' => $r->created_at?->toISOString()];
+        })->toArray(); } catch (\Throwable) {}
+
+        $activity = compact('creditLedger', 'payments', 'appointments', 'feedback', 'auditLogs', 'interpretations', 'healthMetrics', 'referrals');
+
+        return $this->success([
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'email_verified_at' => $user->email_verified_at?->toISOString(),
+                'phone_verified_at' => $user->phone_verified_at?->toISOString(),
+                'credits' => $user->credits,
+                'roles' => $user->getRoleNames()->toArray(),
+                'health_profile' => $user->healthProfile ? [
+                    'date_of_birth' => $user->healthProfile->date_of_birth?->toDateString(),
+                    'sex' => $user->healthProfile->sex,
+                    'is_pregnant' => $user->healthProfile->is_pregnant,
+                    'height_cm' => $user->healthProfile->height_cm,
+                    'weight_kg' => $user->healthProfile->weight_kg,
+                    'blood_type' => $user->healthProfile->blood_type,
+                    'medical_conditions' => $user->healthProfile->medical_conditions,
+                    'current_medications' => $user->healthProfile->current_medications,
+                    'profile_completed' => $user->healthProfile->profile_completed,
+                ] : null,
+                'submissions' => $user->labSubmissions->map(fn($s) => [
+                    'id' => $s->id,
+                    'panel_name' => $s->testPanel?->name,
+                    'type' => $s->submission_type,
+                    'status' => $s->interpretation?->status ?? 'pending',
+                    'created_at' => $s->created_at->toISOString(),
+                ]),
+                'created_at' => $user->created_at->toISOString(),
+            ],
+            'activity' => $activity,
+        ]);
     }
 
     // ── Appointments ──
