@@ -1231,57 +1231,46 @@
     {{-- Floating PWA Install Button --}}
     <button class="pwa-float" id="pwaInstallFloat" aria-label="Install HealthIntel app for offline access">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span class="pwa-float-text">Add to Home Screen</span>
+        <span class="pwa-float-text">Use as an app</span>
     </button>
 
     <style>
         .pwa-float {
             position: fixed;
-            bottom: 24px;
-            right: 16px;
-            left: 16px;
+            bottom: 20px;
+            right: 12px;
+            left: auto;
+            width: auto;
             z-index: 46;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 10px;
+            gap: 8px;
             background: linear-gradient(135deg, var(--primary-deep), var(--primary));
             color: #fff;
-            border: 1px solid rgba(255,255,255,0.25);
             border-radius: var(--radius-pill);
-            padding: 14px 22px;
+            padding: 10px 16px;
             cursor: pointer;
             font-family: inherit;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             font-weight: 700;
             letter-spacing: -0.01em;
-            box-shadow: 0 8px 30px rgba(14,107,92,0.35), 0 2px 8px rgba(16,32,27,0.15);
-            transition: transform 0.35s var(--ease-out-expo), box-shadow 0.35s var(--ease-out-expo), opacity 0.3s var(--ease-smooth);
+            box-shadow: 0 4px 16px rgba(14,107,92,0.3), 0 1px 4px rgba(16,32,27,0.12);
+            transition: transform 0.3s var(--ease-out-expo), box-shadow 0.3s var(--ease-out-expo);
             outline: none;
             -webkit-tap-highlight-color: transparent;
-            border: 1px solid rgba(255,255,255,0.25);
+            border: 1px solid rgba(255,255,255,0.2);
         }
-        .pwa-float:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 12px 36px rgba(14,107,92,0.4), 0 4px 12px rgba(16,32,27,0.2); }
-        .pwa-float:active { transform: translateY(-1px) scale(0.98); }
-        .pwa-float svg { flex-shrink: 0; }
+        .pwa-float:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,107,92,0.35), 0 2px 8px rgba(16,32,27,0.15); }
+        .pwa-float:active { transform: translateY(0) scale(0.97); }
+        .pwa-float svg { flex-shrink: 0; width: 18px; height: 18px; }
         .pwa-float-text { white-space: nowrap; }
 
         /* Hide if already installed or dismissed */
         .pwa-float.installed,
         .pwa-float.dismissed { display: none !important; }
 
-        @media (min-width: 640px) {
-            .pwa-float {
-                left: auto;
-                width: auto;
-                padding: 14px 28px;
-                font-size: 0.95rem;
-                bottom: 28px;
-                right: 28px;
-            }
-        }
         @supports (padding-bottom: env(safe-area-inset-bottom)) {
-            .pwa-float { bottom: calc(24px + env(safe-area-inset-bottom)); }
+            .pwa-float { bottom: calc(20px + env(safe-area-inset-bottom)); }
         }
     </style>
 
