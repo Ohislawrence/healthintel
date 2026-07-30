@@ -18,6 +18,16 @@
     <meta name="twitter:description" content="@yield('description')">
     <meta name="robots" content="@yield('robots', 'index, follow')">
     
+    <!-- PWA / Web App Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0E6B5C">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HealthIntel">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png">
+    
     @yield('structured_data')
     
     <!-- Fonts -->
@@ -1231,7 +1241,7 @@
     {{-- Floating PWA Install Button --}}
     <button class="pwa-float" id="pwaInstallFloat" aria-label="Install HealthIntel app for offline access">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span class="pwa-float-text">Use as an app</span>
+        <span class="pwa-float-text" id="pwaInstallText">Use as an app</span>
     </button>
 
     <style>
@@ -1275,6 +1285,12 @@
     </style>
 
     <script>
+        // ── Register Service Worker (required for beforeinstallprompt to fire) ──
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
+                .catch(function(err) { console.warn('[PWA] SW registration failed:', err); });
+        }
+
         // ── Mobile Menu Logic ──
         const mobileMenuToggle = document.getElementById('mobileMenuToggle');
         const mobileMenu = document.getElementById('mobileMenu');
@@ -1343,34 +1359,104 @@
         // ── PWA Floating Install Button Logic ──
         (function() {
             const btn = document.getElementById('pwaInstallFloat');
-            if (!btn) return;
+            const btnText = document.getElementById('pwaInstallText');
+            if (!btn || !btnText) return;
             let deferredInstallPrompt = null;
 
-            // Hide immediately if already installed
-            if (window.matchMedia('(display-mode: standalone)').matches) {
+            // Device detection
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+                || window.navigator.standalone === true;
+
+            // Hide immediately if already installed (standalone mode)
+            if (isStandalone) {
                 btn.classList.add('installed');
                 return;
             }
 
-            // Listen for beforeinstallprompt
+            // Set button label based on device
+            if (isIOS) {
+                btnText.textContent = 'Tap to add to Home Screen';
+            } else {
+                btnText.textContent = 'Install app';
+            }
+
+            // Listen for beforeinstallprompt (Android/Chrome, desktop Chrome)
             window.addEventListener('beforeinstallprompt', (e) => {
                 e.preventDefault();
                 deferredInstallPrompt = e;
+                // Update button text now that we know native install is available
+                btnText.textContent = 'Install app';
             });
 
             // Tap to install
             btn.addEventListener('click', async () => {
                 if (deferredInstallPrompt) {
+                    // Android/Chrome — fire the native install prompt
                     deferredInstallPrompt.prompt();
                     const { outcome } = await deferredInstallPrompt.userChoice;
+                    console.log('[PWA] Install outcome:', outcome);
                     if (outcome === 'accepted') {
                         btn.classList.add('installed');
                     }
                     deferredInstallPrompt = null;
+                } else if (isIOS) {
+                    // iOS — show Safari-specific instructions
+                    showIOSInstallGuide();
                 } else {
-                    alert('To install HealthIntel:\n\n📱 iOS/Safari: Tap Share → "Add to Home Screen"\n\n📱 Android/Chrome: Tap ⋮ → "Install app"');
+                    // Fallback: show generic instructions
+                    showInstallGuide();
                 }
             });
+
+            // iOS-specific install guide
+            function showIOSInstallGuide() {
+                const oldGuide = document.getElementById('pwaInstallGuide');
+                if (oldGuide) oldGuide.remove();
+
+                var svgShareArrow = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin:0 2px"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>';
+
+                var guide = document.createElement('div');
+                guide.id = 'pwaInstallGuide';
+                guide.innerHTML = [
+                    '<div style="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);padding:20px" onclick="this.remove()">',
+                        '<div style="background:#fff;border-radius:14px;padding:24px 28px;max-width:340px;box-shadow:0 16px 48px rgba(0,0,0,0.2);text-align:center;font-family:\'Inter\',sans-serif" onclick="event.stopPropagation()">',
+                            '<div style="font-size:2.5rem;margin-bottom:8px">📱</div>',
+                            '<p style="font-weight:700;font-size:1rem;margin-bottom:6px;color:#10201B">Add HealthIntel to Home Screen</p>',
+                            '<ol style="text-align:left;font-size:0.85rem;color:#57645D;margin-bottom:16px;line-height:1.8;padding-left:20px">',
+                                '<li>Tap the ' + svgShareArrow + ' <strong>Share</strong> button in Safari\'s toolbar</li>',
+                                '<li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>',
+                                '<li>Tap <strong>"Add"</strong> in the top right corner</li>',
+                            '</ol>',
+                            '<button style="width:100%;padding:10px;border-radius:8px;background:#0E6B5C;color:#fff;border:none;font-weight:600;cursor:pointer;font-family:inherit" onclick="document.getElementById(\'pwaInstallGuide\').remove()">Got it</button>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+                document.body.appendChild(guide);
+            }
+
+            // Generic fallback install guide
+            function showInstallGuide() {
+                const oldGuide = document.getElementById('pwaInstallGuide');
+                if (oldGuide) oldGuide.remove();
+
+                var guide = document.createElement('div');
+                guide.id = 'pwaInstallGuide';
+                guide.innerHTML = [
+                    '<div style="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);padding:20px" onclick="this.remove()">',
+                        '<div style="background:#fff;border-radius:14px;padding:24px 28px;max-width:340px;box-shadow:0 16px 48px rgba(0,0,0,0.2);text-align:center;font-family:\'Inter\',sans-serif" onclick="event.stopPropagation()">',
+                            '<div style="font-size:2rem;margin-bottom:8px">📲</div>',
+                            '<p style="font-weight:700;font-size:1rem;margin-bottom:8px;color:#10201B">Install HealthIntel</p>',
+                            '<p style="font-size:0.85rem;color:#57645D;margin-bottom:16px;line-height:1.6">',
+                                '<strong>iPhone/iPad:</strong> Tap the Share button in Safari, then "Add to Home Screen"<br><br>',
+                                '<strong>Android:</strong> Tap ⋮ in Chrome, then "Install app"',
+                            '</p>',
+                            '<button style="width:100%;padding:10px;border-radius:8px;background:#0E6B5C;color:#fff;border:none;font-weight:600;cursor:pointer;font-family:inherit" onclick="document.getElementById(\'pwaInstallGuide\').remove()">Got it</button>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+                document.body.appendChild(guide);
+            }
 
             // Hide on successful install
             window.addEventListener('appinstalled', () => {
