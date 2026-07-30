@@ -12,6 +12,12 @@ const useAuthStore = create((set, get) => ({
     setUser: (user) => set({ user, loading: false }),
 
     fetchUser: async () => {
+        // Skip API call if no token — prevents 401 noise for guest visitors
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!token) {
+            set({ user: null, loading: false });
+            return;
+        }
         try {
             const res = await api.get('/auth/me');
             set({ user: res.data.user, loading: false });

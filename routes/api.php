@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\LabSubmissionController;
 use App\Http\Controllers\Api\PartnerPortalController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProviderDirectoryController;
+use App\Http\Controllers\Api\PushController;
 use App\Http\Controllers\Api\SymptomCheckerController;
 use Illuminate\Support\Facades\Route;
 
@@ -18,6 +19,9 @@ use Illuminate\Support\Facades\Route;
 | Public API Routes
 |--------------------------------------------------------------------------
 */
+
+// Push notifications — VAPID public key (needed by frontend to subscribe)
+Route::get('/push/vapid-public-key', [PushController::class, 'vapidPublicKey']);
 
 // Auth (register & login are public, throttled)
 Route::post('/auth/register', [AuthController::class, 'register'])
@@ -131,10 +135,28 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
     Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
 
+    // Push Notifications
+    Route::post('/push/subscribe', [PushController::class, 'subscribe']);
+    Route::post('/push/unsubscribe', [PushController::class, 'unsubscribe']);
+    Route::post('/push/subscription-update', [PushController::class, 'subscriptionUpdate']);
+    Route::post('/push/notification-received', [PushController::class, 'notificationReceived']);
+
     // Partner Portal (authenticated partner routes)
     Route::get('/partner/dashboard', [PartnerPortalController::class, 'dashboard']);
     Route::put('/partner/listing', [PartnerPortalController::class, 'updateListing']);
     Route::post('/partner/regenerate-code', [PartnerPortalController::class, 'regenerateAccessCode']);
+
+    // Partner Interpretation (B2B lab partners)
+    Route::get('/partner/stats', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'stats']);
+    Route::get('/partner/patients', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'patients']);
+    Route::post('/partner/interpretations', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'store']);
+    Route::post('/partner/interpretations/bulk', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'bulkStore']);
+    Route::get('/partner/interpretations/{id}/pdf', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'downloadPdf']);
+    Route::post('/partner/interpretations/batch/pdf', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'downloadBatchPdf']);
+    Route::post('/partner/interpretations/{id}/deliver', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'deliver']);
+    Route::get('/partner/interpretations/batch/{batchId}/status', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'batchStatus']);
+    Route::post('/partner/interpretations/batch/{batchId}/deliver-all', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'deliverAll']);
+    Route::post('/partner/v1/interpretations', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'apiInterpretation']);
+    Route::post('/partner/v1/hl7', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'hl7Parse']);
+    Route::get('/partner/analytics/population', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'populationAnalytics']);
 });
-
-

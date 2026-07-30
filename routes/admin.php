@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Admin\AdminBlogController;
 use App\Http\Controllers\Api\Admin\AdminController;
+use App\Http\Controllers\Api\Admin\AdminPartnershipController;
 use App\Http\Controllers\Api\Admin\AdminSettingController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,8 +36,12 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // Users
     Route::get('/users', [AdminController::class, 'users']);
+    Route::get('/users/trashed', [AdminController::class, 'trashedUsers']);
     Route::get('/users/{id}', [AdminController::class, 'userShow']);
     Route::post('/users/{id}/credit', [AdminController::class, 'grantCredits']);
+    Route::delete('/users/{id}', [AdminController::class, 'softDeleteUser']);
+    Route::post('/users/{id}/restore', [AdminController::class, 'restoreUser']);
+    Route::delete('/users/{id}/force', [AdminController::class, 'forceDeleteUser']);
 
     // Appointments
     Route::get('/appointments', [AdminController::class, 'appointments']);
@@ -64,6 +69,20 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // Uploads
     Route::post('/upload', [AdminBlogController::class, 'uploadImage']);
+
+    // Lab Partnerships
+    Route::get('/partnerships', [AdminPartnershipController::class, 'index']);
+    Route::get('/partnerships/{id}', [AdminPartnershipController::class, 'show']);
+    Route::post('/partnerships', [AdminPartnershipController::class, 'store']);
+    Route::put('/partnerships/{id}', [AdminPartnershipController::class, 'update']);
+    Route::delete('/partnerships/{id}', [AdminPartnershipController::class, 'destroy']);
+    Route::get('/partnerships/{id}/stats', [AdminPartnershipController::class, 'stats']);
+    Route::get('/partnerships/{id}/invoices', [AdminPartnershipController::class, 'partnershipInvoices']);
+    Route::post('/partnerships/{id}/invoices', [AdminPartnershipController::class, 'generateInvoice']);
+    Route::get('/partnerships/{id}/proposal', [AdminPartnershipController::class, 'proposalPdf']);
+    Route::get('/invoices', [AdminPartnershipController::class, 'invoices']);
+    Route::post('/invoices/generate-all', [AdminPartnershipController::class, 'generateAllInvoices']);
+    Route::get('/partner-health', [AdminPartnershipController::class, 'healthScores']);
 
     // Blog Posts
     Route::get('/blog/posts', [AdminBlogController::class, 'posts']);

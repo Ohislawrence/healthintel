@@ -178,6 +178,16 @@
 
         .nav-actions { display: flex; gap: 10px; align-items: center; }
 
+        /* Hide auth buttons on very small screens — show only hamburger */
+        .nav-actions .btn {
+            display: none;
+        }
+        @media (min-width: 400px) {
+            .nav-actions .btn {
+                display: inline-flex;
+            }
+        }
+
         .btn {
             display: inline-flex;
             align-items: center;
@@ -1218,70 +1228,96 @@
         </div>
     </footer>
 
-    {{-- Floating Play Store Badge --}}
-    <a href="https://play.google.com/store/apps/details?id=ng.healthintel.mobile" target="_blank" rel="noopener noreferrer" class="play-store-float anim-scale-in" aria-label="Download HealthIntel on Google Play">
-        <span class="play-store-icon">▶</span>
-        <span class="play-store-text">
-            <span class="play-store-label">GET IT ON</span>
-            <span class="play-store-name">Google Play</span>
+    {{-- Floating PWA Install Prompt --}}
+    <button class="pwa-install-float anim-scale-in" id="pwaInstallFloat" aria-label="Install HealthIntel app for offline access">
+        <span class="pwa-install-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         </span>
-    </a>
+        <span class="pwa-install-text">
+            <span class="pwa-install-heading">Add to Home Screen</span>
+            <span class="pwa-install-sub">Instant access, works offline</span>
+        </span>
+    </button>
 
     <style>
-        .play-store-float {
+        .pwa-install-float {
             position: fixed;
             bottom: 28px;
             right: 28px;
             z-index: 30;
-            display: flex;
+            display: none; /* Hidden by default, shown via JS when installable */
             align-items: center;
-            gap: 12px;
-            background: #000;
+            gap: 14px;
+            background: linear-gradient(135deg, var(--primary-deep) 0%, var(--primary) 100%);
             color: #fff;
-            border-radius: 14px;
-            padding: 12px 22px 12px 16px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.1);
-            transition: transform 0.3s var(--ease-out-expo), box-shadow 0.3s var(--ease-out-expo);
-            text-decoration: none;
-            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 14px 24px 14px 18px;
+            box-shadow: 0 8px 32px rgba(14,107,92,0.3), 0 2px 8px rgba(16,32,27,0.15);
+            transition: transform 0.35s var(--ease-out-expo), box-shadow 0.35s var(--ease-out-expo), opacity 0.3s var(--ease-smooth);
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.2);
+            font-family: inherit;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            animation: installPulse 3s ease-in-out infinite;
         }
-        .play-store-float:hover {
-            transform: translateY(-4px) scale(1.02);
-            box-shadow: 0 16px 48px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.15);
+        .pwa-install-float.visible {
+            display: flex;
+            opacity: 1;
         }
-        .play-store-float:active {
+        .pwa-install-float:hover {
+            transform: translateY(-4px) scale(1.03);
+            box-shadow: 0 16px 48px rgba(14,107,92,0.35), 0 4px 16px rgba(16,32,27,0.2);
+        }
+        .pwa-install-float:active {
             transform: translateY(-1px) scale(0.98);
         }
-        .play-store-icon {
-            font-size: 1.5rem;
-            line-height: 1;
+        .pwa-install-float:focus-visible {
+            outline: 2px solid #fff;
+            outline-offset: 3px;
         }
-        .play-store-text {
+        .pwa-install-float.dismissed {
+            display: none !important;
+        }
+        @keyframes installPulse {
+            0%, 100% { box-shadow: 0 8px 32px rgba(14,107,92,0.3), 0 2px 8px rgba(16,32,27,0.15); }
+            50% { box-shadow: 0 8px 32px rgba(14,107,92,0.3), 0 2px 8px rgba(16,32,27,0.15), 0 0 0 12px rgba(14,107,92,0.08); }
+        }
+        .pwa-install-icon {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+        .pwa-install-text {
             display: flex;
             flex-direction: column;
-            line-height: 1.1;
+            line-height: 1.2;
         }
-        .play-store-label {
-            font-size: 0.55rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            opacity: 0.7;
-            font-weight: 600;
-        }
-        .play-store-name {
-            font-size: 1rem;
+        .pwa-install-heading {
+            font-size: 0.92rem;
             font-weight: 700;
             letter-spacing: -0.01em;
         }
+        .pwa-install-sub {
+            font-size: 0.68rem;
+            opacity: 0.8;
+            font-weight: 500;
+        }
         @media (max-width: 600px) {
-            .play-store-float {
+            .pwa-install-float {
                 bottom: 20px;
                 right: 20px;
-                padding: 10px 18px 10px 14px;
-                border-radius: 12px;
+                left: 20px;
+                width: auto;
+                justify-content: center;
+                padding: 12px 18px;
+                border-radius: 14px;
             }
-            .play-store-name { font-size: 0.9rem; }
-            .play-store-icon { font-size: 1.3rem; }
+            .pwa-install-heading { font-size: 0.85rem; }
+            .pwa-install-sub { font-size: 0.65rem; }
+            .pwa-install-icon svg { width: 20px; height: 20px; }
         }
     </style>
 
@@ -1351,10 +1387,44 @@
         document.querySelectorAll('.anim-fade-up, .anim-fade-in, .anim-slide-left, .anim-scale-in, .stagger-children')
             .forEach(el => animObserver.observe(el));
 
-        // Trigger play store badge animation after a slight delay
-        setTimeout(() => {
-            document.querySelector('.play-store-float')?.classList.add('visible');
-        }, 1500);
+        // ── PWA Install Prompt Logic ──
+        const pwaInstallBtn = document.getElementById('pwaInstallFloat');
+        let deferredInstallPrompt = null;
+
+        // Listen for the beforeinstallprompt event
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+
+            // Show the install button with animation
+            setTimeout(() => {
+                pwaInstallBtn?.classList.add('visible');
+            }, 2000);
+        });
+
+        // Hide button if app is already installed
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            pwaInstallBtn?.classList.add('dismissed');
+        }
+
+        // Handle install button click
+        pwaInstallBtn?.addEventListener('click', async () => {
+            if (!deferredInstallPrompt) return;
+
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+
+            if (outcome === 'accepted') {
+                pwaInstallBtn.classList.add('dismissed');
+            }
+
+            deferredInstallPrompt = null;
+        });
+
+        // Also hide on appinstalled event
+        window.addEventListener('appinstalled', () => {
+            pwaInstallBtn?.classList.add('dismissed');
+        });
     </script>
 </body>
 </html>

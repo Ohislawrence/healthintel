@@ -368,6 +368,111 @@ class AdminController extends BaseController
         return $this->paginated($users);
     }
 
+    public function trashedUsers()
+    {
+        $users = User::onlyTrashed()->with('roles')->latest('deleted_at')->paginate(25);
+        $users->getCollection()->transform(function ($user) {
+            $user->credits = app(\App\Services\CreditService::class)->getBalance($user);
+            return $user;
+        });
+        return $this->paginated($users);
+    }
+
+    public function softDeleteUser(int $id)
+    {
+        $user = User::findOrFail($id);
+
+        // Revoke all Sanctum tokens
+        $user->tokens()->delete();
+
+        // Deactivate push subscriptions (don't delete — they may be re-used if restored)
+        \App\Models\PushSubscription::where('user_id', $user->id)->update(['is_active' => false]);
+
+        // Soft delete the user
+        $user->delete();
+
+        // Log for audit
+        \Illuminate\Support\Facades\DB::table('admin_audit_log')->insert([
+            'admin_id' => request()->user()->id,
+            'action' => 'soft_delete_user',
+            'target_type' => 'user',
+            'target_id' => $user->id,
+            'metadata' => json_encode([
+                'target_name' => $user->name,
+                'target_email' => $user->email,
+            ]),
+            'created_at' => now(),
+        ]);
+
+        return $this->success(null, 'User has been deactivated and moved to trash.');
+    }
+
+    public function restoreUser(int $id)
+    {
+        $user = User::onlyTrashed()->findOrFail($id);
+        $user->restore();
+
+        // Reactivate push subscriptions
+        \App\Models\PushSubscription::where('user_id', $user->id)->update(['is_active' => true]);
+
+        \Illuminate\Support\Facades\DB::table('admin_audit_log')->insert([
+            'admin_id' => request()->user()->id,
+            'action' => 'restore_user',
+            'target_type' => 'user',
+            'target_id' => $user->id,
+            'metadata' => json_encode([
+                'target_name' => $user->name,
+                'target_email' => $user->email,
+            ]),
+            'created_at' => now(),
+        ]);
+
+        return $this->success(null, 'User has been restored.');
+    }
+
+    public function forceDeleteUser(int $id)
+    {
+        $user = User::onlyTrashed()->findOrFail($id);
+
+        // Permanently remove related data
+        $user->tokens()->forceDelete();
+        \App\Models\PushSubscription::where('user_id', $user->id)->delete();
+        \App\Models\HealthProfile::where('user_id', $user->id)->delete();
+        \App\Models\CreditLedger::where('user_id', $user->id)->delete();
+        \App\Models\UserHealthMetric::where('user_id', $user->id)->delete();
+        \App\Models\UserTrackerSnapshot::where('user_id', $user->id)->delete();
+
+        // Lab submissions & interpretations — keep for audit integrity
+        // (They're linked by user_id; we nullify the link instead)
+        \App\Models\LabSubmission::where('user_id', $user->id)->update(['user_id' => null]);
+        \App\Models\Appointment::where('user_id', $user->id)->delete();
+        \App\Models\UserFeedback::where('user_id', $user->id)->delete();
+        \App\Models\ReferralEvent::where('referrer_id', $user->id)->delete();
+        \App\Models\Payment::where('user_id', $user->id)->update(['user_id' => null]);
+
+        // Remove Spatie roles/permissions
+        $user->roles()->detach();
+        $user->permissions()->detach();
+
+        $userName = $user->name;
+        $userEmail = $user->email;
+        $user->forceDelete();
+
+        \Illuminate\Support\Facades\DB::table('admin_audit_log')->insert([
+            'admin_id' => request()->user()->id,
+            'action' => 'force_delete_user',
+            'target_type' => 'user',
+            'target_id' => $id,
+            'metadata' => json_encode([
+                'target_name' => $userName,
+                'target_email' => $userEmail,
+            ]),
+            'created_at' => now(),
+        ]);
+
+        return $this->success(null, 'User permanently deleted along with associated data.');
+    }
+
     public function grantCredits(Request $request, int $id)
     {
         $validated = $request->validate([
@@ -795,11 +900,12 @@ class AdminController extends BaseController
     public function notificationStore(Request $request)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:200',
-            'body' => 'required|string|max:1000',
-            'target' => 'required|in:all,users,user_ids',
+            'title' => 'required|string|max:255',
+            'body' => 'required|string|max:500',
+            'target' => 'required|in:all,users,partners',
             'user_ids' => 'nullable|array',
             'user_ids.*' => 'integer|exists:users,id',
+            'url' => 'nullable|string|max:500',
         ]);
 
         $notification = \App\Models\AdminNotification::create([
@@ -808,9 +914,46 @@ class AdminController extends BaseController
             'body' => $validated['body'],
             'target' => $validated['target'],
             'user_ids' => $validated['user_ids'] ?? [],
-            'read_by' => [],
-            'sent_at' => now(),
+            'url' => $validated['url'] ?? null,
         ]);
+
+        // Dispatch Web Push notifications to subscribed users
+        if (config('webpush.send_admin_notifications', true)) {
+            $webPushService = app(\App\Services\WebPushService::class);
+
+            $pushOptions = [
+                'url' => $validated['url'] ?? '/dashboard',
+                'notification_id' => $notification->id,
+                'requireInteraction' => true,
+            ];
+
+            // Dispatch in the background via a queue or fire-and-forget
+            try {
+                if (!empty($validated['user_ids'])) {
+                    // Target specific users
+                    foreach ($validated['user_ids'] as $userId) {
+                        $webPushService->sendToUser(
+                            $userId,
+                            $validated['title'],
+                            $validated['body'],
+                            $pushOptions
+                        );
+                    }
+                } elseif ($validated['target'] === 'all') {
+                    // Target all users
+                    $webPushService->sendToAll(
+                        $validated['title'],
+                        $validated['body'],
+                        $pushOptions
+                    );
+                }
+                // 'partners' target — only partners have separate notification handling
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning(
+                    'Admin notification web-push dispatch error: ' . $e->getMessage()
+                );
+            }
+        }
 
         return $this->success(['notification' => $notification], 'Notification sent', 201);
     }

@@ -95,6 +95,35 @@ class AuthController extends BaseController
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        // Send welcome email with features overview
+        $featuresList = [
+            '🔬 Upload lab reports (PDF) and get plain-language explanations',
+            '📊 Enter lab values manually and see them checked against real reference ranges',
+            '🩺 Use the Symptom Checker to suggest relevant tests',
+            '🏥 Find hospitals, labs, and specialists near you in the Provider Directory',
+            '📅 Track appointments and set reminders',
+            '📈 Monitor health metrics (BMI, blood pressure, glucose) over time',
+            '🛡️ Compare health insurance plans',
+        ];
+
+        \Mail::send([], [], function ($message) use ($user, $featuresList) {
+            $message->to($user->email)
+                ->subject('Welcome to HealthIntel, ' . $user->name . '! 🎉')
+                ->html(
+                    '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">' .
+                    '<h1 style="color: #0E6B5C;">Welcome to HealthIntel!</h1>' .
+                    '<p>Hi <strong>' . e($user->name) . '</strong>,</p>' .
+                    '<p>Your email has been verified and your account is ready. Here\'s what you can do:</p>' .
+                    '<ul style="line-height: 1.8; padding-left: 20px;">' .
+                    implode('', array_map(fn($f) => '<li>' . e($f) . '</li>', $featuresList)) .
+                    '</ul>' .
+                    '<p style="margin-top: 24px;">You have <strong>3 free credits</strong> to get started. Each lab interpretation uses 1 credit.</p>' .
+                    '<a href="' . config('app.url') . '/dashboard" style="display: inline-block; background: #0E6B5C; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-top: 12px;">Go to Dashboard →</a>' .
+                    '<p style="margin-top: 32px; font-size: 12px; color: #888;">HealthIntel — Understand your health, in plain language.</p>' .
+                    '</div>'
+                );
+        });
+
         return $this->success([
             'user' => $this->formatUser($user),
             'token' => $token,

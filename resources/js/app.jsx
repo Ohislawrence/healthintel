@@ -1,11 +1,33 @@
 import './bootstrap';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import useAuthStore from './stores/authStore';
+import { initPWA, subscribeToPush, isInstalled, isOnline } from './lib/pwa';
 import AppLayout from './layouts/AppLayout';
-import Home from './screens/Home';
+import { useNavigate } from 'react-router-dom';
+
+// PWA Redirect: No frontpages in the PWA — send users directly to auth or dashboard
+function PwaEntry() {
+    const { user, loading } = useAuthStore();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (loading) return;
+        if (user) {
+            navigate(user.roles?.includes('admin') ? '/admin' : '/dashboard', { replace: true });
+        } else {
+            navigate('/login', { replace: true });
+        }
+    }, [user, loading, navigate]);
+
+    return (
+        <div className="flex min-h-screen items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-500 border-t-transparent" />
+        </div>
+    );
+}
 import Login from './screens/auth/Login';
 import Register from './screens/auth/Register';
 import ForgotPassword from './screens/auth/ForgotPassword';
@@ -26,6 +48,7 @@ import ProviderDirectory from './screens/directory/ProviderDirectory';
 import ProviderDetail from './screens/directory/ProviderDetail';
 import InsuranceComparison from './screens/insurance/InsuranceComparison';
 import HealthTools from './screens/tools/HealthTools';
+import Offline from './screens/Offline';
 import AdminLayout from './screens/admin/AdminLayout';
 import AdminDashboard from './screens/admin/AdminDashboard';
 import AdminPanels from './screens/admin/AdminPanels';
@@ -45,6 +68,8 @@ import AdminSettings from './screens/admin/AdminSettings';
 import AdminBlogPosts from './screens/admin/AdminBlogPosts';
 import AdminBlogEditor from './screens/admin/AdminBlogEditor';
 import AdminBlogCategories from './screens/admin/AdminBlogCategories';
+import AdminPartnerships from './screens/admin/AdminPartnerships';
+import AdminPartnershipDetail from './screens/admin/AdminPartnershipDetail';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -109,6 +134,42 @@ function AdminRoute({ children }) {
     return children;
 }
 
+function PWALifecycle() {
+    const { user } = useAuthStore();
+    const [updateAvailable, setUpdateAvailable] = useState(false);
+
+    useEffect(() => {
+        // Initialize PWA: register SW, listen for install prompt
+        initPWA();
+
+        // Listen for PWA update available
+        const handleUpdate = () => setUpdateAvailable(true);
+        window.addEventListener('pwa:update-available', handleUpdate);
+        return () => window.removeEventListener('pwa:update-available', handleUpdate);
+    }, []);
+
+    // Subscribe to push notifications when user logs in
+    useEffect(() => {
+        if (user && 'PushManager' in window) {
+            subscribeToPush();
+        }
+    }, [user]);
+
+    if (!updateAvailable) return null;
+
+    return (
+        <div className="fixed bottom-4 right-4 z-50 bg-teal-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
+            <span className="text-sm">New version available!</span>
+            <button
+                onClick={() => window.location.reload()}
+                className="bg-white text-teal-700 px-3 py-1 rounded text-sm font-medium hover:bg-teal-50"
+            >
+                Refresh
+            </button>
+        </div>
+    );
+}
+
 function App() {
     const fetchUser = useAuthStore((s) => s.fetchUser);
 
@@ -125,8 +186,10 @@ function App() {
     return (
         <QueryClientProvider client={queryClient}>
             <BrowserRouter>
+                <PWALifecycle />
                 <Routes>
-                    <Route path="/" element={<Home />} />
+                    <Route path="/" element={<PwaEntry />} />
+                    <Route path="/offline" element={<Offline />} />
                     <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
                     <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
                     <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
@@ -169,6 +232,9 @@ function App() {
                         <Route path="blog/posts/new" element={<AdminBlogEditor />} />
                         <Route path="blog/posts/:id/edit" element={<AdminBlogEditor />} />
                         <Route path="blog/categories" element={<AdminBlogCategories />} />
+                        <Route path="partnerships" element={<AdminPartnerships />} />
+                        <Route path="partnerships/new" element={<AdminPartnershipDetail />} />
+                        <Route path="partnerships/:id" element={<AdminPartnershipDetail />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />
