@@ -1228,96 +1228,144 @@
         </div>
     </footer>
 
-    {{-- Floating PWA Install Prompt --}}
-    <button class="pwa-install-float anim-scale-in" id="pwaInstallFloat" aria-label="Install HealthIntel app for offline access">
-        <span class="pwa-install-icon">
+    {{-- PWA Install Bar (persistent on mobile, floating on desktop) --}}
+    <div class="pwa-install-bar" id="pwaInstallBar">
+        <button class="pwa-install-btn" id="pwaInstallBtn" aria-label="Install HealthIntel app">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        </span>
-        <span class="pwa-install-text">
-            <span class="pwa-install-heading">Add to Home Screen</span>
-            <span class="pwa-install-sub">Instant access, works offline</span>
-        </span>
-    </button>
+            <span class="pwa-install-btn-text">
+                <strong>Add to Home Screen</strong>
+                <small>Instant access, works offline</small>
+            </span>
+        </button>
+        <button class="pwa-install-close" id="pwaInstallClose" aria-label="Dismiss">✕</button>
+    </div>
 
     <style>
-        .pwa-install-float {
+        .pwa-install-bar {
             position: fixed;
-            bottom: 28px;
-            right: 28px;
-            z-index: 30;
-            display: none; /* Hidden by default, shown via JS when installable */
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 45;
+            display: none;
             align-items: center;
-            gap: 14px;
-            background: linear-gradient(135deg, var(--primary-deep) 0%, var(--primary) 100%);
-            color: #fff;
-            border-radius: 16px;
-            padding: 14px 24px 14px 18px;
-            box-shadow: 0 8px 32px rgba(14,107,92,0.3), 0 2px 8px rgba(16,32,27,0.15);
-            transition: transform 0.35s var(--ease-out-expo), box-shadow 0.35s var(--ease-out-expo), opacity 0.3s var(--ease-smooth);
-            cursor: pointer;
-            border: 1px solid rgba(255,255,255,0.2);
-            font-family: inherit;
-            outline: none;
-            -webkit-tap-highlight-color: transparent;
-            animation: installPulse 3s ease-in-out infinite;
+            gap: 6px;
+            background: #fff;
+            border-top: 2px solid var(--primary);
+            padding: 10px 12px 10px 16px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
         }
-        .pwa-install-float.visible {
+        /* Always show on mobile unless dismissed or already installed */
+        @media (max-width: 768px) {
+            .pwa-install-bar {
+                display: flex;
+            }
+            .pwa-install-bar.dismissed,
+            .pwa-install-bar.installed {
+                display: none !important;
+            }
+        }
+        /* On desktop, only show when installable via beforeinstallprompt */
+        @media (min-width: 769px) {
+            .pwa-install-bar {
+                display: none;
+                bottom: 28px;
+                left: auto;
+                right: 28px;
+                width: auto;
+                border-radius: 16px;
+                border-top: none;
+                border: 1px solid rgba(255,255,255,0.2);
+                background: linear-gradient(135deg, var(--primary-deep) 0%, var(--primary) 100%);
+                color: #fff;
+                padding: 14px 24px 14px 18px;
+                gap: 14px;
+                box-shadow: 0 8px 32px rgba(14,107,92,0.3), 0 2px 8px rgba(16,32,27,0.15);
+                animation: installPulse 3s ease-in-out infinite;
+            }
+            .pwa-install-bar.visible {
+                display: flex;
+            }
+            .pwa-install-bar .pwa-install-close {
+                display: none;
+            }
+            .pwa-install-btn strong {
+                color: #fff;
+            }
+            .pwa-install-btn small {
+                color: rgba(255,255,255,0.8);
+            }
+        }
+        .pwa-install-btn {
+            flex: 1;
             display: flex;
-            opacity: 1;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 8px;
+            background: none;
+            border: none;
+            color: var(--ink);
+            cursor: pointer;
+            font-family: inherit;
+            text-align: left;
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+            border-radius: 10px;
+            transition: background 0.15s var(--ease-smooth);
         }
-        .pwa-install-float:hover {
-            transform: translateY(-4px) scale(1.03);
-            box-shadow: 0 16px 48px rgba(14,107,92,0.35), 0 4px 16px rgba(16,32,27,0.2);
+        .pwa-install-btn:hover,
+        .pwa-install-btn:active {
+            background: rgba(14,107,92,0.06);
         }
-        .pwa-install-float:active {
-            transform: translateY(-1px) scale(0.98);
+        .pwa-install-btn svg {
+            flex-shrink: 0;
+            color: var(--primary);
         }
-        .pwa-install-float:focus-visible {
-            outline: 2px solid #fff;
-            outline-offset: 3px;
+        .pwa-install-btn-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            line-height: 1.2;
+            min-width: 0;
         }
-        .pwa-install-float.dismissed {
-            display: none !important;
+        .pwa-install-btn strong {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--ink);
+        }
+        .pwa-install-btn small {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+        .pwa-install-close {
+            flex-shrink: 0;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: none;
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 50%;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.15s;
+        }
+        .pwa-install-close:hover {
+            background: rgba(0,0,0,0.05);
+            color: var(--ink);
         }
         @keyframes installPulse {
             0%, 100% { box-shadow: 0 8px 32px rgba(14,107,92,0.3), 0 2px 8px rgba(16,32,27,0.15); }
             50% { box-shadow: 0 8px 32px rgba(14,107,92,0.3), 0 2px 8px rgba(16,32,27,0.15), 0 0 0 12px rgba(14,107,92,0.08); }
         }
-        .pwa-install-icon {
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #fff;
-        }
-        .pwa-install-text {
-            display: flex;
-            flex-direction: column;
-            line-height: 1.2;
-        }
-        .pwa-install-heading {
-            font-size: 0.92rem;
-            font-weight: 700;
-            letter-spacing: -0.01em;
-        }
-        .pwa-install-sub {
-            font-size: 0.68rem;
-            opacity: 0.8;
-            font-weight: 500;
-        }
-        @media (max-width: 600px) {
-            .pwa-install-float {
-                bottom: 20px;
-                right: 20px;
-                left: 20px;
-                width: auto;
-                justify-content: center;
-                padding: 12px 18px;
-                border-radius: 14px;
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .pwa-install-bar {
+                padding-bottom: calc(10px + env(safe-area-inset-bottom));
             }
-            .pwa-install-heading { font-size: 0.85rem; }
-            .pwa-install-sub { font-size: 0.65rem; }
-            .pwa-install-icon svg { width: 20px; height: 20px; }
         }
     </style>
 
@@ -1387,44 +1435,64 @@
         document.querySelectorAll('.anim-fade-up, .anim-fade-in, .anim-slide-left, .anim-scale-in, .stagger-children')
             .forEach(el => animObserver.observe(el));
 
-        // ── PWA Install Prompt Logic ──
-        const pwaInstallBtn = document.getElementById('pwaInstallFloat');
-        let deferredInstallPrompt = null;
+        // ── PWA Install Bar Logic ──
+        (function() {
+            const bar = document.getElementById('pwaInstallBar');
+            const btn = document.getElementById('pwaInstallBtn');
+            const closeBtn = document.getElementById('pwaInstallClose');
+            let deferredInstallPrompt = null;
 
-        // Listen for the beforeinstallprompt event
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredInstallPrompt = e;
+            if (!bar || !btn) return;
 
-            // Show the install button with animation
-            setTimeout(() => {
-                pwaInstallBtn?.classList.add('visible');
-            }, 2000);
-        });
-
-        // Hide button if app is already installed
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            pwaInstallBtn?.classList.add('dismissed');
-        }
-
-        // Handle install button click
-        pwaInstallBtn?.addEventListener('click', async () => {
-            if (!deferredInstallPrompt) return;
-
-            deferredInstallPrompt.prompt();
-            const { outcome } = await deferredInstallPrompt.userChoice;
-
-            if (outcome === 'accepted') {
-                pwaInstallBtn.classList.add('dismissed');
+            // Hide immediately if already installed
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+                bar.classList.add('installed');
+                return;
             }
 
-            deferredInstallPrompt = null;
-        });
+            // Hide if user dismissed in this session
+            if (sessionStorage.getItem('pwa-install-dismissed') === '1') {
+                bar.classList.add('dismissed');
+            }
 
-        // Also hide on appinstalled event
-        window.addEventListener('appinstalled', () => {
-            pwaInstallBtn?.classList.add('dismissed');
-        });
+            // Dismiss button
+            closeBtn?.addEventListener('click', () => {
+                bar.classList.add('dismissed');
+                sessionStorage.setItem('pwa-install-dismissed', '1');
+            });
+
+            // Listen for beforeinstallprompt (desktop and Chrome Android)
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredInstallPrompt = e;
+                // On desktop, show the floating version
+                if (window.innerWidth >= 769) {
+                    bar.classList.add('visible');
+                }
+                // On mobile it's already visible by default via CSS
+            });
+
+            // Install button click
+            btn.addEventListener('click', async () => {
+                if (deferredInstallPrompt) {
+                    // Native prompt available
+                    deferredInstallPrompt.prompt();
+                    const { outcome } = await deferredInstallPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        bar.classList.add('installed');
+                    }
+                    deferredInstallPrompt = null;
+                } else {
+                    // No native prompt — show instructions for iOS/manual install
+                    alert('To install HealthIntel:\n\n📱 iOS/Safari: Tap the Share button then "Add to Home Screen"\n\n📱 Android/Chrome: Tap the menu (⋮) then "Install app"');
+                }
+            });
+
+            // Hide on successful install
+            window.addEventListener('appinstalled', () => {
+                bar.classList.add('installed');
+            });
+        })();
     </script>
 </body>
 </html>
