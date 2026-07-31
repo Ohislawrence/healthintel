@@ -201,10 +201,6 @@ export default function ResultScreen() {
                 </button>
             )}
 
-            {/* ── Nearby Providers ── */}
-            <NearbyProviders />
-            <NearbyProviders type="hospital" title="Nearby Hospitals" />
-
             {/* ── Recommended Health Tools (context-aware: 2 based on results) ── */}
             {(() => {
                 const allTools = [
@@ -273,6 +269,10 @@ export default function ResultScreen() {
                     </div>
                 );
             })()}
+
+            {/* ── Nearby Providers ── */}
+            <NearbyProviders />
+            <NearbyProviders type="hospital" title="Nearby Hospitals" />
 
             {/* Disclaimer */}
             <div className="card p-4 bg-teal-50 border-teal-200 flex gap-2.5 items-start">

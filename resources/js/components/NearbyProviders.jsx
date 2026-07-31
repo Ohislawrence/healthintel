@@ -30,7 +30,7 @@ export default function NearbyProviders({ type, title }) {
             const params = {
                 latitude: position.coords.latitude,
                 longitude: position.coords.longitude,
-                limit: 4,
+                limit: 3,
             };
             if (type) params.type = type;
 
