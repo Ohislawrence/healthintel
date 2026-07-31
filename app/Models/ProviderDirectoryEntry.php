@@ -51,4 +51,33 @@ class ProviderDirectoryEntry extends Model
         'affiliate' => 'Affiliate partner',
         'sponsored' => 'Sponsored listing',
     ];
+
+    /** Whether this listing is currently an active sponsored partner. */
+    public function getIsSponsoredAttribute(): bool
+    {
+        if ($this->partner_status !== 'sponsored') return false;
+        if (!$this->monetization_type) return false;
+
+        // Check time-based expiry
+        if ($this->monetization_limit_type === 'time' && $this->monetization_expires_at) {
+            if (now()->gt($this->monetization_expires_at)) return false;
+        }
+
+        // Check view-based expiry
+        if ($this->monetization_limit_type === 'views') {
+            $limit = $this->monetization_limit_value ?? 0;
+            $used = $this->monetization_views_used ?? 0;
+            if ($limit > 0 && $used >= $limit) return false;
+        }
+
+        return true;
+    }
+
+    /** Increment view counter for sponsored listings. */
+    public function incrementSponsorViews(): void
+    {
+        if ($this->partner_status === 'sponsored' && $this->monetization_limit_type === 'views') {
+            $this->increment('monetization_views_used');
+        }
+    }
 }

@@ -52,6 +52,7 @@ Route::get('/providers/specialties', [ProviderDirectoryController::class, 'speci
 Route::get('/providers/states', [ProviderDirectoryController::class, 'states']);
 Route::get('/providers/types', [ProviderDirectoryController::class, 'types']);
 Route::get('/providers/insurance/list', [ProviderDirectoryController::class, 'insuranceList']);
+Route::get('/providers/nearby-recommended', [ProviderDirectoryController::class, 'nearbyRecommended']);
 Route::get('/providers/{slug}', [ProviderDirectoryController::class, 'show']);
 
 // Insurance/HMO comparison (public read-only)
@@ -102,12 +103,17 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::get('/submissions', [LabSubmissionController::class, 'index']);
     Route::get('/submissions/{id}', [LabSubmissionController::class, 'show']);
     Route::post('/submissions', [LabSubmissionController::class, 'submit']);
+    Route::post('/submissions/pdf/draft', [LabSubmissionController::class, 'submitPdfDraft']);
+    Route::post('/submissions/pdf/draft/{draftId}/confirm', [LabSubmissionController::class, 'confirmPdfDraft']);
     Route::post('/submissions/pdf', [LabSubmissionController::class, 'submitPdf']);
     Route::get('/trends', [LabSubmissionController::class, 'trends']);
+    Route::post('/trends/share', [LabSubmissionController::class, 'shareTrend']);
 
     // Symptom Checker
     Route::post('/symptoms/suggest', [SymptomCheckerController::class, 'suggestPanels']);
     Route::post('/symptoms/check', [SymptomCheckerController::class, 'check']);
+    Route::post('/symptoms/funnel/track', [SymptomCheckerController::class, 'trackFunnel']);
+    Route::get('/symptoms/funnel/analytics', [SymptomCheckerController::class, 'funnelAnalytics']);
 
     // Provider Directory (actions requiring auth)
     Route::post('/providers/{slug}/click-out', [ProviderDirectoryController::class, 'clickOut']);
@@ -148,14 +154,22 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
 
     // Partner Interpretation (B2B lab partners)
     Route::get('/partner/stats', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'stats']);
+    Route::get('/partner/roi', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'roi']);
+    Route::get('/partner/delivery-health', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'deliveryHealth']);
+    Route::get('/partner/panels', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'panels']);
     Route::get('/partner/patients', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'patients']);
     Route::post('/partner/interpretations', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'store']);
     Route::post('/partner/interpretations/bulk', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'bulkStore']);
-    Route::get('/partner/interpretations/{id}/pdf', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'downloadPdf']);
     Route::post('/partner/interpretations/batch/pdf', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'downloadBatchPdf']);
-    Route::post('/partner/interpretations/{id}/deliver', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'deliver']);
     Route::get('/partner/interpretations/batch/{batchId}/status', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'batchStatus']);
     Route::post('/partner/interpretations/batch/{batchId}/deliver-all', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'deliverAll']);
+    Route::get('/partner/interpretations/{id}', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'show']);
+    Route::put('/partner/interpretations/{id}', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'update']);
+    Route::post('/partner/interpretations/{id}/suppress', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'suppress']);
+    Route::get('/partner/interpretations/{id}/history', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'history']);
+    Route::post('/partner/interpretations/{id}/toggle-version', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'toggleVersion']);
+    Route::get('/partner/interpretations/{id}/pdf', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'downloadPdf']);
+    Route::post('/partner/interpretations/{id}/deliver', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'deliver']);
     Route::post('/partner/v1/interpretations', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'apiInterpretation']);
     Route::post('/partner/v1/hl7', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'hl7Parse']);
     Route::get('/partner/analytics/population', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'populationAnalytics']);

@@ -89,7 +89,7 @@ class SymptomCheckerController extends BaseController
 
         $selected = Symptom::whereIn('slug', $validated['symptoms'])->get();
 
-        // Get matching test panels
+        // Get matching test panels with health-profile boosting
         $panelIds = DB::table('symptom_test_panels')
             ->whereIn('symptom_id', $selected->pluck('id'))
             ->select('test_panel_id', DB::raw('SUM(relevance_score) as total_relevance'))
@@ -100,8 +100,59 @@ class SymptomCheckerController extends BaseController
         $panels = TestPanel::whereIn('id', $panelIds)
             ->where('is_active', true)
             ->get()
+            ->map(function($p) use ($panelIds) {
+                $p->base_rank = array_search($p->id, $panelIds->toArray());
+                return $p;
+            })
             ->sortBy(fn($p) => array_search($p->id, $panelIds->toArray()))
             ->values();
+
+        // ── Personalized ranking boost by health profile ──
+        $profile = $user->healthProfile;
+        if ($profile && $profile->medical_conditions) {
+            $conditions = is_array($profile->medical_conditions)
+                ? $profile->medical_conditions
+                : json_decode($profile->medical_conditions, true);
+
+            if (is_array($conditions)) {
+                $boostMap = [
+                    'diabetes' => ['diabetes', 'glucose', 'hba1c', 'kidney', 'lipid', 'thyroid'],
+                    'hypertension' => ['heart health', 'kidney', 'electrolytes', 'lipid'],
+                    'thyroid' => ['tft', 'thyroid'],
+                    'asthma' => ['respiratory'],
+                    'malaria' => ['malaria', 'fbc'],
+                    'typhoid' => ['typhoid', 'fbc'],
+                    'pregnancy' => ['antenatal', 'fbc', 'glucose'],
+                ];
+
+                $boostedSlugs = [];
+                foreach ($conditions as $condition) {
+                    $c = strtolower(is_array($condition) ? ($condition['condition'] ?? '') : $condition);
+                    foreach ($boostMap as $key => $slugs) {
+                        if (str_contains($c, $key)) {
+                            $boostedSlugs = array_merge($boostedSlugs, $slugs);
+                        }
+                    }
+                }
+
+                // Apply +20% to relevance for matched panels
+                if (!empty($boostedSlugs)) {
+                    $panels = $panels->map(function($p) use ($boostedSlugs) {
+                        $matches = false;
+                        foreach ($boostedSlugs as $slug) {
+                            if (stripos($p->slug, $slug) !== false || stripos($p->name, $slug) !== false) {
+                                $matches = true;
+                                break;
+                            }
+                        }
+                        if ($matches) {
+                            $p->health_profile_boost = 20;
+                        }
+                        return $p;
+                    });
+                }
+            }
+        }
 
         // Build context from health profile
         $context = $validated['patient_context'] ?? $this->buildContextFromProfile($user);
@@ -184,6 +235,27 @@ class SymptomCheckerController extends BaseController
                 ->values();
         }
 
+        // ── Track funnel ──
+        \App\Models\SymptomCheckFunnel::create([
+            'user_id' => $user->id,
+            'symptoms_selected' => $selected->pluck('slug')->toArray(),
+            'panels_suggested' => $panels->map(fn($p) => [
+                'slug' => $p->slug, 'name' => $p->name,
+            ])->toArray(),
+            'stage' => 'checked',
+        ]);
+
+        // Return error if AI completely failed
+        if (!$interpretation) {
+            return $this->success([
+                'selected_symptoms' => $selected,
+                'suggested_panels' => $panels,
+                'interpretation' => 'The AI interpretation service is temporarily unavailable. Please review the suggested test panels below and consult a healthcare provider.',
+                'ai_status' => 'unavailable',
+                'nearby_providers' => $nearbyProviders,
+            ], 'Symptom check completed — AI interpretation unavailable (no credits deducted)');
+        }
+
         return $this->success([
             'selected_symptoms' => $selected,
             'suggested_panels' => $panels,
@@ -227,6 +299,66 @@ IMPORTANT GUARDRAILS:
 6. Reference the available test panels by name when making recommendations.
 7. Explain WHY a particular test panel is relevant to the reported symptoms.
 TXT;
+    }
+
+    /**
+     * Track funnel progression: user clicked on a panel, viewed a provider, or booked.
+     */
+    public function trackFunnel(Request $request)
+    {
+        $validated = $request->validate([
+            'funnel_id' => 'required|integer|exists:symptom_check_funnels,id',
+            'stage' => 'required|in:panel_viewed,provider_viewed,booked',
+            'provider_id' => 'nullable|integer|exists:provider_directory_entries,id|required_if:stage,provider_viewed,booked',
+        ]);
+
+        $funnel = \App\Models\SymptomCheckFunnel::where('user_id', $request->user()->id)
+            ->findOrFail($validated['funnel_id']);
+
+        $update = ['stage' => $validated['stage']];
+
+        if ($validated['stage'] === 'provider_viewed' || $validated['stage'] === 'booked') {
+            $update['provider_viewed_id'] = $validated['provider_id'];
+        }
+        if ($validated['stage'] === 'booked') {
+            $update['appointment_booked'] = true;
+        }
+
+        $funnel->update($update);
+
+        return $this->success([
+            'funnel_id' => $funnel->id,
+            'stage' => $funnel->stage,
+        ], 'Funnel step tracked');
+    }
+
+    /**
+     * Get funnel conversion analytics.
+     */
+    public function funnelAnalytics(Request $request)
+    {
+        $days = min((int) $request->get('days', 30), 365);
+        $since = now()->subDays($days);
+
+        $funnels = \App\Models\SymptomCheckFunnel::where('created_at', '>=', $since)->get();
+
+        $total = $funnels->count();
+        $panelViewed = $funnels->whereIn('stage', ['panel_viewed', 'provider_viewed', 'booked'])->count();
+        $providerViewed = $funnels->whereIn('stage', ['provider_viewed', 'booked'])->count();
+        $booked = $funnels->where('stage', 'booked')->count();
+
+        return $this->success([
+            'funnel_analytics' => [
+                'period_days' => $days,
+                'total_checks' => $total,
+                'panel_viewed' => $panelViewed,
+                'panel_view_rate' => $total > 0 ? round(($panelViewed / $total) * 100, 1) . '%' : '0%',
+                'provider_viewed' => $providerViewed,
+                'provider_view_rate' => $total > 0 ? round(($providerViewed / $total) * 100, 1) . '%' : '0%',
+                'booked' => $booked,
+                'booking_rate' => $total > 0 ? round(($booked / $total) * 100, 1) . '%' : '0%',
+            ],
+        ]);
     }
 
     /**

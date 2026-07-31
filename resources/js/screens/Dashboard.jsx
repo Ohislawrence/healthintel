@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 import useAuthStore from '../stores/authStore';
+import SponsoredBannerCarousel from '../components/SponsoredBannerCarousel';
 
 function StatPill({ value, label, icon, color, to }) {
     const navigate = useNavigate();
@@ -128,6 +129,9 @@ export default function Dashboard() {
                     to="/onboarding"
                 />
             </div>
+
+            {/* ── Sponsored Banner Carousel ───────────────── */}
+            <SponsoredBannerCarousel />
 
             {/* ── Health Score Card ──────────────────────── */}
             <Link to="/dashboard" className="block card overflow-hidden border-0 shadow-lg" style={{ boxShadow: '0 6px 24px rgba(15,118,110,0.12)' }}>

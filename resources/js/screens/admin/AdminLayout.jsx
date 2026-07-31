@@ -15,7 +15,6 @@ export default function AdminLayout() {
         { to: '/admin/panels', label: 'Test Panels', icon: '📋' },
         { to: '/admin/symptom-mappings', label: 'Symptom Links', icon: '🔗' },
         { to: '/admin/providers', label: 'Providers', icon: '🏥' },
-        { to: '/admin/partners', label: 'Partners', icon: '🤝' },
         { to: '/admin/partnerships', label: 'Partnerships', icon: '🏢' },
         { to: '/admin/credit-packages', label: 'Credit Packages', icon: '₦' },
         { to: '/admin/blog/posts', label: 'Blog Posts', icon: '📝' },

@@ -9,13 +9,38 @@
  * - Notification click handling
  */
 
-const VAPID_PUBLIC_KEY =
-  window.HEALTHINTEL_VAPID_KEY || 'Zs5sVm6P2SL0Tcvs2_rr2GXtlSZMpfgex5yzQjaDOXs';
+// Will be fetched from server
+let VAPID_PUBLIC_KEY = null;
 
 // ── State ────────────────────────────────────────────────────
 let swRegistration = null;
 let deferredPrompt = null;
 let notificationPermission = 'default';
+
+/**
+ * Fetch the VAPID public key from the server.
+ */
+async function fetchVapidKey() {
+  if (VAPID_PUBLIC_KEY) return VAPID_PUBLIC_KEY;
+
+  try {
+    const resp = await fetch('/api/push/vapid-public-key');
+    if (resp.ok) {
+      const data = await resp.json();
+      VAPID_PUBLIC_KEY = data?.publicKey || data?.data?.publicKey || data?.ok?.publicKey;
+      if (VAPID_PUBLIC_KEY) {
+        console.log('[PWA] VAPID key fetched from server');
+        return VAPID_PUBLIC_KEY;
+      }
+    }
+  } catch (e) {
+    console.warn('[PWA] Could not fetch VAPID key from server:', e);
+  }
+
+  // Fallback — this key must match config/webpush.php
+  VAPID_PUBLIC_KEY = window.HEALTHINTEL_VAPID_KEY || '';
+  return VAPID_PUBLIC_KEY;
+}
 
 // ── Utility: Convert base64 to Uint8Array for VAPID ─────────
 function urlBase64ToUint8Array(base64String) {
@@ -192,10 +217,17 @@ export async function subscribeToPush() {
       return subscription;
     }
 
+    // Fetch VAPID key first
+    const key = await fetchVapidKey();
+    if (!key) {
+      console.warn('[PWA] No VAPID public key available — skipping push subscription');
+      return null;
+    }
+
     // Subscribe
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      applicationServerKey: urlBase64ToUint8Array(key),
     });
 
     console.log('[PWA] Push subscription created');

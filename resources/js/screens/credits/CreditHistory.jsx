@@ -10,8 +10,8 @@ export default function CreditHistory() {
         queryKey: ['credit-ledger'],
         queryFn: () => api.get('/payment/summary'),
     });
-    const summary = data?.data?.summary || {};
-    const transactions = summary?.transactions || [];
+    const transactions = data?.data?.transactions || [];
+    const balance = data?.data?.balance ?? (user?.credits ?? 0);
 
     return (
         <div className="space-y-5">
@@ -26,7 +26,7 @@ export default function CreditHistory() {
             <div className="card overflow-hidden border-0 shadow-lg" style={{ boxShadow: '0 6px 24px rgba(15,118,110,0.12)' }}>
                 <div className="gradient-teal p-5 text-center">
                     <span className="text-xs font-extrabold text-white/60 uppercase tracking-widest">Available Credits</span>
-                    <p className="text-5xl font-extrabold text-white tracking-tighter mt-2">{user?.credits ?? 0}</p>
+                    <p className="text-5xl font-extrabold text-white tracking-tighter mt-2">{balance}</p>
                     <Link to="/credits/buy" className="mt-4 inline-flex items-center gap-1.5 bg-white/20 rounded-xl px-4 py-2 text-sm font-bold text-white hover:bg-white/30 transition-all">
                         + Buy More
                     </Link>
@@ -60,10 +60,11 @@ export default function CreditHistory() {
                                         {tx.action_type?.replace(/_/g, ' ') || 'Transaction'}
                                     </p>
                                     <p className="text-xs text-neutral-400 mt-0.5">
-                                        {new Date(tx.created_at).toLocaleDateString('en-US', {
+                                        {tx.created_at ? new Date(tx.created_at).toLocaleDateString('en-US', {
                                             month: 'short', day: 'numeric', year: 'numeric',
-                                        })}
+                                        }) : '—'}
                                     </p>
+                                    {tx.description && <p className="text-xs text-neutral-400 mt-0.5 truncate max-w-[200px]">{tx.description}</p>}
                                 </div>
                                 <span className={`text-sm font-bold ${tx.credits_delta > 0 ? 'text-success-600' : 'text-danger-600'}`}>
                                     {tx.credits_delta > 0 ? '+' : ''}{tx.credits_delta}

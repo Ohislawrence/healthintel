@@ -58,6 +58,16 @@
         </div>
     </div>
 
+    @if($interpretation->escalation_level === 'urgent')
+    <div style="background: #DC2626; color: white; padding: 14px 18px; border-radius: 8px; margin-bottom: 20px; font-size: 11pt; font-weight: bold; text-align: center;">
+        ⚠️ {{ $interpretation->escalation_message ?? 'This result is critically outside range — seek urgent medical attention.' }}
+    </div>
+    @elseif($interpretation->escalation_level === 'flagged')
+    <div style="background: #FEF3C7; color: #92400E; padding: 10px 16px; border: 1px solid #FCD34D; border-radius: 8px; margin-bottom: 20px; font-size: 10pt; text-align: center;">
+        ⚠ {{ $interpretation->escalation_message ?? 'This result is outside the normal range — speak to a doctor.' }}
+    </div>
+    @endif
+
     <div class="result-card">
         <div class="result-header">
             <div>

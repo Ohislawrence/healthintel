@@ -10,10 +10,11 @@ class CreditPackageSeeder extends Seeder
     public function run(): void
     {
         $packages = [
-            ['name' => '5 Credits', 'credits' => 5, 'price_kobo' => 50000, 'currency' => 'NGN', 'sort_order' => 1],
-            ['name' => '10 Credits', 'credits' => 10, 'price_kobo' => 90000, 'currency' => 'NGN', 'sort_order' => 2],
-            ['name' => '20 Credits', 'credits' => 20, 'price_kobo' => 160000, 'currency' => 'NGN', 'sort_order' => 3],
-            ['name' => '50 Credits', 'credits' => 50, 'price_kobo' => 350000, 'currency' => 'NGN', 'sort_order' => 4],
+            ['name' => 'Single Test', 'credits' => 1, 'price_kobo' => 20000, 'currency' => 'NGN', 'sort_order' => 1],
+            ['name' => 'Quick Check (3)', 'credits' => 3, 'price_kobo' => 50000, 'currency' => 'NGN', 'sort_order' => 2],
+            ['name' => 'Value Pack (10)', 'credits' => 10, 'price_kobo' => 150000, 'currency' => 'NGN', 'sort_order' => 3],
+            ['name' => 'Family Pack (25)', 'credits' => 25, 'price_kobo' => 300000, 'currency' => 'NGN', 'sort_order' => 4],
+            ['name' => 'Health Partner (50)', 'credits' => 50, 'price_kobo' => 500000, 'currency' => 'NGN', 'sort_order' => 5],
         ];
 
         foreach ($packages as $pkg) {

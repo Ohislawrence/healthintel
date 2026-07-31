@@ -37,6 +37,21 @@ export default function AdminProviders() {
         onSuccess: () => { refetch(); setEditingSlug(null); },
     });
 
+    const accessCodeMutation = useMutation({
+        mutationFn: (slug) => api.post(`/admin/providers/${slug}/generate-access-code`),
+        onSuccess: (res) => {
+            const code = res?.data?.access_code || res?.access_code;
+            if (code) {
+                navigator.clipboard.writeText(code).catch(() => {});
+                alert(`Access code generated and copied to clipboard:\n\n${code}\n\nLogin URL: ${res?.login_url || `${window.location.origin}/partner/login`}`);
+            }
+            refetch();
+        },
+        onError: (err) => {
+            alert(err?.response?.data?.message || err?.message || 'Failed to generate access code');
+        },
+    });
+
     const toggleMutation = useMutation({
         mutationFn: (slug) => api.post(`/admin/providers/${slug}/toggle-active`),
         onSuccess: () => refetch(),
@@ -419,9 +434,22 @@ export default function AdminProviders() {
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">{p.is_active ? '🟢' : '🔴'}</td>
-                                            <td className="px-3 py-2 space-x-2">
+                                            <td className="px-3 py-2 space-x-2 whitespace-nowrap">
                                                 <button onClick={() => startEdit(p)} className="text-teal-600 text-xs hover:underline">Edit</button>
                                                 <button onClick={() => { if (confirm(`Toggle active for ${p.name}?`)) toggleMutation.mutate(p.slug); }} className="text-gray-400 text-xs hover:underline">Toggle</button>
+                                                {p.partner_status !== 'none' && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm(`Generate a new access code for ${p.name}? The old code will stop working.`)) {
+                                                                accessCodeMutation.mutate(p.slug);
+                                                            }
+                                                        }}
+                                                        className="text-indigo-600 text-xs hover:underline"
+                                                        disabled={accessCodeMutation.isPending}
+                                                    >
+                                                        {accessCodeMutation.isPending ? 'Generating...' : '🔑 Login Code'}
+                                                    </button>
+                                                )}
                                             </td>
                                         </>
                                     )}

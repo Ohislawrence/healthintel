@@ -318,6 +318,39 @@ class AdminController extends BaseController
         return $this->success(['provider' => $provider->fresh()], 'Toggled');
     }
 
+    public function generateProviderAccessCode(string $slug)
+    {
+        $provider = ProviderDirectoryEntry::where('slug', $slug)->firstOrFail();
+
+        if ($provider->partner_status === 'none') {
+            return $this->error('Provider is not a partner. Set partner status to affiliate or sponsored first.', 422);
+        }
+
+        $provider->update([
+            'access_code' => \Illuminate\Support\Str::random(40),
+            'access_code_generated_at' => now(),
+        ]);
+
+        // Log for audit
+        \Illuminate\Support\Facades\DB::table('admin_audit_log')->insert([
+            'admin_id' => request()->user()->id,
+            'action' => 'generate_partner_access_code',
+            'target_type' => 'provider',
+            'target_id' => $provider->id,
+            'metadata' => json_encode([
+                'target_name' => $provider->name,
+                'partner_status' => $provider->partner_status,
+            ]),
+            'created_at' => now(),
+        ]);
+
+        return $this->success([
+            'provider_id' => $provider->id,
+            'access_code' => $provider->access_code,
+            'login_url' => config('app.url') . '/partner/login',
+        ], 'Access code generated. Share this code with the partner to log in.');
+    }
+
     // ── Credit Packages CRUD ──
 
     public function creditPackages()
@@ -498,6 +531,56 @@ class AdminController extends BaseController
             ]),
             'created_at' => now(),
         ]);
+
+        // Send congratulatory email to the user
+        $creditsText = $validated['credits'] . ' ' . \Illuminate\Support\Str::plural('credit', $validated['credits']);
+        $reasonText = !empty($validated['reason']) ? e($validated['reason']) : 'to help you get the most out of HealthIntel';
+        $appUrl = config('app.url');
+
+        $plainText = "Hi " . $user->name . ",\n\n"
+            . "You've been gifted " . $creditsText . " " . $reasonText . ".\n\n"
+            . "Your new balance is " . $newBalance . " credits. You can use them to upload lab reports, interpret your results, and explore your health.\n\n"
+            . "Go to your dashboard: " . $appUrl . "/dashboard\n\n"
+            . "Kind regards,\n"
+            . "The HealthIntel Team";
+
+        try {
+            \Mail::send([], [], function ($message) use ($user, $plainText, $creditsText, $reasonText, $newBalance, $appUrl) {
+                $message->to($user->email, $user->name)
+                    ->subject($creditsText . ' added to your HealthIntel account')
+                    ->text($plainText)
+                    ->html(
+                        '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"></head>'
+                        . '<body style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; color: #1B2622; background: #F4F6F3;">'
+                        . '<table width="100%" cellpadding="0" cellspacing="0" style="background: #FFFFFF; border-radius: 14px; overflow: hidden; border: 1px solid #DCE3DE;">'
+                            . '<tr><td style="padding: 32px 28px 24px;">'
+                                . '<p style="font-size: 14px; color: #57645D; margin: 0 0 8px;">Hello ' . e($user->name) . ',</p>'
+                                . '<p style="font-size: 16px; line-height: 1.6; color: #1B2622; margin: 0 0 24px;">'
+                                    . 'We wanted to let you know that <strong>' . e($creditsText) . '</strong> ' . ($validated['reason'] ? 'have been added to your account ' . e($reasonText) : 'have been added to your account.') . '</p>'
+                                . '<table width="100%" cellpadding="0" cellspacing="0" style="background: rgba(14,107,92,0.06); border-radius: 10px; margin-bottom: 24px;">'
+                                    . '<tr><td style="padding: 20px 24px; text-align: center;">'
+                                        . '<p style="font-size: 13px; color: #57645D; margin: 0 0 4px;">Your new balance</p>'
+                                        . '<p style="font-size: 32px; font-weight: 700; color: #0E6B5C; margin: 0; line-height: 1;">' . (int)$newBalance . '</p>'
+                                        . '<p style="font-size: 13px; color: #57645D; margin: 4px 0 0;">credits</p>'
+                                    . '</td></tr>'
+                                . '</table>'
+                                . '<p style="font-size: 14px; color: #57645D; line-height: 1.6; margin: 0 0 8px;">Use them to upload lab reports, enter values manually, or run a symptom check — each interpretation uses a credit from your balance.</p>'
+                                . '<p style="font-size: 14px; color: #57645D; line-height: 1.6; margin: 0 0 24px;">If you have any questions, just reply to this email.</p>'
+                                . '<a href="' . $appUrl . '/dashboard" style="display: inline-block; background: #0E6B5C; color: #FFFFFF; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Go to your dashboard</a>'
+                            . '</td></tr>'
+                            . '<tr><td style="padding: 16px 28px; background: #F9FAFB; border-top: 1px solid #E8EBE7; font-size: 12px; color: #9CA3AF; line-height: 1.6;">'
+                                . 'This email was sent because an administrator at HealthIntel added credits to your account. '
+                                . 'HealthIntel — Understand your health, in plain language.'
+                            . '</td></tr>'
+                        . '</table>'
+                        . '</body></html>'
+                    );
+            });
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning(
+                'Credit grant email failed for user ' . $user->id . ': ' . $e->getMessage()
+            );
+        }
 
         return $this->success([
             'user_id' => $user->id,

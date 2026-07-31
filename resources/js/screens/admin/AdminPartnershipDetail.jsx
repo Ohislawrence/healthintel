@@ -62,7 +62,14 @@ export default function AdminPartnershipDetail() {
                     setStats({
                         monthly_count: p.monthly_count,
                         estimated_bill: p.estimated_bill,
+                        total_tests: p.total_tests,
+                        active_since: p.created_at,
                     });
+                    // Also fetch admin-specific stats
+                    api.get(`/admin/partnerships/${id}/stats`).then(r => {
+                        const s = r.data?.stats || r.data || {};
+                        setStats(prev => ({ ...prev, ...s }));
+                    }).catch(() => {});
                 })
                 .catch(() => {
                     alert('Failed to load partnership');

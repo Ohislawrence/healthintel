@@ -52,7 +52,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('/feedback/{id}', [AdminController::class, 'feedbackUpdate']);
 
     // Partner Portal
-    Route::get('/partners', [AdminController::class, 'partners']);
+    Route::post('/providers/{slug}/generate-access-code', [AdminController::class, 'generateProviderAccessCode']);
 
     // PDF Submissions
     Route::get('/pdf-submissions', [AdminController::class, 'pdfSubmissions']);

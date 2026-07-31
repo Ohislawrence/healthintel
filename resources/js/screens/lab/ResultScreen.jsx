@@ -1,8 +1,9 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../lib/api';
 import InterpretationCards from '../../components/ui/InterpretationCards';
+import NearbyProviders from '../../components/NearbyProviders';
 
 const flagStyles = {
     normal: { bg: 'bg-success-50', text: 'text-success-700', border: 'border-success-200', dot: 'bg-success-500' },
@@ -199,6 +200,79 @@ export default function ResultScreen() {
                     View Trends ↗
                 </button>
             )}
+
+            {/* ── Nearby Providers ── */}
+            <NearbyProviders />
+            <NearbyProviders type="hospital" title="Nearby Hospitals" />
+
+            {/* ── Recommended Health Tools (context-aware: 2 based on results) ── */}
+            {(() => {
+                const allTools = [
+                    { icon: '●', color: '#16A34A', title: 'Food & Symptom Diary', desc: 'Track what you eat and how you feel', to: '/health-tools/food-diary', matches: (v) => true },
+                    { icon: '⬤', color: '#DC2626', title: 'Blood Pressure Log', desc: 'Log readings and see trends over time', to: '/health-tools/blood-pressure', matches: (ctx) => ctx.hasBp },
+                    { icon: '∼', color: '#2563EB', title: 'Water Intake Tracker', desc: 'Log daily water intake & track progress', to: '/health-tools/water', matches: (ctx) => ctx.hasKidney },
+                    { icon: '▲', color: '#F97316', title: 'BMR & TDEE Calculator', desc: 'Basal Metabolic Rate & daily energy', to: '/health-tools/bmr', matches: (ctx) => ctx.hasMetabolic },
+                    { icon: '◷', color: '#EC4899', title: 'Due Date Calculator', desc: 'Estimate your baby due date & track pregnancy', to: '/health-tools/due-date', matches: (ctx) => ctx.isPregnant },
+                    { icon: '◇', color: '#9333EA', title: 'Immunization Tracker', desc: "Track your child's vaccines based on NPHCDA schedule", to: '/health-tools/immunization', matches: (ctx) => ctx.hasChild },
+                ];
+
+                // Build context from lab values
+                const valNames = values.map(v => (v.test?.name || v.test_name || v.name || '').toLowerCase()).join(' ');
+                const panelName = (panel.name || '').toLowerCase();
+                const interpretationText = (interpretation?.interpretation_text || '').toLowerCase();
+                const allText = valNames + ' ' + panelName + ' ' + interpretationText;
+
+                const ctx = {
+                    hasBp: /\b(blood pressure|systolic|diastolic|bp|hypertension)\b/i.test(allText),
+                    hasKidney: /\b(kidney|renal|creatinine|urea|egfr|bun)\b/i.test(allText),
+                    hasMetabolic: /\b(glucose|sugar|cholesterol|lipid|triglyceride|hba1c|diabetes|thyroid|tsh|weight|bmi)\b/i.test(allText),
+                    isPregnant: /\b(pregnant|pregnancy|antenatal|hcg)\b/i.test(allText),
+                    hasChild: /\b(child|infant|pediatric|newborn)\b/i.test(allText),
+                };
+
+                // Pick first 2 matching tools, fallback to general ones
+                const matched = allTools.filter(t => t.matches(ctx)).slice(0, 2);
+                const tools = matched.length >= 2 ? matched : [
+                    ...matched,
+                    ...allTools.filter(t => !matched.includes(t)).slice(0, 2 - matched.length),
+                ];
+
+                return (
+                    <div className="card p-5">
+                        <div className="flex items-center gap-3 mb-4 pb-4 border-b border-neutral-100">
+                            <div className="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center text-base text-orange-500">◷</div>
+                            <div>
+                                <p className="text-base font-bold text-neutral-900">Health Tools For You</p>
+                                <p className="text-xs text-neutral-400 mt-0.5">Recommended based on your results</p>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            {tools.map((tool) => (
+                                        <Link
+                                        key={tool.title}
+                                        to={tool.to}
+                                        className="flex items-center gap-3 bg-neutral-50 rounded-xl p-3 hover:bg-neutral-100 transition-colors"
+                                    >
+                                    <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0" style={{ backgroundColor: tool.color + '15' }}>
+                                        <span style={{ color: tool.color }}>{tool.icon}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-neutral-900">{tool.title}</p>
+                                        <p className="text-xs text-neutral-500 mt-0.5">{tool.desc}</p>
+                                    </div>
+                                    <span className="text-neutral-300 text-lg">›</span>
+                                </Link>
+                            ))}
+                        </div>
+                        <Link
+                            to="/health-tools"
+                            className="block text-center mt-4 text-sm font-bold text-teal-700 hover:text-teal-800"
+                        >
+                            Explore all tools →
+                        </Link>
+                    </div>
+                );
+            })()}
 
             {/* Disclaimer */}
             <div className="card p-4 bg-teal-50 border-teal-200 flex gap-2.5 items-start">

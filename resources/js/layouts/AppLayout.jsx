@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import useAuthStore from '../stores/authStore';
 
@@ -14,7 +14,7 @@ export default function AppLayout({ children }) {
     const { user, logout } = useAuthStore();
     const location = useLocation();
     const navigate = useNavigate();
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
 
     const handleLogout = async () => {
         await logout();
@@ -26,7 +26,7 @@ export default function AppLayout({ children }) {
         return location.pathname.startsWith(path);
     };
 
-    const firstName = user?.name?.split(' ')[0] || '';
+
     const profileComplete = !!user?.health_profile?.profile_completed;
 
     return (
@@ -98,29 +98,6 @@ export default function AppLayout({ children }) {
                     <div className="tab-bar-spacer md:hidden" />
                 </main>
             </div>
-
-            {/* ── Mobile Top Bar ─────────────────────────── */}
-            <header className="md:hidden sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-neutral-100 px-4 py-3">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">HealthIntel</p>
-                        <p className="text-lg font-extrabold text-neutral-900 leading-tight">
-                            Hello, {firstName || 'there'}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Link to="/credits" className="rounded-lg bg-teal-50 px-2.5 py-1.5 text-xs font-bold text-teal-700">
-                            ◆ {user?.credits ?? 0}
-                        </Link>
-                        <button
-                            onClick={handleLogout}
-                            className="w-9 h-9 flex items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 font-bold text-sm"
-                        >
-                            ↗
-                        </button>
-                    </div>
-                </div>
-            </header>
 
             {/* ── Mobile Bottom Tab Bar ──────────────────── */}
             <div className="tab-bar-fixed md:hidden">

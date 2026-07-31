@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../../lib/api';
 import useAuthStore from '../../stores/authStore';
 import InterpretationCards from '../../components/ui/InterpretationCards';
+import NearbyProviders from '../../components/NearbyProviders';
 
 export default function SymptomChecker() {
     const navigate = useNavigate();
@@ -56,7 +57,7 @@ export default function SymptomChecker() {
         if (selected.length === 0 && !description.trim()) return;
         checkMutation.mutate({
             symptoms: selected,
-            description: description.trim() || undefined,
+            patient_context: description.trim() || undefined,
         });
     };
 
@@ -99,23 +100,23 @@ export default function SymptomChecker() {
                 )}
 
                 {/* AI Response */}
-                {result?.interpretation_text ? (
+                {result?.interpretation ? (
                     <div className="card p-5 lg:p-6 border-teal-100">
                         <div className="flex items-center gap-3 mb-4 pb-4 border-b border-neutral-100">
                             <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center text-xl text-teal-600">♡</div>
                             <p className="text-lg font-extrabold text-neutral-900">AI Analysis</p>
                         </div>
-                        <InterpretationCards markdownText={result.interpretation_text} />
+                        <InterpretationCards markdownText={result.interpretation} />
                     </div>
-                ) : result?.recommendations?.length > 0 ? (
+                ) : result?.suggested_panels?.length > 0 ? (
                     <div className="space-y-3">
                         <p className="text-sm font-bold text-neutral-900">Recommended Tests</p>
-                        {result.recommendations.map((panel) => (
+                        {result.suggested_panels.map((panel) => (
                             <div key={panel.slug} className="card p-4">
                                 <p className="text-sm font-bold text-neutral-900">{panel.name}</p>
                                 <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{panel.description || 'Recommended test panel'}</p>
                                 <div className="flex items-center gap-2 mt-3">
-                                    {panel.match_score && <span className="badge badge-success">Match {panel.match_score}%</span>}
+                                    {panel.health_profile_boost ? <span className="badge badge-success">Boost +{panel.health_profile_boost}%</span> : null}
                                     <button onClick={() => navigate(`/lab-results/${panel.slug}`)} className="ml-auto text-xs font-bold text-teal-700 hover:text-teal-800">
                                         Check Now →
                                     </button>
@@ -124,6 +125,80 @@ export default function SymptomChecker() {
                         ))}
                     </div>
                 ) : null}
+
+                {/* ── Nearby Providers ── */}
+                <NearbyProviders />
+                <NearbyProviders type="hospital" title="Nearby Hospitals" />
+
+                {/* ── Recommended Health Tools (context-aware: 2 based on symptoms) ── */}
+                {(() => {
+                    const allTools = [
+                        { icon: '●', color: '#16A34A', title: 'Food & Symptom Diary', desc: 'Track what you eat and how you feel to spot patterns', to: '/health-tools/food-diary', matches: (ctx) => true },
+                        { icon: '⬤', color: '#DC2626', title: 'Blood Pressure Log', desc: 'Log readings and see trends over time', to: '/health-tools/blood-pressure', matches: (ctx) => ctx.hasBp },
+                        { icon: '∼', color: '#2563EB', title: 'Water Intake Tracker', desc: 'Log daily water intake & track progress', to: '/health-tools/water', matches: (ctx) => ctx.hasKidney },
+                        { icon: '▲', color: '#F97316', title: 'BMR & TDEE Calculator', desc: 'Understand your daily energy needs', to: '/health-tools/bmr', matches: (ctx) => ctx.hasMetabolic },
+                        { icon: '◷', color: '#EC4899', title: 'Due Date Calculator', desc: 'Estimate your baby due date & track pregnancy', to: '/health-tools/due-date', matches: (ctx) => ctx.isPregnant },
+                        { icon: '◇', color: '#9333EA', title: 'Immunization Tracker', desc: "Track your child's vaccines based on NPHCDA schedule", to: '/health-tools/immunization', matches: (ctx) => ctx.hasChild },
+                    ];
+
+                    const symptomNames = (result?.selected_symptoms || selected).map(s => {
+                        const found = allSymptoms.find(x => x.slug === (s.slug || s));
+                        return (found?.name || s.slug || s || '').toLowerCase();
+                    }).join(' ');
+                    const panelNames = (result?.suggested_panels || []).map(p => (p.name || '').toLowerCase()).join(' ');
+                    const interpText = (result?.interpretation || '').toLowerCase();
+                    const allText = symptomNames + ' ' + panelNames + ' ' + interpText;
+
+                    const ctx = {
+                        hasBp: /\b(blood pressure|systolic|diastolic|bp|hypertension|chest pain|heart)\b/i.test(allText),
+                        hasKidney: /\b(kidney|renal|urine|urinary|creatinine|urea)\b/i.test(allText),
+                        hasMetabolic: /\b(glucose|sugar|cholesterol|lipid|triglyceride|diabetes|thyroid|weight|bmi|metabolism)\b/i.test(allText),
+                        isPregnant: /\b(pregnant|pregnancy|antenatal)\b/i.test(allText),
+                        hasChild: /\b(child|infant|pediatric|newborn|baby)\b/i.test(allText),
+                    };
+
+                    const matched = allTools.filter(t => t.matches(ctx)).slice(0, 2);
+                    const tools = matched.length >= 2 ? matched : [
+                        ...matched,
+                        ...allTools.filter(t => !matched.includes(t)).slice(0, 2 - matched.length),
+                    ];
+
+                    return (
+                        <div className="card p-5">
+                            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-neutral-100">
+                                <div className="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center text-base text-orange-500">◷</div>
+                                <div>
+                                    <p className="text-base font-bold text-neutral-900">Health Tools For You</p>
+                                    <p className="text-xs text-neutral-400 mt-0.5">Recommended based on your symptoms</p>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                {tools.map((tool) => (
+                                        <Link
+                                        key={tool.title}
+                                        to={tool.to}
+                                        className="flex items-center gap-3 bg-neutral-50 rounded-xl p-3 hover:bg-neutral-100 transition-colors"
+                                    >
+                                        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0" style={{ backgroundColor: tool.color + '15' }}>
+                                            <span style={{ color: tool.color }}>{tool.icon}</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-neutral-900">{tool.title}</p>
+                                            <p className="text-xs text-neutral-500 mt-0.5">{tool.desc}</p>
+                                        </div>
+                                        <span className="text-neutral-300 text-lg">›</span>
+                                    </Link>
+                                ))}
+                            </div>
+                            <Link
+                                to="/health-tools"
+                                className="block text-center mt-4 text-sm font-bold text-teal-700 hover:text-teal-800"
+                            >
+                                Explore all tools →
+                            </Link>
+                        </div>
+                    );
+                })()}
 
                 {/* Disclaimer */}
                 <div className="card p-4 bg-teal-50 border-teal-200 flex gap-2.5 items-start">
@@ -136,7 +211,8 @@ export default function SymptomChecker() {
 
     // ── Input View ────────────────────────────
     return (
-        <div className="space-y-5">
+        <>
+        <div className="space-y-5 pb-20">
             <div>
                 <p className="text-2xl font-extrabold text-neutral-900 tracking-tight">Symptom Checker</p>
                 <p className="text-sm font-medium text-neutral-500 mt-0.5">Describe your symptoms for AI-powered guidance</p>
@@ -220,14 +296,17 @@ export default function SymptomChecker() {
                 ))}
             </div>
 
-            {/* Check Button */}
+        </div>
+
+        {/* Floating Analyze Button — above bottom tab bar */}
+        <div className="md:hidden fixed bottom-24 left-0 right-0 px-4 z-40">
             <button
                 onClick={handleCheck}
                 disabled={checkMutation.isPending || (selected.length === 0 && !description.trim())}
-                className="btn btn-primary w-full"
+                className="btn btn-primary w-full shadow-lg"
             >
                 {checkMutation.isPending ? (
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-center justify-center gap-2">
                         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         Analyzing...
                     </span>
@@ -236,5 +315,23 @@ export default function SymptomChecker() {
                 )}
             </button>
         </div>
+        {/* Desktop inline button */}
+        <div className="hidden md:block max-w-lg mx-auto px-4 pb-4">
+            <button
+                onClick={handleCheck}
+                disabled={checkMutation.isPending || (selected.length === 0 && !description.trim())}
+                className="btn btn-primary w-full"
+            >
+                {checkMutation.isPending ? (
+                    <span className="flex items-center justify-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Analyzing...
+                    </span>
+                ) : (
+                    'Analyze Symptoms'
+                )}
+            </button>
+        </div>
+        </>
     );
 }

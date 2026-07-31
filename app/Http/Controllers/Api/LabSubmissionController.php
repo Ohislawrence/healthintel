@@ -12,6 +12,7 @@ use App\Services\CreditService;
 use App\Services\DeepSeekService;
 use App\Services\InterpretationPromptBuilder;
 use App\Services\ReferenceRangeEngine;
+use App\Services\ReferenceRangeService;
 use Illuminate\Http\Request;
 use Spatie\PdfToText\Pdf;
 use Illuminate\Support\Facades\Storage;
@@ -23,6 +24,7 @@ class LabSubmissionController extends BaseController
         private InterpretationPromptBuilder $promptBuilder,
         private DeepSeekService $deepSeek,
         private CreditService $creditService,
+        private ReferenceRangeService $referenceRangeService,
     ) {}
 
     /**
@@ -91,19 +93,25 @@ class LabSubmissionController extends BaseController
         $profile = $user->healthProfile;
         $cost = config('credits.costs.lab_interpretation', 2);
 
-        // Check credits
-        if (!$this->creditService->hasCredits($user, $cost)) {
-            return $this->error('Insufficient credits. Please top up.', 402);
+        // ── First interpretation free ──
+        $isFirstFree = false;
+        if (!$user->received_free_interpretation && config('credits.first_interpretation_free', true)) {
+            $user->update(['received_free_interpretation' => true]);
+            $isFirstFree = true;
+        } else {
+            if (!$this->creditService->hasCredits($user, $cost)) {
+                return $this->error('Insufficient credits. Please top up.', 402);
+            }
+            $this->creditService->debit($user, $cost, 'lab_interpretation');
         }
 
-        // Deduct credits
-        $this->creditService->debit($user, $cost, 'lab_interpretation');
+        $effectiveCost = $isFirstFree ? 0 : $cost;
 
         // Create submission
         $submission = LabSubmission::create([
             'user_id' => $user->id,
             'test_panel_id' => $panel->id,
-            'credits_used' => $cost,
+            'credits_used' => $effectiveCost,
             'submitted_at' => now(),
         ]);
 
@@ -161,7 +169,8 @@ class LabSubmissionController extends BaseController
     }
 
     /**
-     * Trend data: historical values for a given test slug across all user submissions.
+     * Trend data with analysis: historical values for a given test slug
+     * plus trend direction, alerts, and sharing capability.
      */
     public function trends(Request $request)
     {
@@ -169,23 +178,190 @@ class LabSubmissionController extends BaseController
             'test_slug' => 'required|string',
         ]);
 
-        $values = LabSubmissionValue::where('test_slug', $validated['test_slug'])
-            ->whereHas('submission', fn ($q) => $q->where('user_id', $request->user()->id))
-            ->with('submission:id,user_id,test_panel_id,submitted_at')
-            ->latest('created_at')
-            ->get()
-            ->map(fn ($v) => [
-                'value' => $v->value,
-                'flag' => $v->flag,
-                'unit' => $v->unit,
-                'date' => $v->submission->submitted_at?->toDateString() ?? $v->created_at->toDateString(),
-            ]);
+        $analysis = app(\App\Services\TrendService::class)
+            ->analyzeTrend($request->user()->id, $validated['test_slug']);
 
-        return $this->success(['trends' => $values]);
+        return $this->success(['trend' => $analysis]);
     }
 
     /**
-     * Submit a PDF lab report for AI interpretation.
+     * Share a trend summary as a PDF (via download or email).
+     */
+    public function shareTrend(Request $request)
+    {
+        $validated = $request->validate([
+            'test_slug' => 'required|string',
+            'delivery_method' => 'nullable|in:pdf,email', // pdf=download, email=send
+            'recipient_email' => 'nullable|email|required_if:delivery_method,email',
+        ]);
+
+        $user = $request->user();
+        $trendService = app(\App\Services\TrendService::class);
+        $pdf = $trendService->generateTrendSummaryPdf($user->id, $validated['test_slug']);
+
+        $method = $validated['delivery_method'] ?? 'pdf';
+
+        if ($method === 'email') {
+            \Mail::send([], [], function ($message) use ($validated, $pdf) {
+                $message->to($validated['recipient_email'])
+                    ->subject('Lab Trend Summary — Shared by LabDoc User')
+                    ->html('<p>A LabDoc user has shared their lab trend summary with you. Please find it attached.</p>')
+                    ->attachData($pdf, 'trend-summary.pdf', ['mime' => 'application/pdf']);
+            });
+
+            return $this->success(null, 'Trend summary sent to ' . $validated['recipient_email']);
+        }
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="trend-summary.pdf"',
+        ]);
+    }
+
+    /**
+     * Submit a PDF for initial OCR — returns extracted values for user confirmation.
+     * The actual interpretation runs only after the user confirms the values.
+     */
+    public function submitPdfDraft(Request $request)
+    {
+        $validated = $request->validate([
+            'pdf_base64' => 'required|string',
+            'pdf_name' => 'nullable|string|max:255',
+        ]);
+
+        $user = $request->user();
+
+        $pdfData = base64_decode($validated['pdf_base64']);
+        if (!$pdfData) {
+            return $this->error('Invalid PDF data.', 422);
+        }
+
+        $fileName = ($validated['pdf_name'] ?? 'report') . '_' . time() . '.pdf';
+        $path = 'lab-reports/' . $fileName;
+        Storage::put($path, $pdfData);
+        $fullPath = Storage::path($path);
+
+        $pdfText = '';
+        try {
+            $parser = new \Smalot\PdfParser\Parser();
+            $pdf = $parser->parseFile($fullPath);
+            $pdfText = $pdf->getText();
+        } catch (\Throwable) {
+            return $this->error('Could not parse this PDF.', 422);
+        }
+
+        if (empty(trim($pdfText))) {
+            return $this->error('No text could be extracted from this PDF.', 422);
+        }
+
+        // Extract structured values using known test names
+        $extractor = app(\App\Services\PdfValueExtractor::class);
+        $extractedTests = $extractor->extract($pdfText);
+
+        // Save draft
+        $draft = \App\Models\PdfSubmissionDraft::create([
+            'user_id' => $user->id,
+            'raw_ocr_text' => $pdfText,
+            'extracted_tests' => $extractedTests,
+            'confirmation_status' => 'pending',
+            'pdf_path' => $path,
+        ]);
+
+        return $this->success([
+            'draft_id' => $draft->id,
+            'extracted_tests' => $extractedTests,
+            'raw_text_preview' => substr($pdfText, 0, 500),
+            'message' => count($extractedTests) > 0
+                ? 'We found ' . count($extractedTests) . ' test values. Please review and confirm before interpretation.'
+                : 'No test values could be automatically detected. You can manually enter them below.',
+        ]);
+    }
+
+    /**
+     * Confirm extracted values and run the interpretation.
+     * User can also edit the values before confirming.
+     */
+    public function confirmPdfDraft(Request $request, $draftId)
+    {
+        $validated = $request->validate([
+            'confirmed_values' => 'required|array|min:1',
+            'confirmed_values.*.test_name' => 'required|string|max:255',
+            'confirmed_values.*.value' => 'required|numeric',
+            'confirmed_values.*.unit' => 'nullable|string|max:50',
+        ]);
+
+        $user = $request->user();
+        $draft = \App\Models\PdfSubmissionDraft::where('user_id', $user->id)->findOrFail($draftId);
+
+        $cost = config('credits.costs.pdf_interpretation', 3);
+
+        if (!$this->creditService->hasCredits($user, $cost)) {
+            return $this->error('Insufficient credits. Please top up.', 402);
+        }
+
+        // Create a single submission with all confirmed tests as values
+        $submission = LabSubmission::create([
+            'user_id' => $user->id,
+            'submission_type' => 'pdf',
+            'credits_used' => $cost,
+            'pdf_report_url' => $draft->pdf_path,
+            'pdf_text' => $draft->raw_ocr_text,
+            'submitted_at' => now(),
+        ]);
+
+        // Store each confirmed value
+        foreach ($validated['confirmed_values'] as $item) {
+            LabSubmissionValue::create([
+                'lab_submission_id' => $submission->id,
+                'test_slug' => \Illuminate\Support\Str::slug($item['test_name']),
+                'test_name' => $item['test_name'],
+                'unit' => $item['unit'] ?? '',
+                'value' => $item['value'],
+                'flag' => 'pending',
+            ]);
+        }
+
+        // Build prompt
+        $prompt = "The following lab values were extracted from a PDF report and confirmed by the user:\n\n";
+        foreach ($validated['confirmed_values'] as $item) {
+            $prompt .= "- {$item['test_name']}: {$item['value']} {$item['unit']}\n";
+        }
+        $prompt .= "\nProvide a plain-language interpretation for the patient.";
+
+        $interpretation = AiInterpretation::create([
+            'lab_submission_id' => $submission->id,
+            'prompt_input' => $prompt,
+            'guardrail_flags' => [],
+            'status' => 'pending',
+        ]);
+
+        $interpText = $this->deepSeek->interpretPdf($interpretation, $prompt);
+
+        if (!$interpText) {
+            return $this->error('AI interpretation unavailable. Please try again.', 503);
+        }
+
+        $this->creditService->debit($user, $cost, 'pdf_interpretation');
+
+        // Mark draft as confirmed
+        $draft->update([
+            'confirmation_status' => 'confirmed',
+            'confirmed_by' => $user->id,
+            'confirmed_at' => now(),
+            'extracted_tests' => $validated['confirmed_values'],
+        ]);
+
+        $submission->load(['values', 'interpretation']);
+
+        return $this->success([
+            'submission' => $submission,
+            'interpretation' => $interpretation->fresh(),
+            'has_interpretation' => !is_null($interpText),
+        ], 'Values confirmed and interpretation generated', 201);
+    }
+
+    /**
+     * Submit a PDF lab report for AI interpretation (legacy — kept for backward compatibility).
      */
     public function submitPdf(Request $request)
     {

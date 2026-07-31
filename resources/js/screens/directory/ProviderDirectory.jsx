@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../lib/api';
 
+import SponsoredBannerCarousel from '../../components/SponsoredBannerCarousel';
+
 export default function ProviderDirectory() {
     const [search, setSearch] = useState('');
     const [specialty, setSpecialty] = useState('');
@@ -55,6 +57,9 @@ export default function ProviderDirectory() {
                     </select>
                 </div>
             </div>
+
+            {/* Sponsored Banner */}
+            <SponsoredBannerCarousel />
 
             {/* Results */}
             {isLoading ? (

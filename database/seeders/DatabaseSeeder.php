@@ -23,6 +23,9 @@ class DatabaseSeeder extends Seeder
             CreditPackageSeeder::class,
             SymptomSeeder::class,
             ProviderDirectorySeeder::class,
+            ReferenceRangeSeeder::class,
+            InterpretationPanelSeeder::class,
+            MedicationEffectSeeder::class,
         ]);
 
         User::factory()->create([

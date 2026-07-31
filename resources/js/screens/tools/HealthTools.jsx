@@ -1,19 +1,21 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import useAuthStore from '../../stores/authStore';
 
-const CALCULATORS = [
-    { icon: '◷', color: '#0EA5E9', title: 'Appointment Tracker', subtitle: 'Book, track & get reminded for medical appointments', to: null },
-    { icon: '▲', color: '#F97316', title: 'BMR & TDEE Calculator', subtitle: 'Basal Metabolic Rate & Total Daily Energy Expenditure', to: null },
-    { icon: '◉', color: '#F97316', title: 'Waist-to-Hip Ratio', subtitle: 'Assess your body fat distribution and health risk', to: null },
-    { icon: '⚛', color: '#EC4899', title: 'Due Date Calculator', subtitle: 'Estimate your baby due date & track pregnancy weeks', to: null },
+const ALL_CALCULATORS = [
+    { icon: '◉', color: '#0EA5E9', title: 'BMI Calculator', subtitle: 'Body Mass Index — estimates body fat based on height and weight', to: '/health-tools/bmi', forSex: null },
+    { icon: '▲', color: '#F97316', title: 'BMR & TDEE Calculator', subtitle: 'Basal Metabolic Rate & Total Daily Energy Expenditure', to: '/health-tools/bmr', forSex: null },
+    { icon: '⚛', color: '#EC4899', title: 'Due Date Calculator', subtitle: 'Estimate your baby due date & track pregnancy weeks', to: '/health-tools/due-date', forSex: 'female' },
+    { icon: '◉', color: '#F97316', title: 'Waist-to-Hip Ratio', subtitle: 'Assess your body fat distribution and health risk', to: '/health-tools/waist-hip', forSex: null },
 ];
 
-const TRACKERS = [
-    { icon: '◷', color: '#EC4899', title: 'Period & Cycle Tracker', subtitle: 'Log periods, track cycles, predict ovulation & fertile windows', to: null },
-    { icon: '◇', color: '#9333EA', title: 'Immunization Tracker', subtitle: "Track your child's vaccines based on NPHCDA schedule", to: null },
-    { icon: '∼', color: '#2563EB', title: 'Water Intake Tracker', subtitle: 'Log your daily water intake, set goals & track progress', to: null },
-    { icon: '⬤', color: '#DC2626', title: 'Blood Pressure Log', subtitle: 'Log systolic & diastolic readings and see trends over time', to: null },
-    { icon: '●', color: '#16A34A', title: 'Food & Symptom Diary', subtitle: 'Track what you eat and how you feel — spot patterns over time', to: null },
+const ALL_TRACKERS = [
+    { icon: '⬤', color: '#DC2626', title: 'Blood Pressure Log', subtitle: 'Log systolic & diastolic readings and see trends over time', to: '/health-tools/blood-pressure', forSex: null },
+    { icon: '∼', color: '#2563EB', title: 'Water Intake Tracker', subtitle: 'Log your daily water intake, set goals & track progress', to: '/health-tools/water', forSex: null },
+    { icon: '●', color: '#16A34A', title: 'Food & Symptom Diary', subtitle: 'Track what you eat and how you feel — spot patterns over time', to: '/health-tools/food-diary', forSex: null },
+    { icon: '◷', color: '#EC4899', title: 'Period & Cycle Tracker', subtitle: 'Log periods, track cycles, predict ovulation & fertile windows', to: '/health-tools/period', forSex: 'female' },
+    { icon: '◇', color: '#9333EA', title: 'Immunization Tracker', subtitle: "Track your child's vaccines based on NPHCDA schedule", to: '/health-tools/immunization', forSex: null },
+    { icon: '◷', color: '#0EA5E9', title: 'Appointment Tracker', subtitle: 'Book, track & get reminded for medical appointments', to: '/health-tools/appointments', forSex: null },
 ];
 
 function ToolCard({ icon, color, title, subtitle, to }) {
@@ -44,6 +46,11 @@ function ToolCard({ icon, color, title, subtitle, to }) {
 }
 
 export default function HealthTools() {
+    const { user } = useAuthStore();
+    const sex = user?.health_profile?.sex || null;
+
+    const CALCULATORS = ALL_CALCULATORS.filter(t => !t.forSex || t.forSex === sex);
+    const TRACKERS = ALL_TRACKERS.filter(t => !t.forSex || t.forSex === sex);
     return (
         <div className="space-y-5">
             <div>

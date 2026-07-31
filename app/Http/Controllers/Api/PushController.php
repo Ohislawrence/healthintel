@@ -9,8 +9,6 @@ use Illuminate\Support\Facades\Validator;
 
 class PushController extends BaseController
 {
-    use ApiResponse;
-
     /**
      * Subscribe to push notifications.
      * Stores the browser's PushSubscription JSON for the authenticated user.

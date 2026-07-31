@@ -8,6 +8,50 @@ use Illuminate\Support\Facades\Http;
 class DeepSeekService
 {
     /**
+     * Simple ask method used by partner interpretation pipeline.
+     * Sends a single prompt and returns the raw text response.
+     */
+    public function ask(string $prompt, int $maxTokens = 200, float $temperature = 0.3): ?string
+    {
+        $apiKey = config('services.deepseek.api_key')
+            ?: ($_ENV['DEEPSEEK_API_KEY'] ?? getenv('DEEPSEEK_API_KEY'))
+            ?: null;
+
+        if (empty($apiKey)) {
+            return null;
+        }
+
+        $model = config('services.deepseek.model')
+            ?: ($_ENV['DEEPSEEK_MODEL'] ?? getenv('DEEPSEEK_MODEL'))
+            ?: 'deepseek-chat';
+        $baseUrl = config('services.deepseek.base_url', 'https://api.deepseek.com');
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type' => 'application/json',
+            ])->timeout(30)->post($baseUrl . '/v1/chat/completions', [
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $this->systemPrompt()],
+                    ['role' => 'user', 'content' => $prompt],
+                ],
+                'max_tokens' => $maxTokens,
+                'temperature' => $temperature,
+            ]);
+
+            if ($response->successful()) {
+                $body = $response->json();
+                return $body['choices'][0]['message']['content'] ?? null;
+            }
+
+            return null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * Send flagged results to DeepSeek for plain-language interpretation.
      * Graceful degradation: returns null on failure so the controller can fall back to flags-only.
      */

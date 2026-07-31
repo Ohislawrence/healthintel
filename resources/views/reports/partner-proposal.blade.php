@@ -119,6 +119,66 @@
         </div>
     </div>
 
+    {{-- ROI Metrics --}}
+    <div class="page">
+        <h2>Expected ROI for Your Lab</h2>
+        <p>Based on industry data and our partner labs' real results, here's what you can expect from AI-powered lab interpretation:</p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="icon">📞</div>
+                <h4>Reduce Patient Calls</h4>
+                <p>Labs using HealthIntel report a ~70% reduction in "what does this mean?" phone calls. Patients receive instant, clear explanations.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">⭐</div>
+                <h4>Improve Patient Satisfaction</h4>
+                <p>Instant, plain-language reports increase patient trust. Partners see improved NPS scores and positive feedback.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">🔄</div>
+                <h4>Increase Re-Test Rates</h4>
+                <p>Patients who understand their results are more likely to return for follow-up testing. Typical re-test rate improvement: 25-40%.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">⚡</div>
+                <h4>Faster Turnaround</h4>
+                <p>Instant AI interpretation means results go from lab → patient in minutes, not hours. Average interpretation time: under 30 seconds.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">🔴</div>
+                <h4>Critical Result Flagging</h4>
+                <p>Urgent findings are automatically flagged with clear escalation: "This result is critically outside range — speak to a doctor immediately."</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">📊</div>
+                <h4>Clinician + Patient Views</h4>
+                <p>Dual interpretation: technical version for healthcare professionals and simplified version for patients — both generated instantly.</p>
+            </div>
+        </div>
+
+        @php
+            $roi = app(\App\Services\RoiMetricsService::class)->calculate($partnership, 90);
+        @endphp
+
+        @if($roi['total_tests'] > 0)
+        <h3 style="margin-top: 30px;">Your Lab's Current Metrics (Last 90 Days)</h3>
+        <table class="pricing-table">
+            <tr><td width="45%"><strong>Total Interpretations</strong></td><td>{{ number_format($roi['total_tests']) }}</td></tr>
+            <tr><td><strong>Unique Patients</strong></td><td>{{ number_format($roi['total_patients']) }}</td></tr>
+            <tr><td><strong>Abnormal Detection Rate</strong></td><td>{{ $roi['abnormal_detection']['abnormal_rate'] ?? 0 }}%</td></tr>
+            <tr><td><strong>Critical Findings Flagged</strong></td><td>{{ $roi['abnormal_detection']['critical_count'] ?? 0 }}</td></tr>
+            <tr><td><strong>Est. Calls Prevented</strong></td><td>{{ number_format($roi['patient_communication']['estimated_calls_prevented'] ?? 0) }}</td></tr>
+            <tr><td><strong>Patient Re-Test Rate</strong></td><td>{{ $roi['patient_retention']['retest_rate'] ?? '0%' }}</td></tr>
+            <tr><td><strong>Avg. Turnaround Time</strong></td><td>{{ round($roi['efficiency']['avg_turnaround_minutes'] ?? 0, 1) }} min</td></tr>
+        </table>
+
+        <div class="highlight" style="margin-top: 20px;">
+            <strong>📊 ROI Summary:</strong> {{ $roi['patient_communication']['description'] ?? '' }} {{ $roi['patient_retention']['description'] ?? '' }}
+        </div>
+        @endif
+    </div>
+
     {{-- Getting Started --}}
     <div class="page">
         <h2>Getting Started</h2>

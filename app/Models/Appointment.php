@@ -18,12 +18,14 @@ class Appointment extends Model
         'notes',
         'reminder_enabled',
         'reminder_minutes_before',
+        'reminder_sent_at',
     ];
 
     protected $casts = [
         'appointment_date' => 'date',
         'reminder_enabled' => 'boolean',
         'reminder_minutes_before' => 'integer',
+        'reminder_sent_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

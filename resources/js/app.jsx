@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import useAuthStore from './stores/authStore';
+import usePartnerAuthStore from './stores/partnerAuthStore';
 import { initPWA, subscribeToPush, isInstalled, isOnline } from './lib/pwa';
 import AppLayout from './layouts/AppLayout';
 import { useNavigate } from 'react-router-dom';
@@ -48,6 +49,16 @@ import ProviderDirectory from './screens/directory/ProviderDirectory';
 import ProviderDetail from './screens/directory/ProviderDetail';
 import InsuranceComparison from './screens/insurance/InsuranceComparison';
 import HealthTools from './screens/tools/HealthTools';
+import BMICalculator from './screens/tools/BMICalculator';
+import BMRCalculator from './screens/tools/BMRCalculator';
+import DueDateCalculator from './screens/tools/DueDateCalculator';
+import WaistHipCalculator from './screens/tools/WaistHipCalculator';
+import BloodPressureLog from './screens/tools/BloodPressureLog';
+import WaterIntakeTracker from './screens/tools/WaterIntakeTracker';
+import FoodSymptomDiary from './screens/tools/FoodSymptomDiary';
+import PeriodTracker from './screens/tools/PeriodTracker';
+import ImmunizationTracker from './screens/tools/ImmunizationTracker';
+import AppointmentTracker from './screens/tools/AppointmentTracker';
 import Offline from './screens/Offline';
 import AdminLayout from './screens/admin/AdminLayout';
 import AdminDashboard from './screens/admin/AdminDashboard';
@@ -61,7 +72,6 @@ import AdminAnalytics from './screens/admin/AdminAnalytics';
 import AdminAppointments from './screens/admin/AdminAppointments';
 import AdminFeedback from './screens/admin/AdminFeedback';
 import AdminSubmissions from './screens/admin/AdminSubmissions';
-import AdminPartners from './screens/admin/AdminPartners';
 import AdminNotifications from './screens/admin/AdminNotifications';
 import AdminAuditLog from './screens/admin/AdminAuditLog';
 import AdminSettings from './screens/admin/AdminSettings';
@@ -70,6 +80,20 @@ import AdminBlogEditor from './screens/admin/AdminBlogEditor';
 import AdminBlogCategories from './screens/admin/AdminBlogCategories';
 import AdminPartnerships from './screens/admin/AdminPartnerships';
 import AdminPartnershipDetail from './screens/admin/AdminPartnershipDetail';
+import PartnerLogin from './screens/partner/PartnerLogin';
+import PartnerLayout from './screens/partner/PartnerLayout';
+import PartnerDashboard from './screens/partner/PartnerDashboard';
+import PartnerInterpretations from './screens/partner/PartnerInterpretations';
+
+// Placeholder screens for partner portal (fallback for routes not yet built)
+function PartnerPlaceholder({ title }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+      <h3 className="text-lg font-semibold text-gray-700 mb-2">{title}</h3>
+      <p className="text-sm text-gray-400">This section is coming soon.</p>
+    </div>
+  );
+}
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -110,6 +134,16 @@ function GuestRoute({ children }) {
             return <Navigate to="/admin" replace />;
         }
         return <Navigate to="/dashboard" replace />;
+    }
+
+    return children;
+}
+
+function PartnerProtectedRoute({ children }) {
+    const { provider, token } = usePartnerAuthStore();
+
+    if (!provider || !token) {
+        return <Navigate to="/partner/login" replace />;
     }
 
     return children;
@@ -210,6 +244,16 @@ function App() {
                     <Route path="/providers/:slug" element={<ProtectedRoute><AppLayout><ProviderDetail /></AppLayout></ProtectedRoute>} />
                     <Route path="/insurance" element={<ProtectedRoute><AppLayout><InsuranceComparison /></AppLayout></ProtectedRoute>} />
 <Route path="/health-tools" element={<ProtectedRoute><AppLayout><HealthTools /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/bmi" element={<ProtectedRoute><AppLayout><BMICalculator /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/bmr" element={<ProtectedRoute><AppLayout><BMRCalculator /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/due-date" element={<ProtectedRoute><AppLayout><DueDateCalculator /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/waist-hip" element={<ProtectedRoute><AppLayout><WaistHipCalculator /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/blood-pressure" element={<ProtectedRoute><AppLayout><BloodPressureLog /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/water" element={<ProtectedRoute><AppLayout><WaterIntakeTracker /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/food-diary" element={<ProtectedRoute><AppLayout><FoodSymptomDiary /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/period" element={<ProtectedRoute><AppLayout><PeriodTracker /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/immunization" element={<ProtectedRoute><AppLayout><ImmunizationTracker /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/appointments" element={<ProtectedRoute><AppLayout><AppointmentTracker /></AppLayout></ProtectedRoute>} />
 
                     {/* Admin Routes */}
                     <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
@@ -223,7 +267,6 @@ function App() {
                         <Route path="panels" element={<AdminPanels />} />
                         <Route path="symptom-mappings" element={<AdminSymptomMappings />} />
                         <Route path="providers" element={<AdminProviders />} />
-                        <Route path="partners" element={<AdminPartners />} />
                         <Route path="credit-packages" element={<AdminCreditPackages />} />
                         <Route path="notifications" element={<AdminNotifications />} />
                         <Route path="audit-log" element={<AdminAuditLog />} />
@@ -235,6 +278,19 @@ function App() {
                         <Route path="partnerships" element={<AdminPartnerships />} />
                         <Route path="partnerships/new" element={<AdminPartnershipDetail />} />
                         <Route path="partnerships/:id" element={<AdminPartnershipDetail />} />
+                    </Route>
+
+                    {/* Partner Portal Routes */}
+                    <Route path="/partner/login" element={<PartnerLogin />} />
+                    <Route path="/partner" element={<PartnerProtectedRoute><PartnerLayout /></PartnerProtectedRoute>}>
+                        <Route index element={<Navigate to="/partner/dashboard" replace />} />
+                        <Route path="dashboard" element={<PartnerDashboard />} />
+                        <Route path="interpretations" element={<PartnerInterpretations />} />
+                        <Route path="patients" element={<PartnerPlaceholder title="Patients" />} />
+                        <Route path="invoices" element={<PartnerPlaceholder title="Invoices" />} />
+                        <Route path="submit" element={<PartnerPlaceholder title="Submit Results" />} />
+                        <Route path="api-docs" element={<PartnerPlaceholder title="API Documentation" />} />
+                        <Route path="settings" element={<PartnerPlaceholder title="Settings" />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />

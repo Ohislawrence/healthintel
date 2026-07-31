@@ -59,18 +59,30 @@ export default function BuyCredits() {
                         <button
                             key={pkg.id}
                             onClick={() => setSelectedPackage(pkg.id)}
-                            className={`w-full card p-4 text-left hover:shadow-md transition-all ${
-                                selectedPackage === pkg.id ? 'border-teal-700 ring-2 ring-teal-100' : ''
+                            className={`w-full card p-4 text-left transition-all ${
+                                selectedPackage === pkg.id
+                                    ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-200 shadow-md'
+                                    : 'border-neutral-200 hover:border-teal-200 hover:shadow-sm'
                             }`}
                         >
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm font-bold text-neutral-900">{pkg.name}</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-sm font-bold text-neutral-900">{pkg.name}</p>
+                                        {selectedPackage === pkg.id && (
+                                            <span className="text-[10px] font-bold bg-teal-500 text-white px-2 py-0.5 rounded-full">Selected</span>
+                                        )}
+                                    </div>
                                     <p className="text-xs text-neutral-500 mt-0.5">{pkg.description || `${pkg.credits} credits`}</p>
                                 </div>
-                                <span className="text-xl font-extrabold text-teal-700">
-                                    {pkg.price_formatted || '₦' + parseFloat(pkg.price_naira || 0).toLocaleString()}
-                                </span>
+                                <div className="text-right">
+                                    <span className={`text-xl font-extrabold ${selectedPackage === pkg.id ? 'text-teal-700' : 'text-neutral-700'}`}>
+                                        {pkg.price_formatted || '₦' + parseFloat(pkg.price_naira || 0).toLocaleString()}
+                                    </span>
+                                    {pkg.credits && (
+                                        <p className="text-xs font-bold text-teal-500 mt-0.5">{pkg.credits} credits</p>
+                                    )}
+                                </div>
                             </div>
                         </button>
                     ))}
@@ -82,7 +94,7 @@ export default function BuyCredits() {
                 disabled={!selectedPackage || initMutation.isPending}
                 className="btn btn-primary w-full"
             >
-                {initMutation.isPending ? 'Redirecting to Paystack...' : 'Pay with Paystack'}
+                {initMutation.isPending ? 'Redirecting...' : 'Pay Now'}
             </button>
         </div>
     );

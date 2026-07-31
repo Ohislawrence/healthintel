@@ -103,7 +103,17 @@ function parseSections(text) {
         sections.push(section);
     }
 
-    return sections;
+    // Reorder: Explanation before Key Findings, remove Disclaimer
+    const priority = (s) => {
+        const t = s.title.toLowerCase();
+        if (t.includes('explanation') || t.includes('what this means')) return 0;
+        if (t.includes('key finding') || t.includes('summary') || t.includes('overview') || t.includes('abnormal')) return 1;
+        return 2;
+    };
+
+    return sections
+        .filter(s => !s.title.toLowerCase().includes('disclaimer'))
+        .sort((a, b) => priority(a) - priority(b));
 }
 
 /**

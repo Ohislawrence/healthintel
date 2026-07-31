@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\Partner;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Api\BaseController;
+use App\Models\InterpretationOverride;
 use App\Models\LabPartnership;
 use App\Models\PartnerInterpretation;
 use App\Models\ProviderDirectoryEntry;
+use App\Services\ReferenceRangeService;
 use App\Services\ReportRenderer;
 use Illuminate\Http\Request;
 
@@ -14,6 +16,7 @@ class PartnerInterpretationController extends BaseController
 {
     public function __construct(
         private ReportRenderer $renderer,
+        private ReferenceRangeService $referenceRangeService,
     ) {}
 
     // ── Resolve the authenticated partner ────────────────
@@ -191,6 +194,273 @@ class PartnerInterpretationController extends BaseController
         ], "{$rowCount} interpretations processed", 201);
     }
 
+    // ── ROI Metrics ────────────────────────────────────
+
+    public function roi(Request $request)
+    {
+        $partner = $this->resolvePartner($request);
+        $days = min((int) $request->get('days', 90), 365);
+
+        $metrics = app(\App\Services\RoiMetricsService::class)->calculate($partner, $days);
+
+        return $this->success(['roi' => $metrics]);
+    }
+
+    // ── Delivery Health ─────────────────────────────────
+
+    public function deliveryHealth(Request $request)
+    {
+        $partner = $this->resolvePartner($request);
+
+        $thisMonth = now()->startOfMonth();
+        $attempts = \App\Models\DeliveryAttempt::whereHas(
+            'interpretation',
+            fn($q) => $q->where('partnership_id', $partner->id)
+        )
+        ->where('created_at', '>=', $thisMonth)
+        ->get();
+
+        $sent = $attempts->where('status', 'sent')->count();
+        $failed = $attempts->where('status', 'failed')->count();
+        $pendingRetry = $attempts->where('status', 'failed')
+            ->where('next_retry_at', '!=', null)
+            ->where('next_retry_at', '<=', now())
+            ->count();
+        $total = $attempts->count();
+
+        $deliveryRate = $total > 0 ? round(($sent / $total) * 100, 1) : 0;
+
+        $recentFailed = $attempts->where('status', 'failed')
+            ->sortByDesc('created_at')
+            ->take(5)
+            ->map(fn($a) => [
+                'interpretation_id' => $a->interpretation_id,
+                'method' => $a->delivery_method,
+                'error' => $a->error_message,
+                'attempt' => $a->attempt_number,
+                'next_retry' => $a->next_retry_at?->toISOString(),
+            ])
+            ->values();
+
+        return $this->success([
+            'delivery_health' => [
+                'this_month' => [
+                    'total_attempts' => $total,
+                    'sent' => $sent,
+                    'failed' => $failed,
+                    'pending_retry' => $pendingRetry,
+                    'delivery_rate' => $deliveryRate . '%',
+                ],
+                'recent_failures' => $recentFailed,
+            ],
+        ]);
+    }
+
+    // ── Panels ──────────────────────────────────────────
+
+    public function panels(Request $request)
+    {
+        $panels = \App\Models\InterpretationPanel::where('status', 'approved')
+            ->get()
+            ->map(fn($p) => [
+                'id' => $p->id,
+                'slug' => $p->slug,
+                'name' => $p->name,
+                'description' => $p->description,
+                'test_codes' => $p->test_codes,
+                'layout_sections' => $p->layout_sections,
+                'test_count' => count($p->test_codes),
+                'version' => $p->version,
+            ]);
+
+        return $this->success(['panels' => $panels]);
+    }
+
+    // ── View / Edit Interpretation (dual-view) ──────────────
+
+    public function show(Request $request, $id)
+    {
+        $partner = $this->resolvePartner($request);
+        $i = PartnerInterpretation::where('partnership_id', $partner->id)->findOrFail($id);
+
+        return $this->success([
+            'id' => $i->id,
+            'patient_identifier' => $i->patient_identifier,
+            'test_name' => $i->test_name,
+            'value' => $i->value,
+            'unit' => $i->unit,
+            'reference_range_low' => $i->reference_range_low,
+            'reference_range_high' => $i->reference_range_high,
+            'sex' => $i->sex,
+            'age' => $i->age,
+            'interpretation_text' => $i->interpretation_text,
+            'clinician_interpretation_text' => $i->clinician_interpretation_text,
+            'version_for_patient' => $i->version_for_patient,
+            'status' => $i->status,
+            'delivery_method' => $i->delivery_method,
+            'delivery_status' => $i->delivery_status,
+            'created_at' => $i->created_at->toISOString(),
+        ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $partner = $this->resolvePartner($request);
+        $i = PartnerInterpretation::where('partnership_id', $partner->id)->findOrFail($id);
+        $provider = $request->user();
+
+        $validated = $request->validate([
+            'interpretation_text' => 'nullable|string|max:5000',
+            'clinician_interpretation_text' => 'nullable|string|max:5000',
+            'version_for_patient' => 'nullable|boolean',
+            'reference_range_low' => 'nullable|string|max:50',
+            'reference_range_high' => 'nullable|string|max:50',
+            'override_reason' => 'nullable|string|max:1000', // why the change is being made
+        ]);
+
+        // ── Snapshot original state BEFORE update ──
+        $originalPatientText = $i->interpretation_text;
+        $originalClinicianText = $i->clinician_interpretation_text;
+        $originalStatus = $i->status;
+        $originalVersion = $i->version_for_patient;
+
+        $i->update($validated);
+
+        // ── Determine which fields actually changed ──
+        $changedFields = [];
+        if (isset($validated['interpretation_text']) && $validated['interpretation_text'] !== $originalPatientText) {
+            $changedFields[] = 'patient_text';
+        }
+        if (isset($validated['clinician_interpretation_text']) && $validated['clinician_interpretation_text'] !== $originalClinicianText) {
+            $changedFields[] = 'clinician_text';
+        }
+        if (isset($validated['version_for_patient']) && $validated['version_for_patient'] !== $originalVersion) {
+            $changedFields[] = 'version_for_patient';
+        }
+        if (isset($validated['reference_range_low']) || isset($validated['reference_range_high'])) {
+            $changedFields[] = 'reference_range';
+        }
+
+        // ── Create immutable audit log entry ──
+        if (!empty($changedFields)) {
+            InterpretationOverride::create([
+                'interpretation_id' => $i->id,
+                'overridden_by' => $provider instanceof ProviderDirectoryEntry ? $provider->id : null,
+                'original_clinician_text' => $originalClinicianText,
+                'original_patient_text' => $originalPatientText,
+                'original_status' => $originalStatus,
+                'new_clinician_text' => $i->clinician_interpretation_text,
+                'new_patient_text' => $i->interpretation_text,
+                'new_status' => $i->status,
+                'override_type' => 'edit',
+                'override_reason' => $validated['override_reason'] ?? 'Manual edit by partner',
+                'changed_fields' => implode(',', $changedFields),
+            ]);
+        }
+
+        return $this->success([
+            'interpretation' => [
+                'id' => $i->id,
+                'interpretation_text' => $i->interpretation_text,
+                'clinician_interpretation_text' => $i->clinician_interpretation_text,
+                'version_for_patient' => $i->version_for_patient,
+            ],
+        ], 'Interpretation updated');
+    }
+
+    /**
+     * Suppress an interpretation — soft-delete from patient view, retains for audit.
+     */
+    public function suppress(Request $request, $id)
+    {
+        $partner = $this->resolvePartner($request);
+        $i = PartnerInterpretation::where('partnership_id', $partner->id)->findOrFail($id);
+        $provider = $request->user();
+
+        $validated = $request->validate([
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        $originalStatus = $i->status;
+
+        // Mark as suppressed — stays in DB, excluded from patient views
+        $i->update(['status' => 'suppressed']);
+
+        InterpretationOverride::create([
+            'interpretation_id' => $i->id,
+            'overridden_by' => $provider instanceof ProviderDirectoryEntry ? $provider->id : null,
+            'original_clinician_text' => $i->clinician_interpretation_text,
+            'original_patient_text' => $i->interpretation_text,
+            'original_status' => $originalStatus,
+            'new_clinician_text' => $i->clinician_interpretation_text,
+            'new_patient_text' => $i->interpretation_text,
+            'new_status' => 'suppressed',
+            'override_type' => 'suppress',
+            'override_reason' => $validated['reason'],
+            'changed_fields' => 'status',
+        ]);
+
+        return $this->success(null, 'Interpretation suppressed. It will no longer appear in patient-facing views.');
+    }
+
+    /**
+     * Get full audit history for a single interpretation.
+     */
+    public function history(Request $request, $id)
+    {
+        $partner = $this->resolvePartner($request);
+        $i = PartnerInterpretation::where('partnership_id', $partner->id)->findOrFail($id);
+
+        $overrides = InterpretationOverride::where('interpretation_id', $i->id)
+            ->with('overriddenBy:id,name,phone,email')
+            ->latest()
+            ->get()
+            ->map(fn($o) => [
+                'id' => $o->id,
+                'override_type' => $o->override_type,
+                'override_reason' => $o->override_reason,
+                'changed_fields' => $o->changed_fields ? explode(',', $o->changed_fields) : [],
+                'original' => [
+                    'patient_text' => $o->original_patient_text,
+                    'clinician_text' => $o->original_clinician_text,
+                    'status' => $o->original_status,
+                ],
+                'new' => [
+                    'patient_text' => $o->new_patient_text,
+                    'clinician_text' => $o->new_clinician_text,
+                    'status' => $o->new_status,
+                ],
+                'overridden_by' => $o->overriddenBy?->name ?? 'System',
+                'overridden_at' => $o->created_at->toISOString(),
+            ]);
+
+        return $this->success([
+            'interpretation_id' => $i->id,
+            'current_status' => $i->status,
+            'total_overrides' => $overrides->count(),
+            'overrides' => $overrides,
+        ]);
+    }
+
+    public function toggleVersion(Request $request, $id)
+    {
+        $partner = $this->resolvePartner($request);
+        $i = PartnerInterpretation::where('partnership_id', $partner->id)->findOrFail($id);
+
+        $i->update([
+            'version_for_patient' => !$i->version_for_patient,
+        ]);
+
+        return $this->success([
+            'version_for_patient' => $i->version_for_patient,
+            'active_text' => $i->version_for_patient
+                ? $i->interpretation_text
+                : $i->clinician_interpretation_text,
+        ], $i->version_for_patient
+            ? 'Switched to patient version'
+            : 'Switched to clinician version');
+    }
+
     // ── Download PDF Report ───────────────────────────────
 
     public function downloadPdf(Request $request, $id)
@@ -198,11 +468,12 @@ class PartnerInterpretationController extends BaseController
         $partner = $this->resolvePartner($request);
         $interpretation = PartnerInterpretation::where('partnership_id', $partner->id)->findOrFail($id);
 
-        $pdf = $this->renderer->renderSingle($interpretation);
+        $version = $request->query('version', 'patient');
+        $pdf = $this->renderer->renderSingle($interpretation, $version);
 
         return response($pdf, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="interpretation-' . $id . '.pdf"',
+            'Content-Disposition' => 'inline; filename="interpretation-' . $id . ($version === 'clinician' ? '-clinician' : '') . '.pdf"',
         ]);
     }
 
@@ -612,29 +883,222 @@ class PartnerInterpretationController extends BaseController
 
     // ── Private Helpers ───────────────────────────────────
 
+    /**
+     * Generate both clinician and patient interpretations in one LLM call.
+     * Stores both versions on the model. Returns the patient-facing text
+     * for backward compatibility.
+     */
     private function generateInterpretation(PartnerInterpretation $i): string
     {
         try {
-            $service = app(\App\Services\DeepSeekService::class);
-
-            $rangeInfo = '';
-            if ($i->reference_range_low && $i->reference_range_high) {
-                $rangeInfo = "The normal reference range is {$i->reference_range_low} to {$i->reference_range_high} {$i->unit}.";
+            // ── STEP 1: Classify the result against verified reference ranges ──
+            $parsedAge = null;
+            if ($i->age) {
+                $parsedAge = (float) preg_replace('/[^0-9.]/', '', $i->age);
             }
 
-            $prompt = "You are a medical lab result interpreter. Explain this test result in plain, simple language a patient can understand. Keep it under 3 sentences.\n\n"
+            $classification = $this->referenceRangeService->classify(
+                testName: $i->test_name,
+                value: (float) $i->value,
+                unit: $i->unit ?? '',
+                sex: $i->sex,
+                age: $parsedAge ?: null,
+            );
+
+            $classificationStatus = $classification['status'];
+            $confidence = $classification['confidence'];
+
+            $rangeLow = $classification['range_low'];
+            $rangeHigh = $classification['range_high'];
+            $rangeUnit = $classification['unit'];
+            $source = $classification['source'] ?? 'standard clinical guidelines';
+            $reason = $classification['reason'];
+
+            $statusLabel = match ($classificationStatus) {
+                'critical_low' => 'CRITICALLY LOW — urgent medical attention needed',
+                'critical_high' => 'CRITICALLY HIGH — urgent medical attention needed',
+                'abnormal_low' => 'BELOW normal range',
+                'abnormal_high' => 'ABOVE normal range',
+                'normal' => 'WITHIN normal range',
+                'unknown' => '— reference range not available',
+            };
+
+            $escalation = '';
+            if (in_array($classificationStatus, ['critical_low', 'critical_high'])) {
+                $escalation = "IMPORTANT: This result is critically outside the normal range. The patient should speak to a doctor immediately.";
+            } elseif (in_array($classificationStatus, ['abnormal_low', 'abnormal_high'])) {
+                $escalation = "IMPORTANT: This result is outside the normal range — the patient should speak to a doctor.";
+            }
+
+            $service = app(\App\Services\DeepSeekService::class);
+
+            // ── STEP 2: Single LLM call producing a JSON response with both versions ──
+            $prompt = "You are a clinical lab result interpreter for LabDoc, a Nigerian health-tech platform. "
+                . "A test result has been CLASSIFIED by a verified reference range database. "
+                . "You must respond with TWO versions of the interpretation in a strict JSON format.\n\n"
                 . "Test: {$i->test_name}\n"
                 . "Result: {$i->value} {$i->unit}\n"
+                . "Classification: {$statusLabel}\n"
+                . "Verified normal range: {$rangeLow} – {$rangeHigh} {$rangeUnit} (source: {$source})\n"
                 . ($i->sex ? "Patient sex: {$i->sex}\n" : '')
                 . ($i->age ? "Patient age: {$i->age}\n" : '')
-                . "{$rangeInfo}\n\n"
-                . "Important: Add 'This is not a medical diagnosis.' at the end.";
+                . "Classification reasoning: {$reason}\n"
+                . ($escalation ? "{$escalation}\n" : '')
+                . "\nResponse format — output ONLY valid JSON, no other text:\n"
+                . "{\n"
+                . '  "clinician": "Technical interpretation with medical terminology. Include differential diagnoses to consider, clinical context, relevant guidelines, and actionable recommendations for a healthcare professional. 2-4 sentences.",'
+                . "\n"
+                . '  "patient": "Plain-language explanation using grade 7-8 English. Explain what the test measures, what the result means in simple terms, and what to do next. Use short sentences. 2-3 sentences. End with \'This is not a medical diagnosis.\'"'
+                . "\n}";
 
-            $response = $service->ask($prompt, maxTokens: 200, temperature: 0.3);
-            return trim($response ?? 'No interpretation available.');
+            $response = $service->ask($prompt, maxTokens: 350, temperature: 0.3);
+
+            if (!$response) {
+                throw new \RuntimeException('LLM returned empty response');
+            }
+
+            // ── STEP 3: Parse the JSON response ──
+            $json = json_decode($response, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                // LLM didn't return valid JSON — try to extract
+                $extracted = $this->extractJsonFromResponse($response);
+                if ($extracted) {
+                    $json = $extracted;
+                } else {
+                    // Fallback: use the raw response as patient text, generate clinician fallback
+                    $patientText = trim($response);
+                    $clinicianText = $this->generateClinicianFallback($i, $classification);
+                    $i->update([
+                        'interpretation_text' => $patientText,
+                        'clinician_interpretation_text' => $clinicianText,
+                        'classification_status' => $classificationStatus,
+                        'confidence_score' => $confidence,
+                        'escalation_level' => $this->escalationLevelFromStatus($classificationStatus),
+                        'escalation_message' => $this->escalationMessageFromLevel($this->escalationLevelFromStatus($classificationStatus), $classificationStatus),
+                    ]);
+                    return $patientText;
+                }
+            }
+
+            $patientText = $json['patient'] ?? ($json['patient_interpretation'] ?? 'No patient interpretation available.');
+            $clinicianText = $json['clinician'] ?? ($json['clinician_interpretation'] ?? $this->generateClinicianFallback($i, $classification));
+
+            // ── STEP 4: Store both versions + classification metadata ──
+            $escalationLevel = match ($classificationStatus) {
+                'critical_low', 'critical_high' => 'urgent',
+                'abnormal_low', 'abnormal_high' => 'flagged',
+                'normal' => 'info',
+                default => 'info',
+            };
+
+            $escalationMessage = match ($escalationLevel) {
+                'urgent' => 'This result is critically outside range — seek urgent medical attention.',
+                'flagged' => 'This result is outside the normal range — speak to a doctor.',
+                'info' => $classificationStatus === 'normal'
+                    ? 'This result is within the normal range.'
+                    : 'This test could not be classified against verified reference ranges.',
+            };
+
+            $i->update([
+                'interpretation_text' => $patientText,
+                'clinician_interpretation_text' => $clinicianText,
+                'classification_status' => $classificationStatus,
+                'confidence_score' => $confidence,
+                'escalation_level' => $escalationLevel,
+                'escalation_message' => $escalationMessage,
+            ]);
+
+            return $patientText;
         } catch (\Throwable) {
-            return (new ReportRenderer)->generateFallbackText($i);
+            $fallback = (new ReportRenderer)->generateFallbackText($i);
+            $i->update([
+                'interpretation_text' => $fallback,
+                'clinician_interpretation_text' => $this->generateClinicianFallback($i, ['status' => 'unknown']),
+                'classification_status' => 'unknown',
+                'confidence_score' => 0,
+                'escalation_level' => 'info',
+                'escalation_message' => 'This test could not be classified against verified reference ranges.',
+            ]);
+            return $fallback;
         }
+    }
+
+    /**
+     * Try to extract JSON from a malformed LLM response.
+     */
+    private function extractJsonFromResponse(string $response): ?array
+    {
+        // Try to find JSON between { and }
+        if (preg_match('/\{(?:[^{}]|(?R))*\}/s', $response, $matches)) {
+            $decoded = json_decode($matches[0], true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $decoded;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Generate a clinician-facing fallback when the LLM fails to produce one.
+     */
+    private function generateClinicianFallback(PartnerInterpretation $i, array $classification): string
+    {
+        $status = $classification['status'] ?? 'unknown';
+        $rangeLow = $classification['range_low'] ?? $i->reference_range_low;
+        $rangeHigh = $classification['range_high'] ?? $i->reference_range_high;
+        $unit = $classification['unit'] ?? $i->unit ?? '';
+        $source = $classification['source'] ?? 'standard reference';
+        $confidence = $classification['confidence'] ?? 0;
+
+        $header = "Test: {$i->test_name}\n"
+            . "Result: {$i->value} {$unit}\n"
+            . "Reference range: {$rangeLow} – {$rangeHigh} {$unit} ({$source})\n"
+            . ($i->sex ? "Sex: {$i->sex}  " : '')
+            . ($i->age ? "Age: {$i->age}  " : '');
+
+        $body = match ($status) {
+            'critical_low' => "CRITICAL: Result is below the critical threshold. Immediate clinical evaluation required. "
+                . "Consider severe anaemia, acute blood loss, bone marrow suppression, or haemolysis. "
+                . "Correlate with clinical presentation and order urgent repeat testing.",
+            'critical_high' => "CRITICAL: Result exceeds the critical threshold. Immediate clinical evaluation required. "
+                . "Consider polycythaemia vera, severe dehydration, or cardiopulmonary disease. "
+                . "Correlate with clinical presentation and order urgent repeat testing.",
+            'abnormal_low' => "ABNORMAL LOW: Result is below the reference range. "
+                . "Consider nutritional deficiency, chronic disease, medication effects, or early pathology. "
+                . "Clinical correlation advised. Consider repeat testing in 2–4 weeks if asymptomatic.",
+            'abnormal_high' => "ABNORMAL HIGH: Result exceeds the reference range. "
+                . "Consider inflammatory processes, metabolic disorder, medication effects, or organ dysfunction. "
+                . "Clinical correlation recommended. Further targeted testing may be warranted.",
+            'normal' => "NORMAL: Result is within the verified reference range for the patient's demographic profile. "
+                . "No further action required based on this test alone. Continue routine monitoring as clinically indicated.",
+            default => "Reference range not available for this test with the patient's demographic profile. "
+                . "Interpret with clinical judgment using institutional or literature-based norms. "
+                . "Confidence score: {$confidence}/100.",
+        };
+
+        return "{$header}\n\n{$body}\n\n— Auto-generated by LabDoc Reference Range Engine (confidence: {$confidence}%)";
+    }
+
+    private function escalationLevelFromStatus(string $status): string
+    {
+        return match ($status) {
+            'critical_low', 'critical_high' => 'urgent',
+            'abnormal_low', 'abnormal_high' => 'flagged',
+            'normal' => 'info',
+            default => 'info',
+        };
+    }
+
+    private function escalationMessageFromLevel(string $level, string $status): string
+    {
+        return match ($level) {
+            'urgent' => 'This result is critically outside range — seek urgent medical attention.',
+            'flagged' => 'This result is outside the normal range — speak to a doctor.',
+            default => $status === 'normal'
+                ? 'This result is within the normal range.'
+                : 'This test could not be classified against verified reference ranges.',
+        };
     }
 
     private function sendViaEmail(PartnerInterpretation $i, string $recipient): void

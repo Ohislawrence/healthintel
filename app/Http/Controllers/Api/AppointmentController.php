@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Appointment;
+use App\Jobs\SendAppointmentReminder;
 use Illuminate\Http\Request;
 
 class AppointmentController extends BaseController
@@ -56,6 +57,17 @@ class AppointmentController extends BaseController
         ]);
 
         $appointment->load('provider:id,name,type,specialty,city,state,phone');
+
+        // Dispatch reminder with appropriate delay
+        if ($appointment->reminder_enabled) {
+            $appointmentDateTime = \Carbon\Carbon::parse(
+                $appointment->appointment_date->format('Y-m-d') . ' ' . ($appointment->appointment_time ?? '00:00')
+            );
+            $reminderAt = $appointmentDateTime->copy()->subMinutes($appointment->reminder_minutes_before);
+
+            SendAppointmentReminder::dispatch($appointment->id)
+                ->delay($reminderAt->isFuture() ? $reminderAt : null);
+        }
 
         return $this->success($appointment, 'Appointment created', 201);
     }

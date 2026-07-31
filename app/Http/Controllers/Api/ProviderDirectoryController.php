@@ -172,6 +172,56 @@ class ProviderDirectoryController extends BaseController
         return $this->success(['message' => 'Your enquiry has been submitted. The provider will contact you shortly.']);
     }
 
+    /**
+     * Get recommended nearby providers for lab-result / symptom-checker pages.
+     * Sponsored → affiliate → verified, sorted by proximity.
+     */
+    public function nearbyRecommended(Request $request)
+    {
+        $request->validate([
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'type' => 'nullable|in:lab,hospital,clinic',
+            'limit' => 'nullable|integer|min:1|max:10',
+        ]);
+
+        $lat = (float) $request->input('latitude');
+        $lng = (float) $request->input('longitude');
+        $type = $request->input('type');
+        $limit = (int) $request->input('limit', 5);
+
+        $this->expireStaleSponsorships();
+
+        $query = ProviderDirectoryEntry::where('is_active', true)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude');
+
+        if ($type) {
+            $query->where('type', $type);
+        } else {
+            $query->whereIn('type', ['lab', 'hospital', 'clinic']);
+        }
+
+        $providers = $query->get()
+            ->map(function ($p) use ($lat, $lng) {
+                $p->distance_km = $this->referralService->haversineDistance(
+                    $lat, $lng, $p->latitude, $p->longitude
+                );
+                return $p;
+            })
+            ->filter(fn($p) => $p->distance_km <= 50)
+            ->sortBy(function ($p) {
+                // Sort priority: sponsored (0) → affiliate (1) → others (2), then by distance
+                $partnerOrder = $p->partner_status === 'sponsored' && $p->is_sponsored ? 0
+                    : ($p->partner_status === 'affiliate' ? 1 : 2);
+                return sprintf('%d-%06.1f', $partnerOrder, $p->distance_km);
+            })
+            ->take($limit)
+            ->values();
+
+        return $this->success(['providers' => $providers]);
+    }
+
     public function specialties()
     {
         return $this->success([
