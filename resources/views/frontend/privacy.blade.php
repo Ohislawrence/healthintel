@@ -48,12 +48,12 @@
                     <tr>
                         <td style="padding:12px 16px;border:1px solid var(--line);font-weight:600;white-space:nowrap">Lab Results</td>
                         <td style="padding:12px 16px;border:1px solid var(--line)">Test panel selected, individual test values (e.g., Hemoglobin: 13.2 g/dL), units, normal/abnormal flags, uploaded PDF lab reports, extracted text from PDFs</td>
-                        <td style="padding:12px 16px;border:1px solid var(--line)">To generate AI-powered plain-language interpretations of your lab results</td>
+                        <td style="padding:12px 16px;border:1px solid var(--line)">To generate plain-language interpretations of your lab results</td>
                     </tr>
                     <tr>
-                        <td style="padding:12px 16px;border:1px solid var(--line);font-weight:600;white-space:nowrap">AI Interpretations</td>
-                        <td style="padding:12px 16px;border:1px solid var(--line)">AI model used (DeepSeek), the prompt sent to the AI (which contains your lab values), AI-generated interpretation text, and guardrail/safety flags</td>
-                        <td style="padding:12px 16px;border:1px solid var(--line)">To provide you with understandable lab explanations and maintain a history of your interpretations. <em>Note: Your lab data is transmitted to DeepSeek's API for processing. See Section 7 for details.</em></td>
+                        <td style="padding:12px 16px;border:1px solid var(--line);font-weight:600;white-space:nowrap">Interpretations</td>
+                        <td style="padding:12px 16px;border:1px solid var(--line)">The prompt sent for processing (which contains your lab values), generated interpretation text, and guardrail/safety flags</td>
+                        <td style="padding:12px 16px;border:1px solid var(--line)">To provide you with understandable lab explanations and maintain a history of your interpretations. <em>Note: Your lab data is transmitted to our processing service's API. See Section 7 for details.</em></td>
                     </tr>
                     <tr>
                         <td style="padding:12px 16px;border:1px solid var(--line);font-weight:600;white-space:nowrap">Health Metrics & Trackers</td>
@@ -77,8 +77,8 @@
                     </tr>
                     <tr>
                         <td style="padding:12px 16px;border:1px solid var(--line);font-weight:600;white-space:nowrap">Symptom Checker Queries</td>
-                        <td style="padding:12px 16px;border:1px solid var(--line)">Symptoms you enter, AI-suggested test panels, AI-generated responses</td>
-                        <td style="padding:12px 16px;border:1px solid var(--line)">To suggest relevant lab tests based on symptoms. Sent to DeepSeek API for processing.</td>
+                        <td style="padding:12px 16px;border:1px solid var(--line)">Symptoms you enter, suggested test panels, generated responses</td>
+                        <td style="padding:12px 16px;border:1px solid var(--line)">To suggest relevant lab tests based on symptoms. Sent to our processing service's API.</td>
                     </tr>
                     <tr>
                         <td style="padding:12px 16px;border:1px solid var(--line);font-weight:600;white-space:nowrap">Feedback & Support</td>
@@ -98,7 +98,7 @@
             <h2>2. How We Use Your Data</h2>
             <p>Your data is used <strong>exclusively</strong> to provide and improve HealthIntel's services:</p>
             <ul>
-                <li><strong>Core Service:</strong> Generating AI-powered lab result interpretations and symptom suggestions</li>
+                <li><strong>Core Service:</strong> Generating plain-language lab result interpretations and symptom suggestions</li>
                 <li><strong>Personalisation:</strong> Tailoring reference ranges based on your age, sex, and health profile</li>
                 <li><strong>Account Management:</strong> Authentication, password resets, credit balance tracking, transaction history</li>
                 <li><strong>Communication:</strong> Sending essential service updates (never marketing emails without consent)</li>
@@ -119,7 +119,7 @@
             <p>Under the NDPR and NDPA, we process your data on the following lawful bases:</p>
             <ul>
                 <li><strong>Consent:</strong> You explicitly provide your data when you create an account and enter health information. You may withdraw consent at any time by deleting your account (see Section 8).</li>
-                <li><strong>Contractual Necessity:</strong> We need certain data (email, lab values) to deliver the AI interpretation service you requested.</li>
+                <li><strong>Contractual Necessity:</strong> We need certain data (email, lab values) to deliver the interpretation service you requested.</li>
                 <li><strong>Legitimate Interest:</strong> We process anonymised usage data to improve the service, and IP addresses for security (rate limiting, abuse prevention).</li>
                 <li><strong>Legal Obligation:</strong> We may retain transaction records as required by Nigerian tax and financial regulations.</li>
             </ul>
@@ -171,9 +171,9 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td style="padding:10px 16px;border:1px solid var(--line);font-weight:600">DeepSeek</td>
-                        <td style="padding:10px 16px;border:1px solid var(--line)">AI lab result interpretation, symptom analysis, PDF report interpretation</td>
-                        <td style="padding:10px 16px;border:1px solid var(--line)">Lab values, test names, unit measurements, health profile data (age, sex, pregnancy status), symptoms, PDF text. <em>DeepSeek's privacy policy states they do not use API customer data for model training.</em></td>
+                        <td style="padding:10px 16px;border:1px solid var(--line);font-weight:600">Language Processing Service</td>
+                        <td style="padding:10px 16px;border:1px solid var(--line)">Lab result interpretation, symptom analysis, PDF report interpretation</td>
+                        <td style="padding:10px 16px;border:1px solid var(--line)">Lab values, test names, unit measurements, health profile data (age, sex, pregnancy status), symptoms, PDF text. <em>This provider's privacy policy states they do not use API customer data for model training.</em></td>
                         <td style="padding:10px 16px;border:1px solid var(--line)">Global (API endpoints)</td>
                     </tr>
                     <tr>
@@ -200,15 +200,15 @@
                 <li><strong>With your consent:</strong> For any other purpose, we will ask your explicit permission first</li>
             </ul>
 
-            <!-- 7. AI & Automated Processing -->
-            <h2>7. AI & Automated Decision-Making</h2>
-            <p>HealthIntel uses <strong>DeepSeek AI</strong> (deepseek-v4-flash) to generate lab result interpretations, symptom analysis, and PDF report summaries. Here's what you should know:</p>
+            <!-- 7. Automated Processing -->
+            <h2>7. Automated Processing & Interpretations</h2>
+            <p>HealthIntel uses a third-party language processing service to generate lab result interpretations, symptom analysis, and PDF report summaries. Here's what you should know:</p>
             <ul>
-                <li><strong>What happens:</strong> When you submit lab results or symptoms, we build a prompt containing your test values and health profile. This prompt is sent to DeepSeek's API. The AI generates a plain-language explanation, which we display to you.</li>
-                <li><strong>Not medical diagnosis:</strong> Every AI interpretation includes a clear disclaimer: <em>"This is NOT medical advice. Please consult a licensed healthcare professional."</em> Our AI does not make medical decisions — it only translates lab data into understandable language.</li>
-                <li><strong>Guardrails:</strong> We include strict safety prompts that prevent the AI from claiming to diagnose diseases, recommending medications, or providing dosages.</li>
-                <li><strong>Data sent to DeepSeek:</strong> The prompt contains your lab values (e.g., "Hemoglobin: 13.2 g/dL"), test names, age, sex, pregnancy status if applicable, and symptoms. No directly identifying information (name, email, phone) is included in the AI prompt.</li>
-                <li><strong>DeepSeek's data policy:</strong> Per DeepSeek's API terms, they do not use customer API data for model training. The data is processed ephemerally and not stored by DeepSeek beyond what is needed to generate the response. We recommend reviewing <a href="https://api-docs.deepseek.com/" target="_blank" rel="noopener">DeepSeek's API documentation</a> for their latest privacy practices.</li>
+                <li><strong>What happens:</strong> When you submit lab results or symptoms, we build a prompt containing your test values and health profile. This prompt is sent to our processing partner's API. The service generates a plain-language explanation, which we display to you.</li>
+                <li><strong>Not medical diagnosis:</strong> Every interpretation includes a clear disclaimer: <em>"This is NOT medical advice. Please consult a licensed healthcare professional."</em> Our service does not make medical decisions — it only translates lab data into understandable language.</li>
+                <li><strong>Guardrails:</strong> We include strict safety prompts that prevent the service from claiming to diagnose diseases, recommending medications, or providing dosages.</li>
+                <li><strong>Data sent to our processor:</strong> The prompt contains your lab values (e.g., "Hemoglobin: 13.2 g/dL"), test names, age, sex, pregnancy status if applicable, and symptoms. No directly identifying information (name, email, phone) is included in the prompt.</li>
+                <li><strong>Processor's data policy:</strong> Per our processing partner's API terms, they do not use customer API data for model training. The data is processed ephemerally and not stored by the processor beyond what is needed to generate the response.</li>
             </ul>
 
             <!-- 8. Your Rights -->
@@ -230,7 +230,7 @@
                 </div>
                 <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px">
                     <strong style="color:var(--primary)">🚫 Right to Object / Restrict</strong>
-                    <p style="margin:8px 0 0;font-size:0.9rem">You can object to processing of your data. For essential service data, this may mean we can no longer provide AI interpretations. For non-essential data (trackers, appointments), you can simply stop using those features.</p>
+                    <p style="margin:8px 0 0;font-size:0.9rem">You can object to processing of your data. For essential service data, this may mean we can no longer provide interpretations. For non-essential data (trackers, appointments), you can simply stop using those features.</p>
                 </div>
                 <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px">
                     <strong style="color:var(--primary)">📤 Right to Data Portability</strong>

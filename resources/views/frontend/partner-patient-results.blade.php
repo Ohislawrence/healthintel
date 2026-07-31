@@ -1,7 +1,7 @@
 @extends('layouts.frontend')
 
 @section('title', $provider->name . ' — Lab Results')
-@section('description', 'View your lab results and AI-powered plain-language interpretations.')
+@section('description', 'View your lab results and plain-language interpretations.')
 
 @section('content')
 <section style="padding: 60px 0;">
@@ -15,7 +15,7 @@
                 {{ $provider->name }}
             </h1>
             <p style="color: var(--text-muted); font-size: 0.95rem;">
-                Your Lab Results & AI-Powered Interpretations
+                Your Lab Results & Interpretations
             </p>
         </div>
 

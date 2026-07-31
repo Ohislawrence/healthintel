@@ -14,6 +14,7 @@ use App\Models\Symptom;
 use App\Models\TestPanel;
 use App\Models\User;
 use App\Models\UserHealthMetric;
+use App\Services\EmailService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -1052,5 +1053,172 @@ class AdminController extends BaseController
             ->paginate(50);
 
         return $this->paginated($logs);
+    }
+
+    // ── Email Campaigns ──
+
+    /**
+     * Get available token list and role list for email composition.
+     */
+    public function emailTokens()
+    {
+        $emailService = app(EmailService::class);
+
+        return $this->success([
+            'tokens' => $emailService->availableTokens(),
+            'roles'  => \Spatie\Permission\Models\Role::pluck('name')->toArray(),
+        ]);
+    }
+
+    /**
+     * Preview the recipient count for given filters.
+     */
+    public function emailPreview(Request $request)
+    {
+        $validated = $request->validate([
+            'roles'             => 'nullable|array',
+            'roles.*'           => 'string',
+            'has_submissions'   => 'nullable|boolean',
+            'email_verified'    => 'nullable|boolean',
+            'signup_from'       => 'nullable|date',
+            'signup_to'         => 'nullable|date',
+            'user_ids'          => 'nullable|array',
+            'user_ids.*'        => 'integer|exists:users,id',
+        ]);
+
+        $emailService = app(EmailService::class);
+        $filters = $this->buildEmailFilters($validated);
+        $count = $emailService->countRecipients($filters);
+
+        return $this->success(['recipient_count' => $count]);
+    }
+
+    /**
+     * Send a bulk email campaign to users matching the given filters.
+     */
+    public function emailSend(Request $request)
+    {
+        $validated = $request->validate([
+            'subject'           => 'required|string|max:255',
+            'body_html'         => 'required|string|max:50000',
+            'body_text'         => 'nullable|string|max:50000',
+            'roles'             => 'nullable|array',
+            'roles.*'           => 'string',
+            'has_submissions'   => 'nullable|boolean',
+            'email_verified'    => 'nullable|boolean',
+            'signup_from'       => 'nullable|date',
+            'signup_to'         => 'nullable|date',
+            'user_ids'          => 'nullable|array',
+            'user_ids.*'        => 'integer|exists:users,id',
+        ]);
+
+        $emailService = app(EmailService::class);
+        $filters = $this->buildEmailFilters($validated);
+
+        $result = $emailService->sendBulk(
+            $filters,
+            $validated['subject'],
+            $validated['body_html'],
+            $validated['body_text'] ?? null
+        );
+
+        // Log for audit
+        \Illuminate\Support\Facades\DB::table('admin_audit_log')->insert([
+            'admin_id'  => $request->user()->id,
+            'action'    => 'send_email_campaign',
+            'target_type' => 'users',
+            'target_id'  => null,
+            'metadata'  => json_encode([
+                'subject'   => $validated['subject'],
+                'filters'   => $filters,
+                'total'     => $result['total'],
+                'sent'      => $result['sent'],
+                'failed'    => $result['failed'],
+            ]),
+            'created_at' => now(),
+        ]);
+
+        return $this->success([
+            'total_recipients'  => $result['total'],
+            'sent'              => $result['sent'],
+            'failed'            => $result['failed'],
+        ], "Email sent to {$result['sent']} of {$result['total']} recipients" . ($result['failed'] > 0 ? " ({$result['failed']} failed)" : ''));
+    }
+
+    /**
+     * Send a test/personalised email to a single user (for preview).
+     */
+    public function emailSendTest(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id'       => 'required|integer|exists:users,id',
+            'subject'       => 'required|string|max:255',
+            'body_html'     => 'required|string|max:50000',
+            'body_text'     => 'nullable|string|max:50000',
+        ]);
+
+        $user = User::findOrFail($validated['user_id']);
+        $emailService = app(EmailService::class);
+
+        $success = $emailService->sendToUser(
+            $user,
+            $validated['subject'],
+            $validated['body_html'],
+            $validated['body_text'] ?? null
+        );
+
+        if ($success) {
+            return $this->success(null, "Test email sent to {$user->email}");
+        }
+
+        return $this->error('Failed to send test email. Check mail configuration.', 500);
+    }
+
+    /**
+     * Build filter array from validated request data.
+     */
+    private function buildEmailFilters(array $validated): array
+    {
+        $filters = [];
+
+        if (!empty($validated['roles'])) {
+            $filters[EmailService::FILTER_ROLES] = $validated['roles'];
+        }
+        if (array_key_exists('has_submissions', $validated) && $validated['has_submissions'] !== null) {
+            $filters[EmailService::FILTER_HAS_SUBMISSIONS] = $validated['has_submissions'];
+        }
+        if (array_key_exists('email_verified', $validated) && $validated['email_verified'] !== null) {
+            $filters[EmailService::FILTER_EMAIL_VERIFIED] = $validated['email_verified'];
+        }
+        if (!empty($validated['signup_from'])) {
+            $filters[EmailService::FILTER_SIGNUP_FROM] = $validated['signup_from'];
+        }
+        if (!empty($validated['signup_to'])) {
+            $filters[EmailService::FILTER_SIGNUP_TO] = $validated['signup_to'];
+        }
+        if (!empty($validated['user_ids'])) {
+            $filters[EmailService::FILTER_USER_IDS] = $validated['user_ids'];
+        }
+
+        return $filters;
+    }
+
+    // ── Partnership Inquiries ──
+
+    public function partnershipInquiries()
+    {
+        $inquiries = \App\Models\PartnershipInquiry::latest()->paginate(25);
+        return $this->paginated($inquiries);
+    }
+
+    public function partnershipInquiryUpdate(Request $request, int $id)
+    {
+        $inquiry = \App\Models\PartnershipInquiry::findOrFail($id);
+        $validated = $request->validate([
+            'status' => 'sometimes|in:new,contacted,converted,closed',
+            'admin_notes' => 'nullable|string|max:5000',
+        ]);
+        $inquiry->update($validated);
+        return $this->success(['inquiry' => $inquiry->fresh()]);
     }
 }

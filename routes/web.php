@@ -9,6 +9,7 @@ Route::get('/about', [FrontendController::class, 'about'])->name('about');
 Route::get('/how-it-works', [FrontendController::class, 'howItWorks'])->name('how-it-works');
 Route::get('/features', [FrontendController::class, 'features'])->name('features');
 Route::get('/contact', [FrontendController::class, 'contact'])->name('contact');
+Route::get('/partnerships', [FrontendController::class, 'partnerships'])->name('partnerships');
 Route::get('/blog', [FrontendController::class, 'blog'])->name('blog');
 Route::get('/blog/{slug}', [FrontendController::class, 'blogShow'])->name('blog.detail');
 Route::get('/r/{slug}', [FrontendController::class, 'partnerPatientResults'])->name('partner.results');

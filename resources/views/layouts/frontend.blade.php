@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'HealthIntel — Understand your lab results, in plain language')</title>
-    <meta name="description" content="@yield('description', 'Your lab results explained by AI, checked against real reference ranges. Check symptoms, find doctors, and compare insurance — all in one place.')">
+<meta name="description" content="@yield('description', 'Your lab results explained in plain language, checked against real reference ranges. Check symptoms, find doctors, and compare insurance — all in one place.')">
     <link rel="canonical" href="{{ url()->current() }}">
     
     <!-- Open Graph / Twitter -->
     <meta property="og:title" content="@yield('title', 'HealthIntel — Understand your lab results, in plain language')">
-    <meta property="og:description" content="@yield('description', 'Your lab results explained by AI, checked against real reference ranges.')">
+<meta property="og:description" content="@yield('description', 'Your lab results explained in plain language, checked against real reference ranges.')">
     <meta property="og:url" content="{{ url()->current() }}">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="HealthIntel">
@@ -1229,6 +1229,7 @@
                 <nav style="display:flex;gap:24px;font-size:0.82rem;flex-wrap:wrap;justify-content:center">
                     <a href="{{ route('privacy') }}" style="color:var(--text-muted);text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--line);transition:color 0.2s" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">Privacy Policy</a>
                     <a href="{{ route('terms') }}" style="color:var(--text-muted);text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--line);transition:color 0.2s" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">Terms of Service</a>
+                    <a href="{{ route('partnerships') }}" style="color:var(--text-muted);text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--line);transition:color 0.2s" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">Partnerships</a>
                     <a href="{{ route('contact') }}" style="color:var(--text-muted);text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--line);transition:color 0.2s" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">Contact</a>
                 </nav>
             </div>

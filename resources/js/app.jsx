@@ -80,6 +80,12 @@ import AdminBlogEditor from './screens/admin/AdminBlogEditor';
 import AdminBlogCategories from './screens/admin/AdminBlogCategories';
 import AdminPartnerships from './screens/admin/AdminPartnerships';
 import AdminPartnershipDetail from './screens/admin/AdminPartnershipDetail';
+import AdminPartnershipInquiries from './screens/admin/AdminPartnershipInquiries';
+import AdminReferenceRanges from './screens/admin/AdminReferenceRanges';
+import AdminClinicalPanels from './screens/admin/AdminClinicalPanels';
+import AdminMedicationEffects from './screens/admin/AdminMedicationEffects';
+import AdminEmails from './screens/admin/AdminEmails';
+import AdminDocumentation from './screens/admin/AdminDocumentation';
 import PartnerLogin from './screens/partner/PartnerLogin';
 import PartnerLayout from './screens/partner/PartnerLayout';
 import PartnerDashboard from './screens/partner/PartnerDashboard';
@@ -91,6 +97,20 @@ function PartnerPlaceholder({ title }) {
     <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
       <h3 className="text-lg font-semibold text-gray-700 mb-2">{title}</h3>
       <p className="text-sm text-gray-400">This section is coming soon.</p>
+    </div>
+  );
+}
+
+function AdminPlaceholder({ title }) {
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+      <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+        <p className="text-sm text-gray-500">This admin section is under development. The API endpoints are ready at:</p>
+        <code className="mt-2 block text-xs text-teal-600 bg-teal-50 p-2 rounded">
+          /api/admin/clinical/{title === 'Reference Ranges' ? 'ranges' : title === 'Clinical Panels' ? 'panels' : 'medication-effects'}
+        </code>
+      </div>
     </div>
   );
 }
@@ -278,6 +298,12 @@ function App() {
                         <Route path="partnerships" element={<AdminPartnerships />} />
                         <Route path="partnerships/new" element={<AdminPartnershipDetail />} />
                         <Route path="partnerships/:id" element={<AdminPartnershipDetail />} />
+                        <Route path="clinical/ranges" element={<AdminReferenceRanges />} />
+                        <Route path="clinical/panels" element={<AdminClinicalPanels />} />
+                        <Route path="clinical/medication-effects" element={<AdminMedicationEffects />} />
+                        <Route path="emails" element={<AdminEmails />} />
+                        <Route path="partnership-inquiries" element={<AdminPartnershipInquiries />} />
+                        <Route path="documentation" element={<AdminDocumentation />} />
                     </Route>
 
                     {/* Partner Portal Routes */}

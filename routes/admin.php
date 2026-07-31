@@ -67,6 +67,12 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // Audit Log
     Route::get('/audit-log', [AdminController::class, 'auditLog']);
 
+    // Email Campaigns
+    Route::get('/email/tokens', [AdminController::class, 'emailTokens']);
+    Route::post('/email/preview', [AdminController::class, 'emailPreview']);
+    Route::post('/email/send', [AdminController::class, 'emailSend']);
+    Route::post('/email/send-test', [AdminController::class, 'emailSendTest']);
+
     // Uploads
     Route::post('/upload', [AdminBlogController::class, 'uploadImage']);
 
@@ -113,6 +119,10 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('/clinical/medication-effects', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'medicationEffectStore']);
     Route::put('/clinical/medication-effects/{id}', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'medicationEffectUpdate']);
     Route::delete('/clinical/medication-effects/{id}', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'medicationEffectDestroy']);
+
+    // Partnership Inquiries
+    Route::get('/partnership-inquiries', [AdminController::class, 'partnershipInquiries']);
+    Route::put('/partnership-inquiries/{id}', [AdminController::class, 'partnershipInquiryUpdate']);
 
     // Settings
     Route::get('/settings', [AdminSettingController::class, 'index']);

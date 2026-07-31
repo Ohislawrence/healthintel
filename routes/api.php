@@ -69,6 +69,10 @@ Route::get('/symptoms', [SymptomCheckerController::class, 'index']);
 Route::post('/payment/webhook', [PaymentController::class, 'webhook']);
 Route::post('/payment/webhook/flutterwave', [PaymentController::class, 'flutterwaveWebhook']);
 
+// Partnership inquiry (public — from the /partnerships page modal)
+Route::post('/partnership-inquiry', [\App\Http\Controllers\Api\PartnershipInquiryController::class, 'store'])
+    ->middleware('throttle:5,10');
+
 // Partner portal login (public, access-code based)
 Route::post('/partner/login', [PartnerPortalController::class, 'login'])
     ->middleware('throttle:10,1');

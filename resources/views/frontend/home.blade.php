@@ -1,7 +1,7 @@
 @extends('layouts.frontend')
 
 @section('title', 'HealthIntel — Understand your lab results, in plain language')
-@section('description', 'Add a result and get an interpretation checked against real, verified reference ranges — not a black-box guess. Check symptoms, find a doctor near you, and compare health insurance, all in one place.')
+@section('description', 'Add a result and get an interpretation checked against real, verified reference ranges. Check symptoms, find a doctor near you, and compare health insurance, all in one place.')
 
 @php
 $structuredData = [
@@ -37,7 +37,7 @@ $structuredData = [
                 <h1>Finally understand your <span class="text-gradient">lab results.</span></h1>
                 
                 <p class="lead">
-                    Stop staring at confusing medical jargon. Enter your values or upload your report, and we’ll explain exactly what they mean for <em>you</em>—checked against verified reference ranges, not black-box AI guesses.
+                    Stop staring at confusing medical jargon. Enter your values or upload your report, and we'll explain exactly what they mean for <em>you</em> — checked against verified reference ranges, not black-box guesses.
                 </p>
                 
                 <div class="hero-ctas">
@@ -51,7 +51,7 @@ $structuredData = [
                 <div class="trust-cluster">
                     <div class="trust-note">
                         <span class="trust-dot"></span>
-                        First 5 interpretations are free
+                        First few interpretations are free
                     </div>
                     <div class="trust-note">
                         <span class="trust-dot" style="background: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft);"></span>
@@ -101,7 +101,7 @@ $structuredData = [
                     <div class="plain-language-box">
                         <div class="plain-language-icon">💡</div>
                         <div class="plain-language-text">
-                            <strong>What this means:</strong> This is slightly above the typical range. It’s not an emergency, but it’s a good signal to discuss dietary adjustments or a follow-up test with your doctor.
+                            <strong>What this means:</strong> This is slightly above the typical range. It's not an emergency, but it's a good signal to discuss dietary adjustments or a follow-up test with your doctor.
                         </div>
                     </div>
                     
@@ -134,7 +134,7 @@ $structuredData = [
             <div class="step-card">
                 <div class="step-number mono">02</div>
                 <h3>We check it against real ranges</h3>
-                <p>Every value is compared to verified reference data for your age and sex — never guessed by AI on the spot.</p>
+                <p>Every value is compared to verified reference data for your age and sex — never guessed on the spot.</p>
             </div>
             <div class="step-card">
                 <div class="step-number mono">03</div>
@@ -187,7 +187,7 @@ $structuredData = [
             <div class="trust-copy anim-slide-left">
                 <span class="eyebrow">Why trust it</span>
                 <h2>We explain. We don't diagnose.</h2>
-                <p>Every reference range in HealthIntel comes from verified medical data, reviewed with a licensed medical advisor — never invented on the fly by an AI model.</p>
+                <p>Every reference range in HealthIntel comes from verified medical data, reviewed with a licensed medical advisor — never invented on the fly.</p>
                 <p>The app tells you what a result can mean and when it's worth a conversation with a doctor. It never replaces one.</p>
             </div>
             <div class="trust-disclaimer anim-scale-in" style="animation-delay: 200ms;">
@@ -212,13 +212,13 @@ $structuredData = [
                     <h2>Pay only for what you use.</h2>
                     <p>No subscriptions. Buy credits when you need them, and spend them on the things that matter — browsing and finding care is always free.</p>
                     <div class="credit-tags">
-                        <span class="credit-tag">5 free credits on signup</span>
+                        <span class="credit-tag">Free credits on signup</span>
                         <span class="credit-tag">Top up with Paystack</span>
                     </div>
                 </div>
                 <div class="credits-table">
-                    <div class="credits-table-row"><span>Lab result interpretation</span><span class="cost">2-3 credits</span></div>
-                    <div class="credits-table-row"><span>Symptom check</span><span class="cost">1 credit</span></div>
+                    <div class="credits-table-row"><span>Lab result interpretation</span><span class="cost">Credits apply</span></div>
+                    <div class="credits-table-row"><span>Symptom check</span><span class="cost">Credits apply</span></div>
                     <div class="credits-table-row"><span>View your trends</span><span class="cost">Free</span></div>
                     <div class="credits-table-row"><span>Find a doctor or hospital</span><span class="cost">Free</span></div>
                     <div class="credits-table-row"><span>Compare insurance plans</span><span class="cost">Free</span></div>
@@ -233,7 +233,7 @@ $structuredData = [
     <!-- Staggered entrance for heading, paragraph, and button -->
     <div class="wrap stagger-children" style="text-align: center;">
         <h2>Stop guessing what your results mean.</h2>
-        <p>Create a free account and use your first 5 credits on us.</p>
+        <p>Create a free account and get started with free credits on us.</p>
         <a href="/register" class="btn btn-primary btn-lg" style="margin-top: 8px;">Create free account</a>
     </div>
 </section>

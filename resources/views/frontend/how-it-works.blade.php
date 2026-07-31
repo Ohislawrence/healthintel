@@ -1,6 +1,6 @@
 @extends('layouts.frontend')
 
-@section('title', 'How HealthIntel Works — AI Lab Result Interpretation')
+@section('title', 'How HealthIntel Works — Lab Result Interpretation')
 @section('description', 'Learn how HealthIntel reads your lab reports and explains them in plain language. Three simple steps: sign up, upload, get results.')
 
 @section('content')
@@ -20,7 +20,7 @@
             <div class="step-card anim-fade-up d2">
                 <div class="step-number mono">02</div>
                 <h3>We check it against real ranges</h3>
-                <p>Every value is compared to verified reference data for your age and sex — never guessed by AI on the spot.</p>
+                <p>Every value is compared to verified reference data for your age and sex — never guessed on the spot.</p>
             </div>
             <div class="step-card anim-fade-up d3">
                 <div class="step-number mono">03</div>

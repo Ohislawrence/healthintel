@@ -997,8 +997,13 @@ class PartnerInterpretationController extends BaseController
                 'flagged' => 'This result is outside the normal range — speak to a doctor.',
                 'info' => $classificationStatus === 'normal'
                     ? 'This result is within the normal range.'
-                    : 'This test could not be classified against verified reference ranges.',
+                    : '',
             };
+
+            // ── Admin notification for unknown tests (missing reference range) ──
+            if ($classificationStatus === 'unknown') {
+                $this->notifyAdminMissingRange($i->test_name);
+            }
 
             $i->update([
                 'interpretation_text' => $patientText,
@@ -1099,6 +1104,24 @@ class PartnerInterpretationController extends BaseController
                 ? 'This result is within the normal range.'
                 : 'This test could not be classified against verified reference ranges.',
         };
+    }
+
+    /**
+     * Create an admin notification for a missing reference range.
+     */
+    private function notifyAdminMissingRange(string $testName): void
+    {
+        try {
+            \App\Models\AdminNotification::create([
+                'admin_id' => \App\Models\User::whereHas('roles', fn($q) => $q->where('name', 'admin'))->first()?->id ?? 1,
+                'title' => 'Missing Reference Range',
+                'body' => "The test '{$testName}' was submitted but no verified reference range exists in the database. Please add this range at /admin/clinical/ranges.",
+                'target' => 'all',
+                'sent_at' => now(),
+            ]);
+        } catch (\Throwable) {
+            // Silently fail — don't interrupt interpretation
+        }
     }
 
     private function sendViaEmail(PartnerInterpretation $i, string $recipient): void

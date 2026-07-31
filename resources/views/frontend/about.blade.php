@@ -1,7 +1,7 @@
 @extends('layouts.frontend')
 
-@section('title', 'About HealthIntel — AI-Powered Lab Result Interpretation in Nigeria')
-@section('description', 'HealthIntel helps Nigerians understand their medical lab results using artificial intelligence. Upload PDFs or enter values for instant plain-language explanations.')
+@section('title', 'About HealthIntel — Lab Result Interpretation in Nigeria')
+@section('description', 'HealthIntel helps Nigerians understand their medical lab results. Upload PDFs or enter values for instant plain-language explanations.')
 
 @section('content')
 <section class="section">
@@ -16,7 +16,7 @@
             <h2 class="anim-fade-up">Our Mission</h2>
             <p class="anim-fade-up d1">
                 Medical lab reports are full of numbers, abbreviations, and technical jargon that most people can't interpret.
-                HealthIntel bridges that gap by using artificial intelligence to translate complex lab results into clear,
+                HealthIntel bridges that gap by translating complex lab results into clear,
                 plain-language explanations that anyone can understand.
             </p>
 
@@ -40,7 +40,7 @@
                 <div class="value-item anim-fade-up d4">
                     <div class="feature-dot" aria-hidden="true"></div>
                     <h3>Free to Start</h3>
-                    <p>Get 3 free credits when you sign up. Each lab interpretation costs just 2-3 credits.</p>
+                    <p>Get free credits when you sign up. Pay only when you need to interpret results.</p>
                 </div>
             </div>
         </div>

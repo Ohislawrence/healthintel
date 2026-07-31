@@ -11,8 +11,8 @@ export default function AdminPartnerships() {
         setLoading(true);
         try {
             const res = await api.get('/admin/partnerships', { params: { page } });
-            setPartnerships(res.data.data || []);
-            setPagination(res.data.meta || { current_page: 1, last_page: 1, total: 0 });
+            setPartnerships(res.data || []);
+            setPagination(res.meta || { current_page: 1, last_page: 1, total: 0 });
         } catch (err) {
             console.error('Failed to load partnerships', err);
         } finally {

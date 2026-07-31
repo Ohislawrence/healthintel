@@ -228,7 +228,7 @@ class ReferenceRangeService
                 'critical_low' => null,
                 'critical_high' => null,
                 'unit' => $unit,
-                'reason' => "No reference range found for test '{$testName}'. The interpretation may be limited.",
+                'reason' => "No verified reference range available for '{$testName}'. Admin notified to add this range.",
             ]);
         }
 

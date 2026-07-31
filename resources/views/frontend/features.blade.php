@@ -1,7 +1,7 @@
 @extends('layouts.frontend')
 
 @section('title', 'Features — HealthIntel | Lab Results, Symptom Checker, Provider Directory & More')
-@section('description', 'HealthIntel offers AI lab result interpretation, symptom checker, provider directory, insurance comparison, health calculators, appointment tracking, and a health score — all in one platform.')
+@section('description', 'HealthIntel offers lab result interpretation, symptom checker, provider directory, insurance comparison, health calculators, appointment tracking, and a health score — all in one platform.')
 
 @section('content')
 <section class="section">
@@ -15,7 +15,7 @@
             <div class="feature-card anim-fade-up d1">
                 <div class="feature-dot" aria-hidden="true"></div>
                 <h3>Lab Result Interpretation</h3>
-                <p>Upload a PDF lab report or enter values manually. Our AI explains every result in plain language, flags what's out of range, and gives you trends over time.</p>
+                <p>Upload a PDF lab report or enter values manually. We explain every result in plain language, flag what's out of range, and give you trends over time.</p>
             </div>
             <div class="feature-card anim-fade-up d2">
                 <div class="feature-dot" aria-hidden="true"></div>
