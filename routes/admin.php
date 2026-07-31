@@ -97,6 +97,23 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('/blog/categories/{id}', [AdminBlogController::class, 'categoryUpdate']);
     Route::delete('/blog/categories/{id}', [AdminBlogController::class, 'categoryDelete']);
 
+    // ── Clinical Data Management (Reference Ranges, Panels, Med Effects) ──
+    Route::get('/clinical/ranges', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'ranges']);
+    Route::post('/clinical/ranges', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'rangeStore']);
+    Route::put('/clinical/ranges/{id}', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'rangeUpdate']);
+    Route::delete('/clinical/ranges/{id}', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'rangeDestroy']);
+    Route::get('/clinical/ranges/categories', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'rangeCategories']);
+
+    Route::get('/clinical/panels', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'panels']);
+    Route::post('/clinical/panels', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'panelStore']);
+    Route::put('/clinical/panels/{id}', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'panelUpdate']);
+    Route::delete('/clinical/panels/{id}', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'panelDestroy']);
+
+    Route::get('/clinical/medication-effects', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'medicationEffects']);
+    Route::post('/clinical/medication-effects', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'medicationEffectStore']);
+    Route::put('/clinical/medication-effects/{id}', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'medicationEffectUpdate']);
+    Route::delete('/clinical/medication-effects/{id}', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'medicationEffectDestroy']);
+
     // Settings
     Route::get('/settings', [AdminSettingController::class, 'index']);
     Route::put('/settings/{setting}', [AdminSettingController::class, 'update']);
