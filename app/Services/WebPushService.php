@@ -170,7 +170,15 @@ class WebPushService
             ],
         ];
 
-        $webPush = new \Minishlink\WebPush\WebPush($auth);
+        try {
+            $webPush = new \Minishlink\WebPush\WebPush($auth);
+        } catch (\Throwable $e) {
+            // Constructor failed (e.g., Buzz MultiCurl signature mismatch in old 0.2.x versions)
+            Log::warning('WebPush: Library constructor failed — version mismatch. Please upgrade minishlink/web-push to ^7.0', [
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
 
         try {
             $report = $webPush->sendOneNotification(
