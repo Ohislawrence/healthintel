@@ -11,7 +11,7 @@
         "laravel/framework": "^13.8",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
-        "minishlink/web-push": "^0.2.2",
+        "minishlink/web-push": "^7.0",
         "smalot/pdfparser": "*",
         "spatie/laravel-permission": "^8.3"
     },

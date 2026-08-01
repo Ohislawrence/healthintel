@@ -172,12 +172,12 @@ class WebPushService
 
         $webPush = new \Minishlink\WebPush\WebPush($auth);
 
-        $webPush->queueNotification(
-            \Minishlink\WebPush\Subscription::create($subscription->toWebPushConfig()),
-            json_encode($payload)
-        );
+        try {
+            $report = $webPush->sendOneNotification(
+                \Minishlink\WebPush\Subscription::create($subscription->toWebPushConfig()),
+                json_encode($payload)
+            );
 
-        foreach ($webPush->flush() as $report) {
             if ($report->isSuccess()) {
                 return true;
             }
@@ -191,6 +191,38 @@ class WebPushService
                 'endpoint' => $subscription->endpoint,
                 'reason' => $report->getReason(),
             ]);
+        } catch (\ErrorException $e) {
+            // Fallback for older library versions that use queueNotification/flush
+            Log::info('WebPush: sendOneNotification unavailable, trying flush()', [
+                'error' => $e->getMessage(),
+            ]);
+
+            try {
+                $webPush->queueNotification(
+                    \Minishlink\WebPush\Subscription::create($subscription->toWebPushConfig()),
+                    json_encode($payload)
+                );
+
+                foreach ($webPush->flush() as $report) {
+                    if ($report->isSuccess()) {
+                        return true;
+                    }
+
+                    if ($report->isSubscriptionExpired()) {
+                        $subscription->update(['is_active' => false]);
+                        return false;
+                    }
+
+                    Log::warning('WebPush: Delivery failed', [
+                        'endpoint' => $subscription->endpoint,
+                        'reason' => $report->getReason(),
+                    ]);
+                }
+            } catch (\Throwable $inner) {
+                Log::warning('WebPush: Both sendOneNotification and flush() failed', [
+                    'error' => $inner->getMessage(),
+                ]);
+            }
         }
 
         return false;
