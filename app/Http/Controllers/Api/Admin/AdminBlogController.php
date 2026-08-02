@@ -111,6 +111,11 @@ class AdminBlogController extends BaseController
 
         $data['author_id'] = auth()->id();
 
+        // Ensure excerpt fits DB column (defense-in-depth)
+        if (!empty($data['excerpt'])) {
+            $data['excerpt'] = \Illuminate\Support\Str::limit($data['excerpt'], 500, '');
+        }
+
         if ($data['status'] === 'published') {
             $data['published_at'] = now();
         }
@@ -137,6 +142,11 @@ class AdminBlogController extends BaseController
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:255',
         ]);
+
+        // Ensure excerpt fits DB column (defense-in-depth)
+        if (!empty($data['excerpt'])) {
+            $data['excerpt'] = \Illuminate\Support\Str::limit($data['excerpt'], 500, '');
+        }
 
         if ($data['status'] === 'published' && !$post->published_at) {
             $data['published_at'] = now();
