@@ -53,15 +53,36 @@ export default function ReferralDashboard() {
     }
   };
 
-  const copyReferralLink = async () => {
+  const copyReferralLink = () => {
     if (!user?.referral_code) return;
     const link = `${window.location.origin}/register?ref=${user.referral_code}`;
+
+    // Use Clipboard API if available (HTTPS/localhost), fall back to execCommand for HTTP
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(link).then(
+        () => alert('Referral link copied!'),
+        () => fallbackCopy(link),
+      );
+    } else {
+      fallbackCopy(link);
+    }
+  };
+
+  const fallbackCopy = (text) => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
     try {
-      await navigator.clipboard.writeText(link);
+      document.execCommand('copy');
       alert('Referral link copied!');
     } catch {
-      alert('Failed to copy link');
+      alert('Failed to copy. Your link: ' + text);
     }
+    document.body.removeChild(textarea);
   };
 
   if (loading) {

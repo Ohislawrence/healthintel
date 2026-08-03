@@ -327,6 +327,7 @@ class AuthController extends BaseController
             'email' => $user->email,
             'phone' => $user->phone,
             'phone_verified_at' => $user->phone_verified_at,
+            'referral_code' => $user->referral_code,
             'credits' => $this->creditService->getBalance($user),
             'roles' => $user->getRoleNames()->toArray(),
             'health_profile' => $user->healthProfile ? [
