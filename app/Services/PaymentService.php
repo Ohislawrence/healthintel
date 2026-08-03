@@ -12,6 +12,7 @@ class PaymentService
         private PaystackService $paystack,
         private FlutterwaveService $flutterwave,
         private CreditService $credits,
+        private ReferralProgramService $referralProgram,
     ) {}
 
     /**
@@ -195,5 +196,8 @@ class PaymentService
             actionType: 'credit_purchase',
             reference: $payment,
         );
+
+        // Process referral commission for the referrer
+        $this->referralProgram->processCommission($payment);
     }
 }

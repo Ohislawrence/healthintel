@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
 use App\Services\CreditService;
+use App\Services\ReferralProgramService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -17,6 +18,7 @@ class AuthController extends BaseController
 {
     public function __construct(
         private CreditService $creditService,
+        private ReferralProgramService $referralService,
     ) {}
 
     /**
@@ -48,6 +50,15 @@ class AuthController extends BaseController
                     ->subject('Your HealthIntel Verification Code');
             }
         );
+
+        // Generate referral code for the new user
+        $this->referralService->generateReferralCode($user);
+
+        // Attach referrer if referral code was provided
+        $refCode = $request->input('ref');
+        if ($refCode) {
+            $this->referralService->attachReferrer($user, $refCode);
+        }
 
         // Grant free signup credits
         $this->creditService->grantSignupCredits($user);

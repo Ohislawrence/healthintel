@@ -151,6 +151,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('/push/subscription-update', [PushController::class, 'subscriptionUpdate']);
     Route::post('/push/notification-received', [PushController::class, 'notificationReceived']);
 
+    // Referral Program
+    Route::get('/referral/link', [\App\Http\Controllers\Api\ReferralController::class, 'myLink']);
+    Route::get('/referral/earnings', [\App\Http\Controllers\Api\ReferralController::class, 'earnings']);
+    Route::get('/referral/earnings/summary', [\App\Http\Controllers\Api\ReferralController::class, 'summary']);
+    Route::get('/referral/payouts', [\App\Http\Controllers\Api\ReferralController::class, 'payoutHistory']);
+    Route::post('/referral/payout/request', [\App\Http\Controllers\Api\ReferralController::class, 'requestPayout']);
+
     // Partner Portal (authenticated partner routes)
     Route::get('/partner/dashboard', [PartnerPortalController::class, 'dashboard']);
     Route::put('/partner/listing', [PartnerPortalController::class, 'updateListing']);

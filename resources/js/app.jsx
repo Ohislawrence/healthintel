@@ -59,6 +59,7 @@ import FoodSymptomDiary from './screens/tools/FoodSymptomDiary';
 import PeriodTracker from './screens/tools/PeriodTracker';
 import ImmunizationTracker from './screens/tools/ImmunizationTracker';
 import AppointmentTracker from './screens/tools/AppointmentTracker';
+import ReferralDashboard from './screens/ReferralDashboard';
 import Offline from './screens/Offline';
 import AdminLayout from './screens/admin/AdminLayout';
 import AdminDashboard from './screens/admin/AdminDashboard';
@@ -86,6 +87,7 @@ import AdminClinicalPanels from './screens/admin/AdminClinicalPanels';
 import AdminMedicationEffects from './screens/admin/AdminMedicationEffects';
 import AdminEmails from './screens/admin/AdminEmails';
 import AdminDocumentation from './screens/admin/AdminDocumentation';
+import AdminReferrals from './screens/admin/AdminReferrals';
 import PartnerLogin from './screens/partner/PartnerLogin';
 import PartnerLayout from './screens/partner/PartnerLayout';
 import PartnerDashboard from './screens/partner/PartnerDashboard';
@@ -274,6 +276,7 @@ function App() {
                     <Route path="/health-tools/period" element={<ProtectedRoute><AppLayout><PeriodTracker /></AppLayout></ProtectedRoute>} />
                     <Route path="/health-tools/immunization" element={<ProtectedRoute><AppLayout><ImmunizationTracker /></AppLayout></ProtectedRoute>} />
                     <Route path="/health-tools/appointments" element={<ProtectedRoute><AppLayout><AppointmentTracker /></AppLayout></ProtectedRoute>} />
+                    <Route path="/referral" element={<ProtectedRoute><AppLayout><ReferralDashboard /></AppLayout></ProtectedRoute>} />
 
                     {/* Admin Routes */}
                     <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
@@ -303,6 +306,7 @@ function App() {
                         <Route path="clinical/medication-effects" element={<AdminMedicationEffects />} />
                         <Route path="emails" element={<AdminEmails />} />
                         <Route path="partnership-inquiries" element={<AdminPartnershipInquiries />} />
+                        <Route path="referrals" element={<AdminReferrals />} />
                         <Route path="documentation" element={<AdminDocumentation />} />
                     </Route>
 

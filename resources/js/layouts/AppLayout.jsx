@@ -7,6 +7,7 @@ const navItems = [
     { path: '/lab-results', label: 'Lab Tests', icon: '⚛' },
     { path: '/symptom-checker', label: 'Symptoms', icon: '♡' },
     { path: '/directory', label: 'Directory', icon: '⚕' },
+    { path: '/referral', label: 'Referrals', icon: '👥' },
     { path: '/credits', label: 'Credits', icon: '◆' },
 ];
 
@@ -100,22 +101,22 @@ export default function AppLayout({ children }) {
             </div>
 
             {/* ── Mobile Bottom Tab Bar ──────────────────── */}
-            <div className="tab-bar-fixed md:hidden">
+            <div className="tab-bar-fixed md:hidden flex justify-evenly items-center px-1">
                 {navItems.map((item) => {
                     const active = isActive(item.path);
                     return (
                         <Link
                             key={item.path}
                             to={item.path}
-                            className={`flex flex-col items-center justify-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
+                            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 min-w-0 flex-1 transition-all ${
                                 active ? 'text-teal-700' : 'text-neutral-400'
                             }`}
                         >
-                            <span className={`text-xl ${active ? 'bg-teal-50 w-8 h-8 flex items-center justify-center rounded-lg' : ''}`}>
+                            <span className={`text-lg leading-none ${active ? 'bg-teal-50 w-7 h-7 flex items-center justify-center rounded-lg' : ''}`}>
                                 {item.icon}
                             </span>
-                            <span className="text-[10px] font-bold">{item.label}</span>
-                            {active && <span className="w-1 h-1 rounded-full bg-teal-500 mt-0.5" />}
+                            <span className="text-[9px] font-bold leading-tight truncate max-w-full px-0.5">{item.label}</span>
+                            {active && <span className="w-1 h-1 rounded-full bg-teal-500" />}
                         </Link>
                     );
                 })}

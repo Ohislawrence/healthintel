@@ -1203,6 +1203,173 @@ class AdminController extends BaseController
         return $filters;
     }
 
+    // ── Referral Program Management ──
+
+    public function referralSettings()
+    {
+        $percentage = (int) \App\Models\Setting::getValue('referral.percentage', 10);
+        $maxPayouts = (int) \App\Models\Setting::getValue('referral.max_payouts_per_referral', 3);
+        $minThreshold = (int) \App\Models\Setting::getValue('referral.min_payout_threshold_naira', 5000);
+
+        return $this->success([
+            'percentage' => $percentage,
+            'max_payouts_per_referral' => $maxPayouts,
+            'min_payout_threshold_naira' => $minThreshold,
+        ]);
+    }
+
+    public function referralSettingsUpdate(Request $request)
+    {
+        $validated = $request->validate([
+            'percentage' => 'sometimes|integer|min:1|max:100',
+            'max_payouts_per_referral' => 'sometimes|integer|min:1|max:100',
+            'min_payout_threshold_naira' => 'sometimes|integer|min:100|max:1000000',
+        ]);
+
+        foreach ($validated as $key => $value) {
+            \App\Models\Setting::setValue("referral.{$key}", $value);
+        }
+
+        return $this->success(null, 'Referral settings updated');
+    }
+
+    public function referralEarnings(Request $request)
+    {
+        $query = \App\Models\ReferralEarning::with(['user:id,name,email', 'referredUser:id,name,email']);
+
+        // Filters
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+
+        $earnings = $query->latest()->paginate(30);
+
+        $earnings->getCollection()->transform(function ($e) {
+            return [
+                'id' => $e->id,
+                'user' => $e->user ? ['id' => $e->user->id, 'name' => $e->user->name, 'email' => $e->user->email] : null,
+                'referred_user' => $e->referredUser ? ['id' => $e->referredUser->id, 'name' => $e->referredUser->name, 'email' => $e->referredUser->email] : null,
+                'source_amount_naira' => $e->sourceAmountNaira(),
+                'commission_naira' => $e->commissionNaira(),
+                'percentage_rate' => $e->percentage_rate,
+                'payout_number' => $e->payout_number,
+                'status' => $e->status,
+                'created_at' => $e->created_at->toISOString(),
+            ];
+        });
+
+        return $this->paginated($earnings);
+    }
+
+    public function referralPayouts(Request $request)
+    {
+        $query = \App\Models\ReferralPayoutRequest::with('user:id,name,email');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $payouts = $query->latest()->paginate(30);
+
+        $payouts->getCollection()->transform(function ($p) {
+            return [
+                'id' => $p->id,
+                'user' => $p->user ? ['id' => $p->user->id, 'name' => $p->user->name, 'email' => $p->user->email] : null,
+                'amount_naira' => $p->amountNaira(),
+                'bank_name' => $p->bank_name,
+                'account_number' => $p->account_number,
+                'account_name' => $p->account_name,
+                'status' => $p->status,
+                'admin_notes' => $p->admin_notes,
+                'processed_by' => $p->processedBy ? $p->processedBy->name : null,
+                'created_at' => $p->created_at->toISOString(),
+                'processed_at' => $p->processed_at?->toISOString(),
+            ];
+        });
+
+        return $this->paginated($payouts);
+    }
+
+    public function referralPayoutApprove(Request $request, int $id)
+    {
+        $payout = \App\Models\ReferralPayoutRequest::findOrFail($id);
+
+        if ($payout->status !== 'pending') {
+            return $this->error('This payout request has already been processed.', 400);
+        }
+
+        $validated = $request->validate([
+            'admin_notes' => 'nullable|string|max:5000',
+        ]);
+
+        $payout->update([
+            'status' => 'paid',
+            'processed_by' => $request->user()->id,
+            'processed_at' => now(),
+            'admin_notes' => $validated['admin_notes'] ?? $payout->admin_notes,
+        ]);
+
+        // Mark associated earnings as paid
+        \App\Models\ReferralEarning::where('payout_request_id', $payout->id)
+            ->update([
+                'status' => 'paid',
+                'paid_at' => now(),
+            ]);
+
+        return $this->success(['payout' => $payout->fresh()], 'Payout approved and marked as paid');
+    }
+
+    public function referralPayoutReject(Request $request, int $id)
+    {
+        $payout = \App\Models\ReferralPayoutRequest::findOrFail($id);
+
+        if ($payout->status !== 'pending') {
+            return $this->error('This payout request has already been processed.', 400);
+        }
+
+        $validated = $request->validate([
+            'admin_notes' => 'required|string|max:5000',
+        ]);
+
+        $payout->update([
+            'status' => 'rejected',
+            'processed_by' => $request->user()->id,
+            'processed_at' => now(),
+            'admin_notes' => $validated['admin_notes'],
+        ]);
+
+        // Return earnings to pending status
+        \App\Models\ReferralEarning::where('payout_request_id', $payout->id)
+            ->update([
+                'status' => 'pending',
+                'payout_request_id' => null,
+            ]);
+
+        return $this->success(['payout' => $payout->fresh()], 'Payout rejected and earnings returned to pending');
+    }
+
+    public function referralStats()
+    {
+        $totalEarnings = (int) \App\Models\ReferralEarning::sum('commission_kobo') / 100;
+        $pendingEarnings = (int) \App\Models\ReferralEarning::where('status', 'pending')->sum('commission_kobo') / 100;
+        $paidEarnings = (int) \App\Models\ReferralEarning::where('status', 'paid')->sum('commission_kobo') / 100;
+        $totalReferrers = \App\Models\ReferralEarning::distinct('user_id')->count('user_id');
+        $pendingPayouts = \App\Models\ReferralPayoutRequest::where('status', 'pending')->count();
+        $totalReferrals = User::whereNotNull('referred_by_user_id')->count();
+
+        return $this->success([
+            'total_earnings_naira' => $totalEarnings,
+            'pending_earnings_naira' => $pendingEarnings,
+            'paid_earnings_naira' => $paidEarnings,
+            'total_referrers' => $totalReferrers,
+            'pending_payouts' => $pendingPayouts,
+            'total_referrals' => $totalReferrals,
+        ]);
+    }
+
     // ── Partnership Inquiries ──
 
     public function partnershipInquiries()
