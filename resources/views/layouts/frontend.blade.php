@@ -13,9 +13,11 @@
     <meta property="og:url" content="{{ url()->current() }}">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="HealthIntel">
+    <meta property="og:image" content="@yield('og_image', asset('icons/icon-512x512.png'))">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="@yield('title', 'HealthIntel — Understand your lab results, in plain language')">
     <meta name="twitter:description" content="@yield('description')">
+    <meta name="twitter:image" content="@yield('og_image', asset('icons/icon-512x512.png'))">
     <meta name="robots" content="@yield('robots', 'index, follow')">
     
     <!-- PWA / Web App Manifest -->

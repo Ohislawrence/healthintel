@@ -2,6 +2,9 @@
 
 @section('title', $post->meta_title ?: $post->title . ' — HealthIntel Blog')
 @section('description', $post->meta_description ?: $post->excerpt ?: 'Read this article on the HealthIntel Blog.')
+@if($post->featured_image)
+@section('og_image', $post->featured_image)
+@endif
 
 @section('content')
 {{-- Breadcrumb --}}

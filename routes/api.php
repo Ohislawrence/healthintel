@@ -145,6 +145,15 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
     Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
 
+    // User Notifications (in-app)
+    Route::get('/notifications', [\App\Http\Controllers\Api\UserNotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [\App\Http\Controllers\Api\UserNotificationController::class, 'unreadCount']);
+    Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\UserNotificationController::class, 'markRead']);
+    Route::post('/notifications/mark-all-read', [\App\Http\Controllers\Api\UserNotificationController::class, 'markAllRead']);
+
+    // Global Search
+    Route::get('/search', \App\Http\Controllers\Api\SearchController::class);
+
     // Push Notifications
     Route::post('/push/subscribe', [PushController::class, 'subscribe']);
     Route::post('/push/unsubscribe', [PushController::class, 'unsubscribe']);
