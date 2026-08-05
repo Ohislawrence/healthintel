@@ -27,8 +27,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="HealthIntel">
-    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png">
+    <link rel="apple-touch-icon" href="/logo/healthintel-logo.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/logo/healthintel-logo.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/logo/healthintel-logo.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/logo/healthintel-logo.png">
     
     @yield('structured_data')
     

@@ -254,11 +254,17 @@ class ProviderDirectoryController extends BaseController
         $this->expireStaleSponsorships();
 
         $sponsored = ProviderDirectoryEntry::where('is_active', true)
-            ->where('partner_status', 'sponsored')
-            ->whereNotNull('monetization_type')
+            ->whereIn('partner_status', ['sponsored', 'affiliate'])
+            ->where(function ($q) {
+                $q->where('partner_status', 'affiliate')
+                  ->orWhere(function ($q2) {
+                      $q2->where('partner_status', 'sponsored')
+                         ->whereNotNull('monetization_type');
+                  });
+            })
             ->select([
                 'id', 'name', 'slug', 'type', 'specialty', 'city', 'state',
-                'banner_url', 'monetization_amount',
+                'banner_url', 'partner_status',
                 'latitude', 'longitude',
             ])
             ->get();

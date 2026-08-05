@@ -14,6 +14,12 @@
   "prefer_related_applications": false,
   "icons": [
     {
+      "src": "/logo/healthintel-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/icons/icon-72x72.png",
       "sizes": "72x72",
       "type": "image/png",

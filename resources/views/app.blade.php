@@ -16,17 +16,17 @@
     <meta name="msapplication-config" content="/browserconfig.xml">
 
     {{-- Apple Touch Icons --}}
-    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/logo/healthintel-logo.png">
     <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png">
-    <link rel="mask-icon" href="/icons/icon-192x192.png" color="#0E6B5C">
+    <link rel="apple-touch-icon" sizes="180x180" href="/logo/healthintel-logo.png">
+    <link rel="mask-icon" href="/logo/healthintel-logo.png" color="#0E6B5C">
 
     {{-- PWA Manifest --}}
     <link rel="manifest" href="/manifest.json">
 
     {{-- Favicon --}}
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-72x72.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/logo/healthintel-logo.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/logo/healthintel-logo.png">
 
     <title>HealthIntel — Understand Your Health in Plain Language</title>
 
