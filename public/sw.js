@@ -76,9 +76,30 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // ── API requests: Network-only (don't cache dynamic data) ──
+  // ── API requests for interpretations & trends: Stale-while-revalidate ──
   if (url.pathname.startsWith('/api/')) {
-    // Network-only for API - these are dynamic
+    const cacheablePaths = ['/submissions/', '/trends', '/profile', '/health-score', '/languages'];
+    const isCacheable = cacheablePaths.some(p => url.pathname.includes(p));
+    
+    if (isCacheable && request.method === 'GET') {
+      event.respondWith(
+        caches.match(request).then((cached) => {
+          const fetched = fetch(request).then((response) => {
+            if (response.ok) {
+              const cloned = response.clone();
+              caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, cloned));
+            }
+            return response;
+          });
+          return cached || fetched;
+        }).catch(() => cached || new Response(JSON.stringify({ error: 'offline' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        }))
+      );
+      return;
+    }
+    // Other API: network-only
     return;
   }
 

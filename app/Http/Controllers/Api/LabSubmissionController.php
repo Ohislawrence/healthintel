@@ -27,31 +27,20 @@ class LabSubmissionController extends BaseController
         private ReferenceRangeService $referenceRangeService,
     ) {}
 
-    /**
-     * List available test panels.
-     */
     public function panels()
     {
         $panels = TestPanel::where('is_active', true)
             ->orderBy('sort_order')
             ->get();
-
         return $this->success(['panels' => $panels]);
     }
 
-    /**
-     * Show a single panel with its tests and reference range metadata.
-     */
     public function panelShow(string $slug)
     {
         $panel = TestPanel::where('slug', $slug)->where('is_active', true)->firstOrFail();
-
         return $this->success(['panel' => $panel->load('ranges')]);
     }
 
-    /**
-     * Get the user's submission history.
-     */
     public function index(Request $request)
     {
         $submissions = $request->user()
@@ -59,26 +48,18 @@ class LabSubmissionController extends BaseController
             ->with(['testPanel:id,name', 'values', 'interpretation'])
             ->latest('submitted_at')
             ->paginate(20);
-
         return $this->paginated($submissions);
     }
 
-    /**
-     * Get a single submission with full interpretation.
-     */
     public function show(int $id, Request $request)
     {
         $submission = $request->user()
             ->labSubmissions()
             ->with(['testPanel', 'values', 'interpretation'])
             ->findOrFail($id);
-
         return $this->success(['submission' => $submission]);
     }
 
-    /**
-     * Submit lab values: flag → interpret → store.
-     */
     public function submit(Request $request)
     {
         $validated = $request->validate([
@@ -93,7 +74,6 @@ class LabSubmissionController extends BaseController
         $profile = $user->healthProfile;
         $cost = config('credits.costs.lab_interpretation', 2);
 
-        // ── First interpretation free ──
         $isFirstFree = false;
         if (!$user->received_free_interpretation && config('credits.first_interpretation_free', true)) {
             $user->update(['received_free_interpretation' => true]);
@@ -107,7 +87,6 @@ class LabSubmissionController extends BaseController
 
         $effectiveCost = $isFirstFree ? 0 : $cost;
 
-        // Create submission
         $submission = LabSubmission::create([
             'user_id' => $user->id,
             'test_panel_id' => $panel->id,
@@ -115,21 +94,14 @@ class LabSubmissionController extends BaseController
             'submitted_at' => now(),
         ]);
 
-        // Validate, flag, and store each value
         $flaggedValues = [];
-
         foreach ($validated['values'] as $input) {
             $range = TestReferenceRange::where('test_slug', $input['test_slug'])
                 ->where('test_panel_id', $panel->id)
                 ->first();
-
-            if (!$range) {
-                // Continue gracefully — no reference data for this test
-                continue;
-            }
+            if (!$range) continue;
 
             $flag = $this->flagEngine->flag((float) $input['value'], $range, $profile);
-
             LabSubmissionValue::create([
                 'lab_submission_id' => $submission->id,
                 'test_slug' => $input['test_slug'],
@@ -138,7 +110,6 @@ class LabSubmissionController extends BaseController
                 'value' => $input['value'],
                 'flag' => $flag['flag'],
             ]);
-
             $flaggedValues[] = array_merge([
                 'test_name' => $range->test_name,
                 'test_slug' => $input['test_slug'],
@@ -146,9 +117,7 @@ class LabSubmissionController extends BaseController
             ], $flag);
         }
 
-        // Build prompt and create AI interpretation record
         $prompt = $this->promptBuilder->build($submission, $flaggedValues);
-
         $interpretation = AiInterpretation::create([
             'lab_submission_id' => $submission->id,
             'prompt_input' => $prompt,
@@ -156,9 +125,7 @@ class LabSubmissionController extends BaseController
             'status' => 'pending',
         ]);
 
-        // Call DeepSeek (graceful degradation)
         $interpText = $this->deepSeek->interpret($interpretation, $flaggedValues);
-
         $submission->load(['values', 'interpretation']);
 
         return $this->success([
@@ -169,36 +136,136 @@ class LabSubmissionController extends BaseController
     }
 
     /**
-     * Trend data with analysis: historical values for a given test slug
-     * plus trend direction, alerts, and sharing capability.
+     * Submit an image-based lab report (camera photo or uploaded image).
      */
-    public function trends(Request $request)
+    public function submitImage(Request $request)
     {
         $validated = $request->validate([
-            'test_slug' => 'required|string',
+            'image_base64' => 'required|string',
+            'image_name' => 'nullable|string|max:255',
         ]);
 
-        $analysis = app(\App\Services\TrendService::class)
-            ->analyzeTrend($request->user()->id, $validated['test_slug']);
+        $user = $request->user();
+        $imageService = app(\App\Services\ImageLabReportService::class);
+        $result = $imageService->processImage(
+            $validated['image_base64'],
+            $user->id,
+            $validated['image_name'] ?? null
+        );
 
-        return $this->success(['trend' => $analysis]);
+        if (!$result['success']) {
+            return $this->error($result['error'] ?? 'Could not process this image.', 422);
+        }
+
+        return $this->success([
+            'draft_id' => $result['draft_id'],
+            'extracted_tests' => $result['extracted_tests'],
+            'message' => $result['message'],
+        ]);
     }
 
     /**
-     * Share a trend summary as a PDF (via download or email).
+     * Translate an interpretation to a different language via DeepSeek.
      */
+    public function translate(Request $request, int $id)
+    {
+        $validated = $request->validate([
+            'target_language' => 'required|string|in:en,pcm,yo,ha,ig',
+        ]);
+
+        $submission = $request->user()->labSubmissions()
+            ->with('interpretation')
+            ->findOrFail($id);
+
+        $originalText = $submission->interpretation?->interpretation_text;
+        if (!$originalText) {
+            return $this->error('No interpretation text available to translate.', 404);
+        }
+
+        $langCode = $validated['target_language'];
+        if ($langCode === 'en') {
+            return $this->success(['translated_text' => $originalText]);
+        }
+
+        $langService = app(\App\Services\TranslationService::class);
+        $langInstruction = $langService->languageInstruction($langCode);
+        $langName = $langService->availableLanguages()[$langCode]['label'] ?? $langCode;
+
+        $prompt = <<<EOT
+Translate the following medical lab interpretation into {$langName}.
+
+IMPORTANT: Your ENTIRE response must be in {$langName}. Do NOT mix languages.
+Use the EXACT same markdown format (## sections, bullet points, etc.) but in {$langName}.
+Keep the emoji markers (⚠️, 🔸, ✅, 💡, 📋, ℹ️) as they are.
+
+SPECIFIC INSTRUCTIONS FOR {$langName}:
+{$langInstruction}
+
+ORIGINAL TEXT:
+{$originalText}
+EOT;
+
+        $deepSeekService = app(\App\Services\DeepSeekService::class);
+        // Use a neutral system prompt so the clinical interpreter prompt doesn't override the translation
+        $result = $deepSeekService->ask($prompt, 2048, 0.3, 'You are a professional medical translator. Translate the user\'s text exactly as instructed. Do not add any commentary.');
+
+        if (!$result) {
+            return $this->error('Translation service unavailable.', 503);
+        }
+
+        return $this->success(['translated_text' => $result]);
+    }
+
+    /**
+     * Stream interpretation tokens via Server-Sent Events.
+     */
+    public function interpretStream(Request $request, int $id)
+    {
+        $submission = $request->user()
+            ->labSubmissions()
+            ->with(['testPanel', 'values', 'interpretation'])
+            ->findOrFail($id);
+
+        $prompt = $submission->interpretation?->prompt_input
+            ?? "Lab results for panel: " . ($submission->testPanel?->name ?? 'Unknown');
+
+        return response()->stream(function () use ($prompt) {
+            $generator = app(DeepSeekService::class)->streamInterpret($prompt);
+            foreach ($generator as $token) {
+                echo "data: " . json_encode(['token' => $token]) . "\n\n";
+                ob_flush();
+                flush();
+            }
+            echo "data: [DONE]\n\n";
+            ob_flush();
+            flush();
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    public function trends(Request $request)
+    {
+        $validated = $request->validate(['test_slug' => 'required|string']);
+        $analysis = app(\App\Services\TrendService::class)
+            ->analyzeTrend($request->user()->id, $validated['test_slug']);
+        return $this->success(['trend' => $analysis]);
+    }
+
     public function shareTrend(Request $request)
     {
         $validated = $request->validate([
             'test_slug' => 'required|string',
-            'delivery_method' => 'nullable|in:pdf,email', // pdf=download, email=send
+            'delivery_method' => 'nullable|in:pdf,email',
             'recipient_email' => 'nullable|email|required_if:delivery_method,email',
         ]);
 
         $user = $request->user();
         $trendService = app(\App\Services\TrendService::class);
         $pdf = $trendService->generateTrendSummaryPdf($user->id, $validated['test_slug']);
-
         $method = $validated['delivery_method'] ?? 'pdf';
 
         if ($method === 'email') {
@@ -208,7 +275,6 @@ class LabSubmissionController extends BaseController
                     ->html('<p>A LabDoc user has shared their lab trend summary with you. Please find it attached.</p>')
                     ->attachData($pdf, 'trend-summary.pdf', ['mime' => 'application/pdf']);
             });
-
             return $this->success(null, 'Trend summary sent to ' . $validated['recipient_email']);
         }
 
@@ -218,10 +284,6 @@ class LabSubmissionController extends BaseController
         ]);
     }
 
-    /**
-     * Submit a PDF for initial OCR — returns extracted values for user confirmation.
-     * The actual interpretation runs only after the user confirms the values.
-     */
     public function submitPdfDraft(Request $request)
     {
         $validated = $request->validate([
@@ -230,11 +292,8 @@ class LabSubmissionController extends BaseController
         ]);
 
         $user = $request->user();
-
         $pdfData = base64_decode($validated['pdf_base64']);
-        if (!$pdfData) {
-            return $this->error('Invalid PDF data.', 422);
-        }
+        if (!$pdfData) return $this->error('Invalid PDF data.', 422);
 
         $fileName = ($validated['pdf_name'] ?? 'report') . '_' . time() . '.pdf';
         $path = 'lab-reports/' . $fileName;
@@ -254,11 +313,9 @@ class LabSubmissionController extends BaseController
             return $this->error('No text could be extracted from this PDF.', 422);
         }
 
-        // Extract structured values using known test names
         $extractor = app(\App\Services\PdfValueExtractor::class);
         $extractedTests = $extractor->extract($pdfText);
 
-        // Save draft
         $draft = \App\Models\PdfSubmissionDraft::create([
             'user_id' => $user->id,
             'raw_ocr_text' => $pdfText,
@@ -277,10 +334,6 @@ class LabSubmissionController extends BaseController
         ]);
     }
 
-    /**
-     * Confirm extracted values and run the interpretation.
-     * User can also edit the values before confirming.
-     */
     public function confirmPdfDraft(Request $request, $draftId)
     {
         $validated = $request->validate([
@@ -292,14 +345,12 @@ class LabSubmissionController extends BaseController
 
         $user = $request->user();
         $draft = \App\Models\PdfSubmissionDraft::where('user_id', $user->id)->findOrFail($draftId);
-
         $cost = config('credits.costs.pdf_interpretation', 3);
 
         if (!$this->creditService->hasCredits($user, $cost)) {
             return $this->error('Insufficient credits. Please top up.', 402);
         }
 
-        // Create a single submission with all confirmed tests as values
         $submission = LabSubmission::create([
             'user_id' => $user->id,
             'submission_type' => 'pdf',
@@ -309,7 +360,6 @@ class LabSubmissionController extends BaseController
             'submitted_at' => now(),
         ]);
 
-        // Store each confirmed value
         foreach ($validated['confirmed_values'] as $item) {
             LabSubmissionValue::create([
                 'lab_submission_id' => $submission->id,
@@ -321,7 +371,6 @@ class LabSubmissionController extends BaseController
             ]);
         }
 
-        // Build prompt
         $prompt = "The following lab values were extracted from a PDF report and confirmed by the user:\n\n";
         foreach ($validated['confirmed_values'] as $item) {
             $prompt .= "- {$item['test_name']}: {$item['value']} {$item['unit']}\n";
@@ -336,14 +385,14 @@ class LabSubmissionController extends BaseController
         ]);
 
         $interpText = $this->deepSeek->interpretPdf($interpretation, $prompt);
+        if (!$interpText) return $this->error('AI interpretation unavailable. Please try again.', 503);
 
-        if (!$interpText) {
-            return $this->error('AI interpretation unavailable. Please try again.', 503);
+        if (str_contains($interpText, 'NOT_A_LAB_REPORT')) {
+            $interpretation->update(['status' => 'failed', 'error_message' => 'The uploaded file does not appear to be a lab report.']);
+            return $this->error('This file does not appear to be a lab report. Please upload a document containing lab test results.', 422);
         }
 
         $this->creditService->debit($user, $cost, 'pdf_interpretation');
-
-        // Mark draft as confirmed
         $draft->update([
             'confirmation_status' => 'confirmed',
             'confirmed_by' => $user->id,
@@ -352,7 +401,6 @@ class LabSubmissionController extends BaseController
         ]);
 
         $submission->load(['values', 'interpretation']);
-
         return $this->success([
             'submission' => $submission,
             'interpretation' => $interpretation->fresh(),
@@ -360,9 +408,6 @@ class LabSubmissionController extends BaseController
         ], 'Values confirmed and interpretation generated', 201);
     }
 
-    /**
-     * Submit a PDF lab report for AI interpretation (legacy — kept for backward compatibility).
-     */
     public function submitPdf(Request $request)
     {
         $validated = $request->validate([
@@ -373,23 +418,18 @@ class LabSubmissionController extends BaseController
         $user = $request->user();
         $cost = config('credits.costs.pdf_interpretation', 3);
 
-        // Check credits
         if (!$this->creditService->hasCredits($user, $cost)) {
             return $this->error('Insufficient credits. Please top up.', 402);
         }
 
-        // Decode base64 and save to temp file
         $pdfData = base64_decode($validated['pdf_base64']);
-        if (!$pdfData) {
-            return $this->error('Invalid PDF data. The file could not be decoded.', 422);
-        }
+        if (!$pdfData) return $this->error('Invalid PDF data. The file could not be decoded.', 422);
 
         $fileName = ($validated['pdf_name'] ?? 'report') . '_' . time() . '.pdf';
         $path = 'lab-reports/' . $fileName;
         Storage::put($path, $pdfData);
         $fullPath = Storage::path($path);
 
-        // Extract text from PDF using smalot/pdfparser (pure PHP, no binary needed)
         $pdfText = '';
         try {
             $parser = new \Smalot\PdfParser\Parser();
@@ -403,7 +443,6 @@ class LabSubmissionController extends BaseController
             return $this->error('No text could be extracted from this PDF. The file may be scanned or image-based. Please try a text-based PDF.', 422);
         }
 
-        // Create submission
         $submission = LabSubmission::create([
             'user_id' => $user->id,
             'submission_type' => 'pdf',
@@ -413,7 +452,6 @@ class LabSubmissionController extends BaseController
             'submitted_at' => now(),
         ]);
 
-        // Create AI interpretation
         $interpretation = AiInterpretation::create([
             'lab_submission_id' => $submission->id,
             'prompt_input' => $pdfText,
@@ -421,18 +459,22 @@ class LabSubmissionController extends BaseController
             'status' => 'pending',
         ]);
 
-        // Call DeepSeek
         $interpText = $this->deepSeek->interpretPdf($interpretation, $pdfText);
-
-        // Only deduct credits if interpretation succeeded
         if ($interpText) {
+            // Check if the LLM flagged this as not a lab report
+            if (str_contains($interpText, 'NOT_A_LAB_REPORT')) {
+                $interpretation->update([
+                    'status' => 'failed',
+                    'error_message' => 'The uploaded file does not appear to be a lab report. Please upload a valid lab result document.',
+                ]);
+                return $this->error('This file does not appear to be a lab report. Please upload a document containing lab test results.', 422);
+            }
             $this->creditService->debit($user, $cost, 'pdf_interpretation');
         } else {
             return $this->error('The AI service is currently unavailable. Your credits have not been deducted. Please try again later.', 503);
         }
 
         $submission->load('interpretation');
-
         return $this->success([
             'submission' => $submission,
             'interpretation' => $interpretation->fresh(),
@@ -440,9 +482,6 @@ class LabSubmissionController extends BaseController
         ], 'PDF report submitted for interpretation', 201);
     }
 
-    /**
-     * Build guardrail metadata for the interpretation.
-     */
     private function buildGuardrailFlags(array $flagged): array
     {
         $criticalCount = 0;
@@ -450,13 +489,9 @@ class LabSubmissionController extends BaseController
         $lowCount = 0;
 
         foreach ($flagged as $f) {
-            if (str_starts_with($f['flag'], 'critical')) {
-                $criticalCount++;
-            } elseif ($f['flag'] === 'high') {
-                $highCount++;
-            } elseif ($f['flag'] === 'low') {
-                $lowCount++;
-            }
+            if (str_starts_with($f['flag'], 'critical')) $criticalCount++;
+            elseif ($f['flag'] === 'high') $highCount++;
+            elseif ($f['flag'] === 'low') $lowCount++;
         }
 
         return [

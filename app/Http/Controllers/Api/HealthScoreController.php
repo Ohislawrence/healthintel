@@ -460,4 +460,30 @@ class HealthScoreController extends BaseController
             ],
         };
     }
+
+    /**
+     * Get user gamification data (badges + streaks).
+     */
+    public function gamification(Request $request)
+    {
+        $service = app(\App\Services\GamificationService::class);
+        $data = $service->getUserGamification($request->user());
+        return $this->success($data);
+    }
+
+    /**
+     * Download a comprehensive Health Report Card as PDF.
+     */
+    public function downloadReportCard(Request $request)
+    {
+        $user = $request->user();
+
+        $reportService = app(\App\Services\HealthReportCardService::class);
+        $pdf = $reportService->generate($user);
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="health-report-card-' . $user->id . '.pdf"',
+        ]);
+    }
 }

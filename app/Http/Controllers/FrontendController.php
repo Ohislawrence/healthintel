@@ -28,6 +28,38 @@ class FrontendController extends Controller
         return view('frontend.features');
     }
 
+    public function clinicalValidation()
+    {
+        $benchmarks = \App\Models\BenchmarkRun::where('status', 'completed')
+            ->latest('completed_at')
+            ->limit(5)
+            ->get();
+
+        $latest = $benchmarks->first();
+
+        return view('frontend.clinical-validation', compact('benchmarks', 'latest'));
+    }
+
+    public function forIndividuals()
+    {
+        return view('frontend.for-individuals');
+    }
+
+    public function forClinicians()
+    {
+        return view('frontend.for-clinicians');
+    }
+
+    public function forLabs()
+    {
+        return view('frontend.for-labs');
+    }
+
+    public function forInsurance()
+    {
+        return view('frontend.for-insurance');
+    }
+
     public function contact()
     {
         return view('frontend.contact');
@@ -90,6 +122,11 @@ class FrontendController extends Controller
         return view('frontend.blog-detail', compact('post', 'related'));
     }
 
+    public function partnerPatientResults($slug)
+    {
+        return view('frontend.partner-patient-results', compact('slug'));
+    }
+
     public function sitemap()
     {
         $pages = [
@@ -98,6 +135,10 @@ class FrontendController extends Controller
             ['url' => route('about'), 'priority' => '0.7', 'changefreq' => 'monthly'],
             ['url' => route('how-it-works'), 'priority' => '0.8', 'changefreq' => 'monthly'],
             ['url' => route('blog'), 'priority' => '0.9', 'changefreq' => 'weekly'],
+            ['url' => route('clinical-validation'), 'priority' => '0.8', 'changefreq' => 'monthly'],
+            ['url' => route('for-individuals'), 'priority' => '0.7', 'changefreq' => 'monthly'],
+            ['url' => route('for-clinicians'), 'priority' => '0.7', 'changefreq' => 'monthly'],
+            ['url' => route('for-labs'), 'priority' => '0.8', 'changefreq' => 'monthly'],
             ['url' => route('contact'), 'priority' => '0.6', 'changefreq' => 'monthly'],
             ['url' => route('privacy'), 'priority' => '0.4', 'changefreq' => 'yearly'],
             ['url' => route('terms'), 'priority' => '0.4', 'changefreq' => 'yearly'],

@@ -88,6 +88,8 @@ import AdminMedicationEffects from './screens/admin/AdminMedicationEffects';
 import AdminEmails from './screens/admin/AdminEmails';
 import AdminDocumentation from './screens/admin/AdminDocumentation';
 import AdminReferrals from './screens/admin/AdminReferrals';
+import AdminTestimonials from './screens/admin/AdminTestimonials';
+import AdminBenchmarks from './screens/admin/AdminBenchmarks';
 import PartnerLogin from './screens/partner/PartnerLogin';
 import PartnerLayout from './screens/partner/PartnerLayout';
 import PartnerDashboard from './screens/partner/PartnerDashboard';
@@ -307,6 +309,8 @@ function App() {
                         <Route path="emails" element={<AdminEmails />} />
                         <Route path="partnership-inquiries" element={<AdminPartnershipInquiries />} />
                         <Route path="referrals" element={<AdminReferrals />} />
+                        <Route path="testimonials" element={<AdminTestimonials />} />
+                        <Route path="benchmarks" element={<AdminBenchmarks />} />
                         <Route path="documentation" element={<AdminDocumentation />} />
                     </Route>
 

@@ -47,6 +47,11 @@ class User extends Authenticatable
         return $this->hasMany(ReferralEarning::class, 'user_id');
     }
 
+    public function resultConversations(): HasMany
+    {
+        return $this->hasMany(ResultConversation::class);
+    }
+
     public function referralPayoutRequests(): HasMany
     {
         return $this->hasMany(ReferralPayoutRequest::class, 'user_id');

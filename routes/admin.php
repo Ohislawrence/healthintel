@@ -103,6 +103,15 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('/blog/categories/{id}', [AdminBlogController::class, 'categoryUpdate']);
     Route::delete('/blog/categories/{id}', [AdminBlogController::class, 'categoryDelete']);
 
+    // ── Testimonials ──
+    Route::get('/testimonials', [AdminController::class, 'testimonials']);
+    Route::post('/testimonials', [AdminController::class, 'testimonialStore']);
+    Route::put('/testimonials/{id}', [AdminController::class, 'testimonialUpdate']);
+    Route::delete('/testimonials/{id}', [AdminController::class, 'testimonialDestroy']);
+
+    // ── Clinical Benchmarks ──
+    Route::get('/benchmarks', [AdminController::class, 'benchmarks']);
+
     // ── Clinical Data Management (Reference Ranges, Panels, Med Effects) ──
     Route::get('/clinical/ranges', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'ranges']);
     Route::post('/clinical/ranges', [\App\Http\Controllers\Api\Admin\AdminClinicalDataController::class, 'rangeStore']);

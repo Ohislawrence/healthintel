@@ -1370,6 +1370,59 @@ class AdminController extends BaseController
         ]);
     }
 
+    // ── Testimonials CRUD ──
+    public function testimonials()
+    {
+        $testimonials = \App\Models\Testimonial::orderBy('sort_order')->latest()->get();
+        return $this->success($testimonials);
+    }
+
+    public function testimonialStore(Request $request)
+    {
+        $validated = $request->validate([
+            'author_name' => 'required|string|max:255',
+            'author_role' => 'nullable|string|max:100',
+            'author_organization' => 'nullable|string|max:255',
+            'quote' => 'required|string|max:2000',
+            'rating' => 'nullable|integer|min:1|max:5',
+            'is_active' => 'boolean',
+            'is_featured' => 'boolean',
+            'category' => 'nullable|string|max:50',
+        ]);
+        $t = \App\Models\Testimonial::create($validated);
+        return $this->success(['testimonial' => $t], 'Testimonial created', 201);
+    }
+
+    public function testimonialUpdate(Request $request, int $id)
+    {
+        $t = \App\Models\Testimonial::findOrFail($id);
+        $validated = $request->validate([
+            'author_name' => 'sometimes|string|max:255',
+            'author_role' => 'nullable|string|max:100',
+            'author_organization' => 'nullable|string|max:255',
+            'quote' => 'sometimes|string|max:2000',
+            'rating' => 'nullable|integer|min:1|max:5',
+            'is_active' => 'boolean',
+            'is_featured' => 'boolean',
+            'category' => 'nullable|string|max:50',
+        ]);
+        $t->update($validated);
+        return $this->success(['testimonial' => $t->fresh()]);
+    }
+
+    public function testimonialDestroy(int $id)
+    {
+        \App\Models\Testimonial::findOrFail($id)->delete();
+        return $this->success(null, 'Testimonial deleted');
+    }
+
+    // ── Clinical Benchmarks ──
+    public function benchmarks()
+    {
+        $benchmarks = \App\Models\BenchmarkRun::with([])->latest()->limit(20)->get();
+        return $this->success($benchmarks);
+    }
+
     // ── Partnership Inquiries ──
 
     public function partnershipInquiries()

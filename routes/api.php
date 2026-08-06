@@ -110,6 +110,9 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('/submissions/pdf/draft', [LabSubmissionController::class, 'submitPdfDraft']);
     Route::post('/submissions/pdf/draft/{draftId}/confirm', [LabSubmissionController::class, 'confirmPdfDraft']);
     Route::post('/submissions/pdf', [LabSubmissionController::class, 'submitPdf']);
+    Route::post('/submissions/image', [LabSubmissionController::class, 'submitImage']);
+    Route::post('/submissions/{id}/interpret-stream', [LabSubmissionController::class, 'interpretStream']);
+    Route::post('/submissions/{id}/translate', [LabSubmissionController::class, 'translate']);
     Route::get('/trends', [LabSubmissionController::class, 'trends']);
     Route::post('/trends/share', [LabSubmissionController::class, 'shareTrend']);
 
@@ -159,6 +162,20 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('/push/unsubscribe', [PushController::class, 'unsubscribe']);
     Route::post('/push/subscription-update', [PushController::class, 'subscriptionUpdate']);
     Route::post('/push/notification-received', [PushController::class, 'notificationReceived']);
+
+    // Gamification
+    Route::get('/gamification', [HealthScoreController::class, 'gamification']);
+
+    // Health Report Card
+    Route::get('/health-report-card', [HealthScoreController::class, 'downloadReportCard']);
+    Route::get('/languages', fn () => response()->json(\App\Services\TranslationService::availableLanguages()));
+
+    // Result Chat Conversations
+    Route::get('/conversations', [\App\Http\Controllers\Api\ResultChatController::class, 'index']);
+    Route::get('/conversations/{id}', [\App\Http\Controllers\Api\ResultChatController::class, 'show']);
+    Route::post('/conversations', [\App\Http\Controllers\Api\ResultChatController::class, 'startConversation']);
+    Route::post('/conversations/{id}/message', [\App\Http\Controllers\Api\ResultChatController::class, 'sendMessage']);
+    Route::delete('/conversations/{id}', [\App\Http\Controllers\Api\ResultChatController::class, 'destroy']);
 
     // Referral Program
     Route::get('/referral/link', [\App\Http\Controllers\Api\ReferralController::class, 'myLink']);

@@ -8,6 +8,11 @@ Route::get('/offline', fn () => view('app'))->name('offline');
 Route::get('/about', [FrontendController::class, 'about'])->name('about');
 Route::get('/how-it-works', [FrontendController::class, 'howItWorks'])->name('how-it-works');
 Route::get('/features', [FrontendController::class, 'features'])->name('features');
+Route::get('/clinical-validation', [FrontendController::class, 'clinicalValidation'])->name('clinical-validation');
+Route::get('/for-individuals', [FrontendController::class, 'forIndividuals'])->name('for-individuals');
+Route::get('/for-clinicians', [FrontendController::class, 'forClinicians'])->name('for-clinicians');
+Route::get('/for-labs', [FrontendController::class, 'forLabs'])->name('for-labs');
+Route::get('/for-insurance', [FrontendController::class, 'forInsurance'])->name('for-insurance');
 Route::get('/contact', [FrontendController::class, 'contact'])->name('contact');
 Route::get('/partnerships', [FrontendController::class, 'partnerships'])->name('partnerships');
 Route::get('/blog', [FrontendController::class, 'blog'])->name('blog');
@@ -26,4 +31,3 @@ Route::get('/admin/{any?}', function () {
 Route::get('/{any?}', function () {
     return view('app');
 })->where('any', '^(?!api).*$');
-

@@ -22,6 +22,13 @@ $structuredData = [
 @endsection
 
 @section('content')
+{{-- CREDIBILITY BANNER --}}
+<a href="{{ route('clinical-validation') }}" class="flex h-[50px] w-full items-center justify-center gap-2 px-4" style="background: #0a453d;">
+    <span style="color: #fff; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.88rem; text-decoration: underline;">
+        HealthIntel AI achieves 90%+ accuracy on clinical lab interpretation benchmark — See the results →
+    </span>
+</a>
+
 {{-- HERO --}}
 {{-- HERO --}}
 <section class="hero">
@@ -223,6 +230,38 @@ $structuredData = [
                     <div class="credits-table-row"><span>Find a doctor or hospital</span><span class="cost">Free</span></div>
                     <div class="credits-table-row"><span>Compare insurance plans</span><span class="cost">Free</span></div>
                 </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{{-- TESTIMONIALS --}}
+<section class="section" id="testimonials" style="padding-bottom: 0;">
+    <div class="wrap">
+        <div class="section-header center anim-fade-up">
+            <span class="eyebrow">Testimonials</span>
+            <h2>What people are saying</h2>
+        </div>
+        <div class="features-grid stagger-children" style="margin-bottom: 0;">
+            <div class="feature-card">
+                <p style="font-style: italic; font-size: 0.9rem; line-height: 1.7; margin-bottom: 16px;">"I used to stare at my lab results confused for hours. Now I upload and understand in minutes. This app saved me so much anxiety."</p>
+                <p style="font-weight: 600; font-size: 0.85rem; color: var(--ink);">— Amara O.</p>
+                <p style="font-size: 0.75rem; color: var(--text-muted);">Patient, Lagos</p>
+            </div>
+            <div class="feature-card">
+                <p style="font-style: italic; font-size: 0.9rem; line-height: 1.7; margin-bottom: 16px;">"The dual interpretation workflow means I can review AI drafts and finalize reports in half the time. My patients love the clear explanations."</p>
+                <p style="font-weight: 600; font-size: 0.85rem; color: var(--ink);">— Dr. Chukwu E.</p>
+                <p style="font-size: 0.75rem; color: var(--text-muted);">Clinician, Abuja</p>
+            </div>
+            <div class="feature-card">
+                <p style="font-style: italic; font-size: 0.9rem; line-height: 1.7; margin-bottom: 16px;">"We integrated HealthIntel's API into our LIMS in under a week. Now every report we send includes a plain-language interpretation. Game changer."</p>
+                <p style="font-weight: 600; font-size: 0.85rem; color: var(--ink);">— Bola A.</p>
+                <p style="font-size: 0.75rem; color: var(--text-muted);">Lab Director, Ibadan</p>
+            </div>
+            <div class="feature-card">
+                <p style="font-style: italic; font-size: 0.9rem; line-height: 1.7; margin-bottom: 16px;">"The trend tracking helped me see my blood sugar improving over 6 months. My doctor was impressed. I feel more in control of my health now."</p>
+                <p style="font-weight: 600; font-size: 0.85rem; color: var(--ink);">— Tunde K.</p>
+                <p style="font-size: 0.75rem; color: var(--text-muted);">Patient, Port Harcourt</p>
             </div>
         </div>
     </div>
