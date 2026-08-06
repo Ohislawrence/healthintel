@@ -22,13 +22,6 @@ $structuredData = [
 @endsection
 
 @section('content')
-{{-- CREDIBILITY BANNER --}}
-<a href="{{ route('clinical-validation') }}" class="flex h-[50px] w-full items-center justify-center gap-2 px-4" style="background: #0a453d;">
-    <span style="color: #fff; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.88rem; text-decoration: underline;">
-        HealthIntel AI achieves 90%+ accuracy on clinical lab interpretation benchmark — See the results →
-    </span>
-</a>
-
 {{-- HERO --}}
 {{-- HERO --}}
 <section class="hero">
