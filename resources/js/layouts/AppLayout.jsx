@@ -6,14 +6,17 @@ import api from '../lib/api';
 import SearchModal from '../components/ui/SearchModal';
 import NotificationsDrawer from '../components/ui/NotificationsDrawer';
 
-const navItems = [
+const sidebarItems = [
     { path: '/dashboard', label: 'Home', icon: '⌂' },
     { path: '/lab-results', label: 'Lab Tests', icon: '⚛' },
     { path: '/symptom-checker', label: 'Symptoms', icon: '♡' },
     { path: '/directory', label: 'Directory', icon: '⚕' },
+    { path: '/blog', label: 'Blog', icon: '📝' },
     { path: '/referral', label: 'Referrals', icon: '👥' },
     { path: '/credits', label: 'Credits', icon: '◆' },
 ];
+
+const mobileItems = sidebarItems.filter(item => item.path !== '/blog');
 
 export default function AppLayout({ children }) {
     const { user, logout } = useAuthStore();
@@ -321,7 +324,7 @@ export default function AppLayout({ children }) {
                 {/* Sidebar */}
                 <aside className="hidden md:flex flex-col w-60 min-h-[calc(100vh-64px)] border-r border-neutral-100 bg-white pt-4 px-3 sticky top-16">
                     <nav className="flex flex-col gap-1">
-                        {navItems.map((item) => {
+                        {sidebarItems.map((item) => {
                             const active = isActive(item.path);
                             return (
                                 <Link
@@ -368,7 +371,7 @@ export default function AppLayout({ children }) {
                   MOBILE BOTTOM TAB BAR
                ═══════════════════════════════════════════════ */}
             <div className="tab-bar-fixed md:hidden flex justify-evenly items-center px-1">
-                {navItems.map((item) => {
+                {mobileItems.map((item) => {
                     const active = isActive(item.path);
                     return (
                         <Link

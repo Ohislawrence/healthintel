@@ -90,6 +90,8 @@ import AdminDocumentation from './screens/admin/AdminDocumentation';
 import AdminReferrals from './screens/admin/AdminReferrals';
 import AdminTestimonials from './screens/admin/AdminTestimonials';
 import AdminBenchmarks from './screens/admin/AdminBenchmarks';
+import BlogList from './screens/BlogList';
+import BlogPostDetail from './screens/BlogPostDetail';
 import PartnerLogin from './screens/partner/PartnerLogin';
 import PartnerLayout from './screens/partner/PartnerLayout';
 import PartnerDashboard from './screens/partner/PartnerDashboard';
@@ -279,6 +281,8 @@ function App() {
                     <Route path="/health-tools/immunization" element={<ProtectedRoute><AppLayout><ImmunizationTracker /></AppLayout></ProtectedRoute>} />
                     <Route path="/health-tools/appointments" element={<ProtectedRoute><AppLayout><AppointmentTracker /></AppLayout></ProtectedRoute>} />
                     <Route path="/referral" element={<ProtectedRoute><AppLayout><ReferralDashboard /></AppLayout></ProtectedRoute>} />
+                    <Route path="/blog" element={<ProtectedRoute><AppLayout><BlogList /></AppLayout></ProtectedRoute>} />
+                    <Route path="/blog/:slug" element={<ProtectedRoute><AppLayout><BlogPostDetail /></AppLayout></ProtectedRoute>} />
 
                     {/* Admin Routes */}
                     <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>

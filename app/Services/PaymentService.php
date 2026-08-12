@@ -86,8 +86,10 @@ class PaymentService
         ]);
 
         // Detect success status from the provider response
+        // Flutterwave v4: status can be 'successful', 'completed', or 'received'
         $isSuccess = match ($payment->provider) {
             'flutterwave' => ($result['data']['status'] ?? null) === 'successful'
+                || ($result['data']['status'] ?? null) === 'completed'
                 || ($result['status'] ?? null) === 'success',
             default => ($result['data']['status'] ?? null) === 'success',
         };
@@ -145,11 +147,11 @@ class PaymentService
     }
 
     /**
-     * Handle Flutterwave webhook event.
+     * Handle Flutterwave v4 webhook event.
      */
     private function handleFlutterwaveWebhook(array $payload): void
     {
-        $event = $payload['event'] ?? null;
+        $eventType = $payload['event'] ?? null;
         $data = $payload['data'] ?? [];
         $reference = $data['tx_ref'] ?? null;
 
@@ -157,13 +159,17 @@ class PaymentService
             return;
         }
 
-        if ($event === 'charge.completed' || ($data['status'] ?? null) === 'successful') {
+        // v4 webhook events: charge.completed, charge.failed, etc.
+        if ($eventType === 'charge.completed' || ($data['status'] ?? null) === 'successful') {
             $this->verify($reference);
         }
 
-        // Log webhook to the payment record
+        // Log webhook and persist the v4 charge ID for later verification
         $payment = Payment::where('reference', $reference)->first();
         if ($payment) {
+            if (!empty($data['id']) && $payment->provider_reference === null) {
+                $payment->update(['provider_reference' => $data['id']]);
+            }
             $payment->update(['webhook_log' => $payload]);
         }
     }

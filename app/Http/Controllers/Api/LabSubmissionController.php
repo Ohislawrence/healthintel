@@ -188,59 +188,7 @@ class LabSubmissionController extends BaseController
         }
 
         $langService = app(\App\Services\TranslationService::class);
-        $langInstruction = $langService->languageInstruction($langCode);
-        $langName = $langService->availableLanguages()[$langCode]['label'] ?? $langCode;
-
-        $prompt = <<<EOT
-Translate the following medical lab interpretation into {$langName}.
-
-IMPORTANT: Your ENTIRE response must be in {$langName}. Do NOT mix languages.
-Use the EXACT same markdown format (## sections, bullet points, etc.) but in {$langName}.
-Keep the emoji markers (⚠️, 🔸, ✅, 💡, 📋, ℹ️) as they are.
-
-SPECIFIC INSTRUCTIONS FOR {$langName}:
-{$langInstruction}
-
-ORIGINAL TEXT:
-{$originalText}
-EOT;
-
-        $deepSeekService = app(\App\Services\DeepSeekService::class);
-        // Use a neutral system prompt so the clinical interpreter prompt doesn't override the translation
-        $result = $deepSeekService->ask($prompt, 2048, 0.3, 'You are a professional medical translator. Translate the user\'s text exactly as instructed. Do not add any commentary.');
-
-        if (!$result) {
-            return $this->error('Translation service unavailable.', 503);
-        }
-
-        return $this->success(['translated_text' => $result]);
-    }
-
-    /**
-     * Stream interpretation tokens via Server-Sent Events.
-     */
-    public function interpretStream(Request $request, int $id)
-    {
-        $submission = $request->user()
-            ->labSubmissions()
-            ->with(['testPanel', 'values', 'interpretation'])
-            ->findOrFail($id);
-
-        $prompt = $submission->interpretation?->prompt_input
-            ?? "Lab results for panel: " . ($submission->testPanel?->name ?? 'Unknown');
-
-        return response()->stream(function () use ($prompt) {
-            $generator = app(DeepSeekService::class)->streamInterpret($prompt);
-            foreach ($generator as $token) {
-                echo "data: " . json_encode(['token' => $token]) . "\n\n";
-                ob_flush();
-                flush();
-            }
-            echo "data: [DONE]\n\n";
-            ob_flush();
-            flush();
-        }, 200, [
-            'Content-Type' => 'text/event-stream',
+        $prompt = "Translate the following medical lab interpretation into another language.\n\nORIGINAL TEXT:\n{$originalText}";
             'Cache-Control' => 'no-cache',
             'Connection' => 'keep-alive',
             'X-Accel-Buffering' => 'no',

@@ -122,6 +122,11 @@ class AdminBlogController extends BaseController
 
         $post = BlogPost::create($data);
 
+        // Send push notification to all users when a blog is published
+        if ($data['status'] === 'published') {
+            $this->sendBlogNotification($post, 'new');
+        }
+
         return $this->success([
             'post' => ['id' => $post->id, 'slug' => $post->slug],
         ], 'Post created successfully', 201);
@@ -148,11 +153,18 @@ class AdminBlogController extends BaseController
             $data['excerpt'] = \Illuminate\Support\Str::limit($data['excerpt'], 500, '');
         }
 
+        $wasPreviouslyPublished = (bool) $post->published_at;
+
         if ($data['status'] === 'published' && !$post->published_at) {
             $data['published_at'] = now();
         }
 
         $post->update($data);
+
+        // Only send notification when publishing for the first time (draft → published)
+        if ($data['status'] === 'published' && !$wasPreviouslyPublished) {
+            $this->sendBlogNotification($post->fresh(), 'new');
+        }
 
         return $this->success([
             'post' => ['id' => $post->id, 'slug' => $post->slug],
@@ -233,6 +245,41 @@ class AdminBlogController extends BaseController
             return preg_replace('#^' . preg_quote($appUrl, '#') . '#', '', $url);
         }
         return $url;
+    }
+
+    /**
+     * Send push notification + in-app notification when a blog post is published.
+     */
+    private function sendBlogNotification(BlogPost $post, string $type): void
+    {
+        $title = '📰 ' . $post->title;
+        $body = $post->excerpt ?? \Illuminate\Support\Str::limit(strip_tags($post->content), 120);
+        $url = '/blog/' . $post->slug;
+
+        // 1. In-app notification for all users
+        try {
+            \App\Models\UserNotification::create([
+                'title' => $title,
+                'body' => $body,
+                'type' => 'blog',
+                'url' => $url,
+                'target' => 'all',
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Blog notification creation failed: ' . $e->getMessage());
+        }
+
+        // 2. Web push to all subscribed users (fire-and-forget)
+        try {
+            $webPushService = app(\App\Services\WebPushService::class);
+            $webPushService->sendToAll($title, $body, [
+                'url' => $url,
+                'requireInteraction' => false,
+                'badge' => '/logo/healthintel-logo.png',
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Blog web-push failed: ' . $e->getMessage());
+        }
     }
 
     public function categoryDelete($id)

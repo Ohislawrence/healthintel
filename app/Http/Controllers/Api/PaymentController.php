@@ -44,7 +44,7 @@ class PaymentController extends BaseController
         $authUrl = $this->paymentService->initialize($user, $package, $callbackUrl);
 
         if (!$authUrl) {
-            return $this->error('Payment service is not configured. Please ask the administrator to set up Paystack API keys.', 503);
+            return $this->error('Payment service is not configured. Please ask the administrator to set up payment API keys.', 503);
         }
 
         return $this->success(['authorization_url' => $authUrl]);

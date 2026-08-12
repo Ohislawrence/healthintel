@@ -15,7 +15,7 @@ class FlutterwaveService
     public function __construct()
     {
         $this->secretKey = config('services.flutterwave.secret_key');
-        $this->baseUrl = config('services.flutterwave.base_url', 'https://api.flutterwave.com/v3');
+        $this->baseUrl = config('services.flutterwave.base_url', 'https://api.flutterwave.com');
     }
 
     private function readEnvFile(string $key): ?string
@@ -48,7 +48,8 @@ class FlutterwaveService
     }
 
     /**
-     * Initialize a transaction and return the authorization URL.
+     * Initialize a transaction via Flutterwave v4 API (POST /charges).
+     * Returns the authorization URL (redirect link) for the user to complete payment.
      */
     public function initialize(Payment $payment, User $user, string $callbackUrl): ?string
     {
@@ -59,7 +60,7 @@ class FlutterwaveService
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->secretKey,
             'Content-Type' => 'application/json',
-        ])->timeout(20)->post($this->baseUrl . '/payments', [
+        ])->timeout(20)->post($this->baseUrl . '/charges', [
             'tx_ref' => $payment->reference,
             'amount' => $payment->amountNaira(),
             'currency' => $payment->currency,
@@ -79,7 +80,7 @@ class FlutterwaveService
         ]);
 
         if (!$response->successful()) {
-            Log::error('Flutterwave initialize failed', [
+            Log::error('Flutterwave v4 initialize failed', [
                 'status' => $response->status(),
                 'body' => $response->json(),
             ]);
@@ -93,7 +94,7 @@ class FlutterwaveService
         $body = $response->json();
 
         if ($body['status'] !== 'success') {
-            Log::error('Flutterwave initialize returned error', ['body' => $body]);
+            Log::error('Flutterwave v4 initialize returned error', ['body' => $body]);
             $payment->update([
                 'provider_response' => $body,
                 'status' => 'failed',
@@ -103,14 +104,17 @@ class FlutterwaveService
 
         $payment->update([
             'provider_response' => $body,
-            'provider_reference' => $body['data']['tx_ref'] ?? null,
+            'provider_reference' => $body['data']['id'] ?? $body['data']['tx_ref'] ?? null,
         ]);
 
+        // v4 returns 'data.link' for the hosted payment page
         return $body['data']['link'] ?? null;
     }
 
     /**
-     * Verify a transaction by reference (transaction ID).
+     * Verify a transaction by its Flutterwave charge ID.
+     * In v4, the charge ID is returned in data.id from the initialize/charge response.
+     * We use the provider_reference (charge ID) or fall back to tx_ref lookup.
      */
     public function verify(string $reference): array
     {
@@ -118,24 +122,56 @@ class FlutterwaveService
             return [];
         }
 
+        // v4: GET /charges/{id} — use the charge ID stored as provider_reference
+        // If we don't have a charge ID yet, we can list charges or find by tx_ref
+        // For now, try to retrieve the payment record to get the charge ID
+        $payment = Payment::where('reference', $reference)->first();
+        $chargeId = $payment?->provider_reference;
+
+        if ($chargeId) {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->secretKey,
+            ])->timeout(15)->get($this->baseUrl . '/charges/' . $chargeId);
+
+            return $response->json() ?? [];
+        }
+
+        // Fallback: try to find by tx_ref via listing charges (if charge ID is not stored)
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->secretKey,
-        ])->timeout(15)->get($this->baseUrl . '/transactions/verify_by_reference', [
+        ])->timeout(15)->get($this->baseUrl . '/charges', [
             'tx_ref' => $reference,
         ]);
 
-        return $response->json() ?? [];
+        $body = $response->json() ?? [];
+        if (!empty($body['data']) && is_array($body['data'])) {
+            $charge = $body['data'][0] ?? $body['data'];
+            if (is_array($charge) && !isset($charge[0])) {
+                return $charge;
+            }
+            return $charge ?? $body;
+        }
+
+        return $body;
     }
 
     /**
      * Validate Flutterwave webhook signature using secret hash.
+     * v4 uses HMAC-SHA256 with the secret hash for webhook verification.
      */
     public function isValidWebhook(string $payload, string $signature): bool
     {
         if (!$this->isConfigured()) {
             return false;
         }
-        $computed = hash_hmac('sha256', $payload, $this->secretKey);
+
+        $secretHash = config('services.flutterwave.secret_hash');
+        if (empty($secretHash)) {
+            // Fall back to secret key if secret_hash is not set
+            $secretHash = $this->secretKey;
+        }
+
+        $computed = hash_hmac('sha256', $payload, $secretHash);
         return hash_equals($computed, $signature);
     }
 }
