@@ -93,16 +93,25 @@ class PaymentService
             
             if ($payment->provider === 'flutterwave') {
                 $flwData = $result['data'] ?? [];
-                $status = $flwData['status'] ?? $result['status'] ?? null;
-                $chargedAmount = $flwData['amount'] ?? 0;
+
+                // The transaction status lives inside data.status — do NOT fall back to
+                // the outer API response status ($result['status']) which is always
+                // 'success' when the HTTP call itself returns 200 OK.
+                $txStatus = $flwData['status'] ?? null;
+                $chargedAmount = (float) ($flwData['amount'] ?? 0);
                 $chargedCurrency = strtoupper($flwData['currency'] ?? '');
 
                 $expectedAmount = $payment->amount_kobo / 100;
                 $expectedCurrency = strtoupper($payment->currency);
 
-                $isSuccess = in_array($status, ['successful', 'completed', 'success'])
-                    && $chargedAmount >= $expectedAmount
-                    && $chargedCurrency === $expectedCurrency;
+                if ($txStatus === null || $chargedAmount <= 0) {
+                    // Verification response is missing required fields — do NOT credit
+                    $isSuccess = false;
+                } else {
+                    $isSuccess = in_array($txStatus, ['successful', 'completed', 'success'])
+                        && abs($chargedAmount - $expectedAmount) < 0.01
+                        && $chargedCurrency === $expectedCurrency;
+                }
             } else {
                 $isSuccess = ($result['data']['status'] ?? null) === 'success';
             }
