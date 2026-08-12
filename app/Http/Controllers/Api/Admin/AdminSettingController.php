@@ -33,8 +33,6 @@ class AdminSettingController extends BaseController
      */
     public function paymentGatewayInfo()
     {
-        $activeGateway = Setting::getValue('payment.gateway', 'paystack');
-
         // Try multiple sources because config:cache hides .env:
         // 1. config() — works when config cache was created AFTER keys existed
         // 2. $_ENV / getenv() — works if server sets them as real env vars
@@ -44,6 +42,20 @@ class AdminSettingController extends BaseController
 
         $paystackConfigured = !empty($paystackKey);
         $flutterwaveConfigured = !empty($flutterwaveKey);
+
+        $activeGateway = Setting::getValue('payment.gateway', 'paystack');
+
+        if ($activeGateway === 'flutterwave' && !$flutterwaveConfigured) {
+            $activeGateway = $paystackConfigured ? 'paystack' : 'flutterwave';
+        }
+
+        if ($activeGateway === 'paystack' && !$paystackConfigured) {
+            $activeGateway = $flutterwaveConfigured ? 'flutterwave' : 'paystack';
+        }
+
+        if ($activeGateway !== 'paystack' && $activeGateway !== 'flutterwave') {
+            $activeGateway = $paystackConfigured ? 'paystack' : ($flutterwaveConfigured ? 'flutterwave' : 'paystack');
+        }
 
         return $this->success([
             'active_gateway' => $activeGateway,

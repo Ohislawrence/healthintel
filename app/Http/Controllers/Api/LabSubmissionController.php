@@ -187,12 +187,21 @@ class LabSubmissionController extends BaseController
             return $this->success(['translated_text' => $originalText]);
         }
 
-        $langService = app(\App\Services\TranslationService::class);
-        $prompt = "Translate the following medical lab interpretation into another language.\n\nORIGINAL TEXT:\n{$originalText}";
-            'Cache-Control' => 'no-cache',
-            'Connection' => 'keep-alive',
-            'X-Accel-Buffering' => 'no',
-        ]);
+        $deepSeek = app(\App\Services\DeepSeekService::class);
+        $langInstruction = \App\Services\TranslationService::languageInstruction($langCode);
+
+        $translated = $deepSeek->ask(
+            prompt: "Translate the following medical lab interpretation into another language.\n\nORIGINAL TEXT:\n{$originalText}",
+            maxTokens: 2048,
+            temperature: 0.3,
+            systemPrompt: "You are a medical translation assistant. {$langInstruction} Return ONLY the translated text, with no additional commentary."
+        );
+
+        if ($translated === null) {
+            return $this->error('Translation failed. Please try again.', 500);
+        }
+
+        return $this->success(['translated_text' => $translated]);
     }
 
     public function trends(Request $request)

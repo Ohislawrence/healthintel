@@ -18,30 +18,6 @@ class FlutterwaveService
         $this->baseUrl = config('services.flutterwave.base_url', 'https://api.flutterwave.com');
     }
 
-    private function readEnvFile(string $key): ?string
-    {
-        $path = base_path('.env');
-        if (!file_exists($path)) {
-            return null;
-        }
-        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#')) {
-                continue;
-            }
-            if (str_starts_with($line, $key . '=')) {
-                $value = trim(substr($line, strlen($key) + 1));
-                if ((str_starts_with($value, '"') && str_ends_with($value, '"')) ||
-                    (str_starts_with($value, "'") && str_ends_with($value, "'"))) {
-                    $value = substr($value, 1, -1);
-                }
-                return $value !== '' ? $value : null;
-            }
-        }
-        return null;
-    }
-
     public function isConfigured(): bool
     {
         return !empty($this->secretKey);
@@ -123,8 +99,6 @@ class FlutterwaveService
         }
 
         // v4: GET /charges/{id} — use the charge ID stored as provider_reference
-        // If we don't have a charge ID yet, we can list charges or find by tx_ref
-        // For now, try to retrieve the payment record to get the charge ID
         $payment = Payment::where('reference', $reference)->first();
         $chargeId = $payment?->provider_reference;
 
@@ -157,7 +131,9 @@ class FlutterwaveService
 
     /**
      * Validate Flutterwave webhook signature using secret hash.
-     * v4 uses HMAC-SHA256 with the secret hash for webhook verification.
+     *
+     * The verif-hash header value IS the secret hash itself — we do a direct
+     * comparison, not an HMAC computation over the payload.
      */
     public function isValidWebhook(string $payload, string $signature): bool
     {
@@ -171,7 +147,8 @@ class FlutterwaveService
             $secretHash = $this->secretKey;
         }
 
-        $computed = hash_hmac('sha256', $payload, $secretHash);
-        return hash_equals($computed, $signature);
+        return !empty($secretHash)
+            && !empty($signature)
+            && hash_equals($secretHash, $signature);
     }
 }

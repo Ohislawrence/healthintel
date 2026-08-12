@@ -95,11 +95,13 @@ class PaymentController extends BaseController
         $signature = $request->header('verif-hash');
         $payload = $request->getContent();
 
-        // Verify Flutterwave signature using secret hash
-        $flutterwave = app(\App\Services\FlutterwaveService::class);
+        // Flutterwave v4 webhooks use HMAC-SHA256 over the raw payload using the secret hash.
         $secretHash = config('services.flutterwave.secret_hash');
+        $isValid = !empty($secretHash)
+            && !empty($signature)
+            && hash_equals(hash_hmac('sha256', $payload, $secretHash), $signature);
 
-        if ($secretHash && !hash_equals($secretHash, $signature ?? '')) {
+        if (!$isValid) {
             return response()->json(['status' => 'invalid_signature'], 401);
         }
 
