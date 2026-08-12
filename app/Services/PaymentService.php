@@ -180,7 +180,15 @@ class PaymentService
         // v4 webhook events: charge.completed, charge.failed, etc.
         if ($eventType === 'charge.completed' || ($data['status'] ?? null) === 'successful') {
             // Server-side re-verification: call Flutterwave to confirm
-            $result = $this->flutterwave->verify($reference);
+            $transactionId = $data['id'] ?? null;
+            if (!$transactionId) {
+                \Illuminate\Support\Facades\Log::warning(
+                    'Flutterwave webhook received without transaction ID.',
+                    ['reference' => $reference]
+                );
+                return;
+            }
+            $result = $this->flutterwave->verify($transactionId);
 
             $verifiedStatus = ($result['data']['status'] ?? null)
                 ?? ($result['status'] ?? null);

@@ -36,7 +36,7 @@ class FlutterwaveService
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->secretKey,
             'Content-Type' => 'application/json',
-        ])->timeout(20)->post($this->baseUrl . '/charges', [
+        ])->timeout(20)->post($this->baseUrl . '/v3/charges?type=card', [
             'tx_ref' => $payment->reference,
             'amount' => $payment->amountNaira(),
             'currency' => $payment->currency,
@@ -88,67 +88,36 @@ class FlutterwaveService
     }
 
     /**
-     * Verify a transaction by its Flutterwave charge ID.
-     * In v4, the charge ID is returned in data.id from the initialize/charge response.
-     * We use the provider_reference (charge ID) or fall back to tx_ref lookup.
+     * Verify a transaction by its transaction ID.
+     * Uses the Flutterwave v3 /transactions/{id}/verify endpoint.
      */
-    public function verify(string $reference): array
+    public function verify(string $transactionId): array
     {
         if (!$this->isConfigured()) {
             return [];
         }
 
-        // v4: GET /charges/{id} — use the charge ID stored as provider_reference
-        $payment = Payment::where('reference', $reference)->first();
-        $chargeId = $payment?->provider_reference;
-
-        if ($chargeId) {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $this->secretKey,
-            ])->timeout(15)->get($this->baseUrl . '/charges/' . $chargeId);
-
-            return $response->json() ?? [];
-        }
-
-        // Fallback: try to find by tx_ref via listing charges (if charge ID is not stored)
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->secretKey,
-        ])->timeout(15)->get($this->baseUrl . '/charges', [
-            'tx_ref' => $reference,
-        ]);
+        ])->timeout(15)->get($this->baseUrl . '/v3/transactions/' . $transactionId . '/verify');
 
-        $body = $response->json() ?? [];
-        if (!empty($body['data']) && is_array($body['data'])) {
-            $charge = $body['data'][0] ?? $body['data'];
-            if (is_array($charge) && !isset($charge[0])) {
-                return $charge;
-            }
-            return $charge ?? $body;
-        }
-
-        return $body;
+        return $response->json() ?? [];
     }
 
     /**
-     * Validate Flutterwave webhook signature using secret hash.
+     * Validate Flutterwave webhook signature using HMAC-SHA256.
      *
-     * The verif-hash header value IS the secret hash itself — we do a direct
-     * comparison, not an HMAC computation over the payload.
+     * Computes HMAC-SHA256 over the raw request body using the secret hash
+     * and compares it against the verif-hash header value.
      */
     public function isValidWebhook(string $payload, string $signature): bool
     {
-        if (!$this->isConfigured()) {
+        $secretHash = config('services.flutterwave.secret_hash');
+        if (empty($secretHash) || empty($signature)) {
             return false;
         }
 
-        $secretHash = config('services.flutterwave.secret_hash');
-        if (empty($secretHash)) {
-            // Fall back to secret key if secret_hash is not set
-            $secretHash = $this->secretKey;
-        }
-
-        return !empty($secretHash)
-            && !empty($signature)
-            && hash_equals($secretHash, $signature);
+        $hash = hash_hmac('sha256', $payload, $secretHash);
+        return hash_equals($hash, $signature);
     }
 }
