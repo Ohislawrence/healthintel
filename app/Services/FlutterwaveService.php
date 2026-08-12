@@ -24,7 +24,8 @@ class FlutterwaveService
     }
 
     /**
-     * Initialize a transaction via Flutterwave v4 API (POST /charges).
+     * Initialize a transaction via Flutterwave v3 Payments API.
+     * POST /v3/payments
      * Returns the authorization URL (redirect link) for the user to complete payment.
      */
     public function initialize(Payment $payment, User $user, string $callbackUrl): ?string
@@ -36,11 +37,12 @@ class FlutterwaveService
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->secretKey,
             'Content-Type' => 'application/json',
-        ])->timeout(20)->post($this->baseUrl . '/v3/charges?type=card', [
+        ])->timeout(20)->post($this->baseUrl . '/v3/payments', [
             'tx_ref' => $payment->reference,
             'amount' => $payment->amountNaira(),
             'currency' => $payment->currency,
             'redirect_url' => $callbackUrl,
+            'payment_options' => 'card',
             'customer' => [
                 'email' => $user->email,
                 'name' => $user->name ?? $user->email,
@@ -56,7 +58,7 @@ class FlutterwaveService
         ]);
 
         if (!$response->successful()) {
-            Log::error('Flutterwave v4 initialize failed', [
+            Log::error('Flutterwave v3 initialize failed', [
                 'status' => $response->status(),
                 'body' => $response->json(),
             ]);
@@ -69,8 +71,8 @@ class FlutterwaveService
 
         $body = $response->json();
 
-        if ($body['status'] !== 'success') {
-            Log::error('Flutterwave v4 initialize returned error', ['body' => $body]);
+        if (($body['status'] ?? null) !== 'success') {
+            Log::error('Flutterwave v3 initialize returned error', ['body' => $body]);
             $payment->update([
                 'provider_response' => $body,
                 'status' => 'failed',
@@ -83,18 +85,18 @@ class FlutterwaveService
             'provider_reference' => $body['data']['id'] ?? $body['data']['tx_ref'] ?? null,
         ]);
 
-        // v4 returns 'data.link' for the hosted payment page
+        // v3 returns 'data.link' for the hosted payment page
         return $body['data']['link'] ?? null;
     }
 
     /**
      * Verify a transaction by its transaction ID.
-     * Uses the Flutterwave v3 /transactions/{id}/verify endpoint.
+     * Uses the Flutterwave v3 GET /v3/transactions/{id}/verify endpoint.
      */
     public function verify(string $transactionId): array
     {
         if (!$this->isConfigured()) {
-            return [];
+            return ['status' => 'error', 'message' => 'Flutterwave not configured'];
         }
 
         $response = Http::withHeaders([

@@ -10,8 +10,12 @@ export default function PaymentCallback() {
     const [message, setMessage] = useState('');
 
     useEffect(() => {
-        // Paystack returns both 'trxref' and 'reference' in query params
-        const reference = searchParams.get('reference') || searchParams.get('trxref');
+        // Flutterwave uses tx_ref + transaction_id; Paystack uses reference / trxref
+        const txRef = searchParams.get('tx_ref');
+        const transactionId = searchParams.get('transaction_id');
+        const paystackRef = searchParams.get('reference') || searchParams.get('trxref');
+
+        const reference = txRef || paystackRef;
 
         if (!reference) {
             setStatus('error');
@@ -21,7 +25,11 @@ export default function PaymentCallback() {
 
         const verify = async () => {
             try {
-                await api.get(`/payment/verify?reference=${reference}`);
+                let url = `/payment/verify?reference=${encodeURIComponent(reference)}`;
+                if (txRef && transactionId) {
+                    url += `&transaction_id=${encodeURIComponent(transactionId)}`;
+                }
+                await api.get(url);
                 await fetchUser();
                 setStatus('success');
             } catch (err) {

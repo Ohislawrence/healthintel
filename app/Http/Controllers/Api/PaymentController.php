@@ -51,16 +51,27 @@ class PaymentController extends BaseController
     }
 
     /**
-     * Verify a payment by reference.
+     * Verify a payment by reference/tx_ref and transaction ID.
      */
     public function verify(Request $request)
     {
-        $reference = $request->query('reference');
+        // Flutterwave callback passes tx_ref and transaction_id as query params
+        // Paystack uses reference / trxref
+        $reference = $request->query('tx_ref')
+            ?? $request->query('reference')
+            ?? $request->query('trxref');
+
+        // Flutterwave redirect passes the numeric transaction ID
+        $transactionId = $request->query('transaction_id') ?? $request->query('id');
+
         if (!$reference) {
-            return $this->error('Reference query parameter is required.', 422);
+            return $this->error('Verification failed. No payment reference found in callback URL.', 422);
         }
 
-        $payment = $this->paymentService->verify($reference);
+        $payment = $this->paymentService->verify(
+            reference: $reference,
+            flwTransactionId: $transactionId ? (string) $transactionId : null
+        );
 
         return $this->success([
             'payment' => $payment,
@@ -76,7 +87,6 @@ class PaymentController extends BaseController
         $signature = $request->header('x-paystack-signature');
         $payload = $request->getContent();
 
-        // Verify Paystack signature
         if (!hash_equals(hash_hmac('sha512', $payload, config('services.paystack.secret_key')), $signature ?? '')) {
             return response()->json(['status' => 'invalid_signature'], 401);
         }
@@ -92,16 +102,10 @@ class PaymentController extends BaseController
      */
     public function flutterwaveWebhook(Request $request)
     {
-        $signature = $request->header('verif-hash');
         $payload = $request->getContent();
+        $signature = $request->header('verif-hash');
 
-        // Flutterwave v4 webhooks use HMAC-SHA256 over the raw payload using the secret hash.
-        $secretHash = config('services.flutterwave.secret_hash');
-        $isValid = !empty($secretHash)
-            && !empty($signature)
-            && hash_equals(hash_hmac('sha256', $payload, $secretHash), $signature);
-
-        if (!$isValid) {
+        if (!app(\App\Services\FlutterwaveService::class)->isValidWebhook($payload, $signature ?? '')) {
             return response()->json(['status' => 'invalid_signature'], 401);
         }
 
@@ -112,7 +116,7 @@ class PaymentController extends BaseController
     }
 
     /**
-     * Get active payment gateway (for mobile app to know which provider to display).
+     * Get active payment gateway.
      */
     public function gateway(Request $request)
     {

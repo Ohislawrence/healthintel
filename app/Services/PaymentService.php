@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\CreditLedger;
 use App\Models\CreditPackage;
 use App\Models\Payment;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PaymentService
 {
@@ -15,22 +18,14 @@ class PaymentService
         private ReferralProgramService $referralProgram,
     ) {}
 
-    /**
-     * Get the active payment gateway.
-     * Currently hardcoded to 'flutterwave' — deactivate others for now.
-     */
     public function getActiveGateway(): string
     {
         return 'flutterwave';
     }
 
-    /**
-     * Create a payment record, initialize with the active gateway, return auth URL.
-     */
     public function initialize(User $user, CreditPackage $package, string $callbackUrl): ?string
     {
         $gateway = $this->getActiveGateway();
-
         $providerName = $gateway === 'flutterwave' ? 'flutterwave' : 'paystack';
 
         $payment = Payment::create([
@@ -46,78 +41,87 @@ class PaymentService
 
         if ($gateway === 'flutterwave') {
             if (!$this->flutterwave->isConfigured()) {
-                \Illuminate\Support\Facades\Log::warning('Flutterwave not configured — skipping payment initialization.');
+                Log::warning('Flutterwave not configured — skipping payment initialization.');
                 $payment->update(['status' => 'failed']);
                 return null;
             }
             return $this->flutterwave->initialize($payment, $user, $callbackUrl);
         }
 
-        // Default: Paystack
         if (!$this->paystack->isConfigured()) {
-            \Illuminate\Support\Facades\Log::warning('Paystack not configured — skipping payment initialization.');
+            Log::warning('Paystack not configured — skipping payment initialization.');
             $payment->update(['status' => 'failed']);
             return null;
         }
+
         return $this->paystack->initialize($payment, $user, $callbackUrl);
     }
 
     /**
-     * Verify a payment and grant credits on success.
-     * Works for both Paystack and Flutterwave.
-     *
-     * @param array|null $preVerifiedResult Pass the already-fetched verification
-     *                    result to avoid a redundant API call (used by webhooks).
+     * Verify a payment.
+     * 
+     * @param string $reference Our internal transaction reference (e.g. LD-...)
+     * @param string|null $flwTransactionId Optional numeric Flutterwave transaction ID passed from callback query params
+     * @param array|null $preVerifiedResult Pre-fetched verification payload from webhook
      */
-    public function verify(string $reference, ?array $preVerifiedResult = null): Payment
+    public function verify(string $reference, ?string $flwTransactionId = null, ?array $preVerifiedResult = null): Payment
     {
-        $payment = Payment::where('reference', $reference)->firstOrFail();
+        return DB::transaction(function () use ($reference, $flwTransactionId, $preVerifiedResult) {
+            $payment = Payment::where('reference', $reference)->lockForUpdate()->firstOrFail();
 
-        // Already processed?
-        if ($payment->status === 'success') {
+            if ($payment->status === 'success') {
+                return $payment;
+            }
+
+            // Always store/update provider_reference from callback query param
+            if ($flwTransactionId) {
+                $payment->provider_reference = $flwTransactionId;
+            }
+
+            // Perform verification lookup — prefer callback transaction ID over stored reference
+            $result = $preVerifiedResult ?? match ($payment->provider) {
+                'flutterwave' => $this->flutterwave->verify(
+                    $flwTransactionId ?? $payment->provider_reference ?? $reference
+                ),
+                default => $this->paystack->verify($reference),
+            };
+
+            $payment->provider_response = array_merge($payment->provider_response ?? [], $result);
+
+            // Amount and Currency validation
+            $isSuccess = false;
+            
+            if ($payment->provider === 'flutterwave') {
+                $flwData = $result['data'] ?? [];
+                $status = $flwData['status'] ?? $result['status'] ?? null;
+                $chargedAmount = $flwData['amount'] ?? 0;
+                $chargedCurrency = strtoupper($flwData['currency'] ?? '');
+
+                $expectedAmount = $payment->amount_kobo / 100;
+                $expectedCurrency = strtoupper($payment->currency);
+
+                $isSuccess = in_array($status, ['successful', 'completed', 'success'])
+                    && $chargedAmount >= $expectedAmount
+                    && $chargedCurrency === $expectedCurrency;
+            } else {
+                $isSuccess = ($result['data']['status'] ?? null) === 'success';
+            }
+
+            if ($isSuccess) {
+                $payment->status = 'success';
+                $payment->paid_at = now();
+                $payment->save();
+
+                $this->grantCreditsForPayment($payment);
+            } else {
+                $payment->status = 'failed';
+                $payment->save();
+            }
+
             return $payment;
-        }
-
-        // Use the correct provider to verify
-        // Flutterwave: use provider_reference (numeric charge ID), not tx_ref
-        $result = $preVerifiedResult ?? match ($payment->provider) {
-            'flutterwave' => $this->flutterwave->verify($payment->provider_reference ?? $reference),
-            default => $this->paystack->verify($reference),
-        };
-
-        $payment->update([
-            'provider_response' => array_merge($payment->provider_response ?? [], $result),
-            'webhook_log' => $result,
-        ]);
-
-        // Detect success status from the provider response
-        // Flutterwave v4: status can be 'successful' or 'completed'
-        // Note: 'received' means pending bank confirmation — do NOT mark as success
-        $isSuccess = match ($payment->provider) {
-            'flutterwave' => ($result['data']['status'] ?? null) === 'successful'
-                || ($result['data']['status'] ?? null) === 'completed'
-                || ($result['status'] ?? null) === 'success',
-            default => ($result['data']['status'] ?? null) === 'success',
-        };
-
-        if ($isSuccess) {
-            $payment->update([
-                'status' => 'success',
-                'paid_at' => now(),
-            ]);
-
-            // Grant credits if not already granted
-            $this->grantCreditsForPayment($payment);
-        } else {
-            $payment->update(['status' => 'failed']);
-        }
-
-        return $payment->fresh();
+        });
     }
 
-    /**
-     * Handle webhook event from either Paystack or Flutterwave.
-     */
     public function handleWebhook(array $payload, string $provider = 'paystack'): void
     {
         if ($provider === 'flutterwave') {
@@ -128,9 +132,6 @@ class PaymentService
         $this->handlePaystackWebhook($payload);
     }
 
-    /**
-     * Handle Paystack webhook event.
-     */
     private function handlePaystackWebhook(array $payload): void
     {
         $event = $payload['event'] ?? null;
@@ -141,74 +142,58 @@ class PaymentService
             return;
         }
 
-        if ($event === 'charge.success') {
-            $this->verify($reference);
-        }
-
-        // Log webhook to the payment record
         $payment = Payment::where('reference', $reference)->first();
         if ($payment) {
             $payment->update(['webhook_log' => $payload]);
         }
+
+        if ($event === 'charge.success') {
+            $this->verify($reference);
+        }
     }
 
-    /**
-     * Handle Flutterwave v4 webhook event.
-     * Performs server-side re-verification by calling the Flutterwave verify
-     * endpoint before trusting the webhook payload, then passes the result
-     * directly to verify() to avoid a redundant second API call.
-     */
     private function handleFlutterwaveWebhook(array $payload): void
     {
         $eventType = $payload['event'] ?? null;
         $data = $payload['data'] ?? [];
         $reference = $data['tx_ref'] ?? null;
+        $transactionId = $data['id'] ?? null;
 
         if (!$reference) {
             return;
         }
 
-        // Persist the v4 charge ID from the webhook payload for future lookups
         $payment = Payment::where('reference', $reference)->first();
         if ($payment) {
-            if (!empty($data['id']) && $payment->provider_reference === null) {
-                $payment->update(['provider_reference' => $data['id']]);
-            }
-            $payment->update(['webhook_log' => $payload]);
+            $payment->update([
+                'provider_reference' => $transactionId ?? $payment->provider_reference,
+                'webhook_log' => $payload,
+            ]);
         }
 
-        // v4 webhook events: charge.completed, charge.failed, etc.
         if ($eventType === 'charge.completed' || ($data['status'] ?? null) === 'successful') {
-            // Server-side re-verification: call Flutterwave to confirm
-            $transactionId = $data['id'] ?? null;
             if (!$transactionId) {
-                \Illuminate\Support\Facades\Log::warning(
-                    'Flutterwave webhook received without transaction ID.',
-                    ['reference' => $reference]
-                );
+                Log::warning('Flutterwave webhook received without transaction ID.', ['reference' => $reference]);
                 return;
             }
+
             $result = $this->flutterwave->verify($transactionId);
 
-            $verifiedStatus = ($result['data']['status'] ?? null)
-                ?? ($result['status'] ?? null);
+            $verifiedStatus = $result['data']['status'] ?? $result['status'] ?? null;
 
             if (!in_array($verifiedStatus, ['successful', 'completed', 'success'])) {
-                \Illuminate\Support\Facades\Log::warning(
-                    'Flutterwave webhook received but server-side verification failed.',
-                    ['reference' => $reference, 'webhook_status' => $data['status'] ?? null, 'verify_status' => $verifiedStatus]
-                );
+                Log::warning('Flutterwave webhook server-side verification failed.', [
+                    'reference' => $reference,
+                    'webhook_status' => $data['status'] ?? null,
+                    'verify_status' => $verifiedStatus
+                ]);
                 return;
             }
 
-            // Pass the pre-verified result to avoid a redundant second API call
-            $this->verify($reference, $result);
+            $this->verify(reference: $reference, flwTransactionId: (string) $transactionId, preVerifiedResult: $result);
         }
     }
 
-    /**
-     * Grant credits for a completed payment (idempotent).
-     */
     private function grantCreditsForPayment(Payment $payment): void
     {
         $user = $payment->user;
@@ -218,8 +203,7 @@ class PaymentService
             return;
         }
 
-        // Check if already credited
-        $exists = \App\Models\CreditLedger::where('user_id', $user->id)
+        $exists = CreditLedger::where('user_id', $user->id)
             ->where('reference_type', Payment::class)
             ->where('reference_id', $payment->id)
             ->exists();
@@ -235,7 +219,6 @@ class PaymentService
             reference: $payment,
         );
 
-        // Process referral commission for the referrer
         $this->referralProgram->processCommission($payment);
     }
 }
