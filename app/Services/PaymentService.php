@@ -16,11 +16,12 @@ class PaymentService
     ) {}
 
     /**
-     * Get the active payment gateway based on admin setting.
+     * Get the active payment gateway.
+     * Currently hardcoded to 'flutterwave' — deactivate others for now.
      */
     public function getActiveGateway(): string
     {
-        return \App\Models\Setting::getValue('payment.gateway', 'paystack');
+        return 'flutterwave';
     }
 
     /**
