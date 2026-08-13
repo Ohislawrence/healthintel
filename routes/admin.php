@@ -28,6 +28,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('/providers', [AdminController::class, 'providerStore']);
     Route::put('/providers/{slug}', [AdminController::class, 'providerUpdate']);
     Route::post('/providers/{slug}/toggle-active', [AdminController::class, 'providerToggleActive']);
+    Route::post('/providers/upload-asset', [AdminController::class, 'providerAssetUpload']);
 
     // Credit Packages
     Route::get('/credit-packages', [AdminController::class, 'creditPackages']);

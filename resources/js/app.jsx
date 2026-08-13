@@ -37,6 +37,7 @@ import VerifyPhone from './screens/auth/VerifyPhone';
 import VerifyEmail from './screens/auth/VerifyEmail';
 import Dashboard from './screens/Dashboard';
 import HealthProfileOnboarding from './screens/onboarding/HealthProfile';
+import OnboardingTour from './screens/onboarding/OnboardingTour';
 import PanelPicker from './screens/lab/PanelPicker';
 import ValueEntry from './screens/lab/ValueEntry';
 import ResultScreen from './screens/lab/ResultScreen';
@@ -257,6 +258,7 @@ function App() {
                     <Route path="/verify-phone" element={<GuestRoute><VerifyPhone /></GuestRoute>} />
                     <Route path="/verify-email" element={<VerifyEmail />} />
                     <Route path="/onboarding" element={<ProtectedRoute><HealthProfileOnboarding /></ProtectedRoute>} />
+                    <Route path="/onboarding/tour" element={<ProtectedRoute><OnboardingTour /></ProtectedRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
                     <Route path="/lab-results" element={<ProtectedRoute><AppLayout><PanelPicker /></AppLayout></ProtectedRoute>} />
                     <Route path="/lab-results/:slug" element={<ProtectedRoute><AppLayout><ValueEntry /></AppLayout></ProtectedRoute>} />

@@ -49,7 +49,8 @@ export default function HealthProfile() {
         mutationFn: (data) => api.put('/profile', { ...data, profile_completed: true }),
         onSuccess: async () => {
             await fetchUser();
-            navigate('/dashboard');
+            // First-time profile completion triggers the app tour; subsequent updates go straight to dashboard.
+            navigate(isComplete ? '/dashboard' : '/onboarding/tour');
         },
         onError: (err) => setError(err?.message || 'Failed to save profile.'),
     });

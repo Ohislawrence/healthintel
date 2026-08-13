@@ -66,6 +66,9 @@ export default function Dashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div><p className="text-2xl font-extrabold text-neutral-900 tracking-tight">Hello, {firstName || 'there'}</p><p className="text-sm font-medium text-neutral-500 mt-0.5">Your health dashboard</p></div>
+                    <Link to="/onboarding/tour" className="hidden sm:flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-semibold text-neutral-600 hover:border-teal-300 hover:text-teal-700 transition-all">
+                        <span>🎓</span> How to use
+                    </Link>
                 </div>
                 {/* Stats */}
                 <div className="flex gap-3">

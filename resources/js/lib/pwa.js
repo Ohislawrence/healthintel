@@ -156,18 +156,31 @@ export function listenForInstallPrompt() {
     console.log('[PWA] App installed successfully');
     window.dispatchEvent(new CustomEvent('pwa:installed'));
   });
+
+  // Fallback: the Blade shell may have captured the prompt before React mounted.
+  // Re-dispatch so React components that mount later can still show an install button.
+  if (!deferredPrompt && window.__pwaInstallPrompt) {
+    deferredPrompt = window.__pwaInstallPrompt;
+    window.dispatchEvent(
+      new CustomEvent('pwa:install-ready', { detail: { prompt: deferredPrompt } })
+    );
+  }
 }
 
 /**
  * Trigger the install prompt (call this from a UI button)
  */
 export async function promptInstall() {
+  if (!deferredPrompt && window.__pwaInstallPrompt) {
+    deferredPrompt = window.__pwaInstallPrompt;
+  }
   if (!deferredPrompt) return false;
 
   try {
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     deferredPrompt = null;
+    window.__pwaInstallPrompt = null;
     return outcome === 'accepted';
   } catch {
     return false;

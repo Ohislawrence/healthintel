@@ -5,6 +5,7 @@ import useAuthStore from '../stores/authStore';
 import api from '../lib/api';
 import SearchModal from '../components/ui/SearchModal';
 import NotificationsDrawer from '../components/ui/NotificationsDrawer';
+import InstallAppButton from '../components/ui/InstallAppButton';
 
 const sidebarItems = [
     { path: '/dashboard', label: 'Home', icon: '⌂' },
@@ -137,6 +138,9 @@ export default function AppLayout({ children }) {
                         <span>{user?.credits ?? 0}</span>
                     </Link>
 
+                    {/* PWA install */}
+                    <InstallAppButton />
+
                     {/* Profile dropdown */}
                     <div className="relative" ref={profileRef}>
                         <button
@@ -259,6 +263,9 @@ export default function AppLayout({ children }) {
                             </span>
                         )}
                     </button>
+
+                    {/* PWA install (compact) */}
+                    <InstallAppButton compact />
 
                     {/* Profile avatar (tap to open bottom sheet or navigate) */}
                     <div className="relative" ref={profileRef}>

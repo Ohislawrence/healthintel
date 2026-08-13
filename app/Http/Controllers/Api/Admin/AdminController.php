@@ -195,9 +195,38 @@ class AdminController extends BaseController
 
     // ── Provider CRUD ──
 
-    public function providers()
+    public function providers(Request $request)
     {
-        $providers = ProviderDirectoryEntry::orderBy('name')->paginate(20);
+        $query = ProviderDirectoryEntry::with('locations')
+            ->withCount('locations');
+
+        // Search by name, specialty, email, city or state.
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('specialty', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('city', 'like', "%{$search}%")
+                    ->orWhere('state', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by provider type.
+        if ($type = $request->input('type')) {
+            $query->where('type', $type);
+        }
+
+        // Filter by partner status.
+        if ($partnerStatus = $request->input('partner_status')) {
+            $query->where('partner_status', $partnerStatus);
+        }
+
+        // Filter by active/inactive status.
+        if ($request->has('is_active') && $request->input('is_active') !== null && $request->input('is_active') !== '') {
+            $query->where('is_active', $request->boolean('is_active'));
+        }
+
+        $providers = $query->orderBy('name')->paginate(20)->withQueryString();
         return $this->paginated($providers);
     }
 
@@ -227,8 +256,31 @@ class AdminController extends BaseController
             'monetization_amount' => 'nullable|integer|min:0',
             'monetization_limit_type' => 'nullable|in:time,views',
             'monetization_limit_value' => 'nullable|integer|min:0',
-            'banner_url' => 'nullable|url|max:500',
+            'banner_url' => 'nullable|string|max:500',
+            'logo_url' => 'nullable|string|max:500',
+            'locations' => 'nullable|array|max:100',
+            'locations.*.name' => 'nullable|string|max:200',
+            'locations.*.address' => 'nullable|string|max:255',
+            'locations.*.city' => 'nullable|string|max:100',
+            'locations.*.state' => 'nullable|string|max:100',
+            'locations.*.country' => 'nullable|string|max:100',
+            'locations.*.phone' => 'nullable|string|max:50',
+            'locations.*.latitude' => 'nullable|numeric',
+            'locations.*.longitude' => 'nullable|numeric',
+            'locations.*.is_primary' => 'boolean',
         ]);
+
+        // Normalize empty strings to null. The API middleware group does not run
+        // ConvertEmptyStringsToNull, so JSON submissions with "" would otherwise
+        // reach integer/decimal columns and fail MySQL strict mode.
+        foreach ($validated as $key => $value) {
+            if ($value === '') {
+                $validated[$key] = null;
+            }
+        }
+
+        $locations = $request->input('locations', []);
+        unset($validated['locations']);
 
         $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']);
         $validated['is_verified'] ??= false;
@@ -255,7 +307,9 @@ class AdminController extends BaseController
 
         $provider = ProviderDirectoryEntry::create($validated);
 
-        return $this->success(['provider' => $provider], 'Provider created', 201);
+        $this->syncLocations($provider, $locations);
+
+        return $this->success(['provider' => $provider->load('locations')], 'Provider created', 201);
     }
 
     public function providerUpdate(Request $request, string $slug)
@@ -271,7 +325,18 @@ class AdminController extends BaseController
             'monetization_amount' => 'nullable|integer|min:0',
             'monetization_limit_type' => 'nullable|in:time,views',
             'monetization_limit_value' => 'nullable|integer|min:0',
-            'banner_url' => 'nullable|url|max:500',
+            'banner_url' => 'nullable|string|max:500',
+            'logo_url' => 'nullable|string|max:500',
+            'locations' => 'nullable|array|max:100',
+            'locations.*.name' => 'nullable|string|max:200',
+            'locations.*.address' => 'nullable|string|max:255',
+            'locations.*.city' => 'nullable|string|max:100',
+            'locations.*.state' => 'nullable|string|max:100',
+            'locations.*.country' => 'nullable|string|max:100',
+            'locations.*.phone' => 'nullable|string|max:50',
+            'locations.*.latitude' => 'nullable|numeric',
+            'locations.*.longitude' => 'nullable|numeric',
+            'locations.*.is_primary' => 'boolean',
         ]);
 
         $updateData = $request->only([
@@ -281,8 +346,14 @@ class AdminController extends BaseController
             'latitude', 'longitude',
             'monetization_type', 'monetization_rate', 'monetization_amount',
             'monetization_limit_type', 'monetization_limit_value',
-            'banner_url',
+            'banner_url', 'logo_url',
         ]);
+
+        foreach ($updateData as $key => $value) {
+            if ($value === '') {
+                $updateData[$key] = null;
+            }
+        }
 
         // If monetization is being activated or changed, reset tracking
         if (!empty($updateData['monetization_type']) && $updateData['monetization_type'] !== 'none') {
@@ -309,7 +380,67 @@ class AdminController extends BaseController
 
         $provider->update($updateData);
 
-        return $this->success(['provider' => $provider->fresh()], 'Provider updated');
+        if ($request->has('locations')) {
+            $this->syncLocations($provider, $request->input('locations', []));
+        }
+
+        return $this->success(['provider' => $provider->fresh()->load('locations')], 'Provider updated');
+    }
+
+    /**
+     * Replace a provider's locations with the supplied list.
+     */
+    private function syncLocations(ProviderDirectoryEntry $provider, array $locations): void
+    {
+        $normalized = collect($locations)
+            ->filter(fn($loc) => is_array($loc) && (
+                !empty($loc['name']) || !empty($loc['address']) || !empty($loc['city'])
+            ))
+            ->values()
+            ->map(function ($loc) {
+                $nullIfEmpty = fn ($value) => ($value === '' || $value === null) ? null : $value;
+
+                return [
+                    'name' => $nullIfEmpty($loc['name'] ?? null),
+                    'address' => $nullIfEmpty($loc['address'] ?? null),
+                    'city' => $nullIfEmpty($loc['city'] ?? null),
+                    'state' => $nullIfEmpty($loc['state'] ?? null),
+                    'country' => $loc['country'] ?? 'Nigeria',
+                    'phone' => $nullIfEmpty($loc['phone'] ?? null),
+                    'latitude' => $nullIfEmpty($loc['latitude'] ?? null),
+                    'longitude' => $nullIfEmpty($loc['longitude'] ?? null),
+                    'is_primary' => (bool) ($loc['is_primary'] ?? false),
+                ];
+            });
+
+        // Ensure exactly one primary location when locations exist.
+        if ($normalized->isNotEmpty() && !$normalized->contains('is_primary', true)) {
+            $normalized = $normalized->map(function ($item, $index) {
+                if ($index === 0) $item['is_primary'] = true;
+                return $item;
+            });
+        }
+
+        $provider->locations()->delete();
+        foreach ($normalized as $data) {
+            $provider->locations()->create($data);
+        }
+    }
+
+    /**
+     * Upload a provider asset (logo/banner) and return its public URL.
+     */
+    public function providerAssetUpload(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|image|mimes:jpeg,png,jpg,gif,webp,svg|max:5120',
+        ]);
+
+        $path = $request->file('file')->store('provider-assets', 'public');
+
+        return $this->success([
+            'url' => '/storage/' . $path,
+        ], 'Asset uploaded');
     }
 
     public function providerToggleActive(string $slug)

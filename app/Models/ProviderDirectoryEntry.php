@@ -17,7 +17,7 @@ class ProviderDirectoryEntry extends Model
         'monetization_type', 'monetization_rate', 'monetization_amount',
         'monetization_limit_type', 'monetization_limit_value',
         'monetization_started_at', 'monetization_expires_at',
-        'monetization_views_used', 'banner_url',
+        'monetization_views_used', 'banner_url', 'logo_url',
     ];
 
     protected $hidden = [
@@ -42,6 +42,11 @@ class ProviderDirectoryEntry extends Model
     public function referralEvents(): HasMany
     {
         return $this->hasMany(ReferralEvent::class, 'provider_id');
+    }
+
+    public function locations(): HasMany
+    {
+        return $this->hasMany(ProviderLocation::class, 'provider_id');
     }
 
     public const TYPES = ['hospital', 'clinic', 'lab', 'pharmacy', 'specialist', 'insurance'];

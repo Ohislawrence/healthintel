@@ -27,11 +27,19 @@ class ProviderDirectoryController extends BaseController
         }
 
         if ($request->filled('city')) {
-            $query->where('city', 'like', '%' . $request->input('city') . '%');
+            $city = $request->input('city');
+            $query->where(function ($q) use ($city) {
+                $q->where('city', 'like', '%' . $city . '%')
+                  ->orWhereHas('locations', fn($lq) => $lq->where('city', 'like', '%' . $city . '%'));
+            });
         }
 
         if ($request->filled('state')) {
-            $query->where('state', $request->input('state'));
+            $state = $request->input('state');
+            $query->where(function ($q) use ($state) {
+                $q->where('state', $state)
+                  ->orWhereHas('locations', fn($lq) => $lq->where('state', $state));
+            });
         }
 
         if ($request->filled('type')) {
@@ -47,7 +55,12 @@ class ProviderDirectoryController extends BaseController
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', '%' . $search . '%')
                   ->orWhere('specialty', 'like', '%' . $search . '%')
-                  ->orWhere('city', 'like', '%' . $search . '%');
+                  ->orWhere('city', 'like', '%' . $search . '%')
+                  ->orWhereHas('locations', function ($lq) use ($search) {
+                      $lq->where('name', 'like', '%' . $search . '%')
+                         ->orWhere('city', 'like', '%' . $search . '%')
+                         ->orWhere('state', 'like', '%' . $search . '%');
+                  });
             });
         }
 
@@ -57,7 +70,7 @@ class ProviderDirectoryController extends BaseController
             $lng = (float) $request->input('longitude');
             $radiusKm = (float) $request->input('radius', 10);
 
-            $providers = $query->get()
+            $providers = $query->with('locations')->get()
                 ->map(function ($p) use ($lat, $lng) {
                     if ($p->latitude && $p->longitude) {
                         $p->distance_km = $this->referralService->haversineDistance($lat, $lng, $p->latitude, $p->longitude);
@@ -75,6 +88,8 @@ class ProviderDirectoryController extends BaseController
 
         // Sort: sponsored first (still valid), then verified, then alphabetical
         $providers = $query
+            ->with('locations')
+            ->withCount('locations')
             ->orderByRaw("
                 CASE 
                     WHEN partner_status = 'sponsored' AND monetization_type IS NOT NULL THEN 0
@@ -96,6 +111,7 @@ class ProviderDirectoryController extends BaseController
     {
         $provider = ProviderDirectoryEntry::where('slug', $slug)
             ->where('is_active', true)
+            ->with('locations')
             ->firstOrFail();
 
         if ($request->user()) {
@@ -107,6 +123,9 @@ class ProviderDirectoryController extends BaseController
                 ['slug' => $slug],
             );
         }
+
+        // Expose computed sponsored status in the API payload.
+        $provider->append('is_sponsored');
 
         return $this->success(['provider' => $provider]);
     }
@@ -264,7 +283,7 @@ class ProviderDirectoryController extends BaseController
             })
             ->select([
                 'id', 'name', 'slug', 'type', 'specialty', 'city', 'state',
-                'banner_url', 'partner_status',
+                'banner_url', 'logo_url', 'partner_status',
                 'latitude', 'longitude',
             ])
             ->get();

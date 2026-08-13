@@ -81,7 +81,11 @@ export default function ProviderDirectory() {
                             className="card p-4 hover:shadow-md hover:border-teal-200 transition-all"
                         >
                             <div className="flex items-center gap-2 mb-1">
-                                <span className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-sm text-teal-600">⚕</span>
+                                {p.logo_url ? (
+                                    <img src={p.logo_url} alt={p.name} className="w-8 h-8 rounded-lg object-contain bg-white border border-neutral-100" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                ) : (
+                                    <span className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-sm text-teal-600">⚕</span>
+                                )}
                                 <div>
                                     <p className="text-sm font-bold text-neutral-900">{p.name}</p>
                                     <p className="text-xs text-neutral-500">{p.type || 'Healthcare Provider'}</p>
@@ -90,6 +94,9 @@ export default function ProviderDirectory() {
                             <p className="text-xs text-neutral-400 mt-2">
                                 {[p.specialty, p.city, p.state].filter(Boolean).join(' · ')}
                             </p>
+                            {p.locations_count > 1 && (
+                                <p className="text-[10px] font-semibold text-teal-600 mt-1">{p.locations_count} locations</p>
+                            )}
                             {p.is_sponsored && (
                                 <span className="mt-2 badge badge-warning text-[10px]">Sponsored</span>
                             )}
