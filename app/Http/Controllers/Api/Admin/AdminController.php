@@ -523,9 +523,34 @@ class AdminController extends BaseController
 
     // ── Users ──
 
-    public function users()
+    public function users(Request $request)
     {
-        $users = User::with('roles')->latest()->paginate(25);
+        $query = User::with('roles');
+
+        // Search by name, email, or phone.
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by role name.
+        if ($role = $request->input('role')) {
+            $query->whereHas('roles', fn ($q) => $q->where('name', $role));
+        }
+
+        // Filter by email verification status.
+        if ($request->input('email_verified') !== null && $request->input('email_verified') !== '') {
+            if ($request->boolean('email_verified')) {
+                $query->whereNotNull('email_verified_at');
+            } else {
+                $query->whereNull('email_verified_at');
+            }
+        }
+
+        $users = $query->latest()->paginate(25)->withQueryString();
         $users->getCollection()->transform(function ($user) {
             $user->credits = app(\App\Services\CreditService::class)->getBalance($user);
             return $user;

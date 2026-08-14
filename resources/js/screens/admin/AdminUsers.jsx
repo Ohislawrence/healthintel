@@ -11,15 +11,28 @@ export default function AdminUsers() {
     const [creditAmount, setCreditAmount] = useState(5);
     const [showCreditModal, setShowCreditModal] = useState(false);
     const [confirmAction, setConfirmAction] = useState(null); // { type: 'delete'|'restore'|'force', user }
+
+    // Filters (active users only)
+    const [search, setSearch] = useState('');
+    const [filterRole, setFilterRole] = useState('');
+    const [filterEmailVerified, setFilterEmailVerified] = useState('');
+
     const queryClient = useQueryClient();
 
     const { data, isLoading } = useQuery({
-        queryKey: ['admin-users', tab, tab === 'trashed' ? trashPage : page],
+        queryKey: ['admin-users', tab, tab === 'trashed' ? trashPage : page, search, filterRole, filterEmailVerified],
         queryFn: () => {
             if (tab === 'trashed') {
                 return api.get('/admin/users/trashed', { params: { page: trashPage } });
             }
-            return api.get('/admin/users', { params: { page } });
+            return api.get('/admin/users', {
+                params: {
+                    page,
+                    search: search || undefined,
+                    role: filterRole || undefined,
+                    email_verified: filterEmailVerified === '' ? undefined : filterEmailVerified,
+                },
+            });
         },
     });
 
@@ -102,6 +115,58 @@ export default function AdminUsers() {
                     </button>
                 </div>
             </div>
+
+            {/* Filters (active tab only) */}
+            {tab === 'active' && (
+                <div className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
+                    <div className="flex-1 min-w-[200px]">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Search</label>
+                        <input
+                            className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm"
+                            value={search}
+                            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                            placeholder="Name, email, or phone…"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Role</label>
+                        <select
+                            className="rounded border border-gray-300 px-3 py-1.5 text-sm"
+                            value={filterRole}
+                            onChange={(e) => { setFilterRole(e.target.value); setPage(1); }}
+                        >
+                            <option value="">All roles</option>
+                            <option value="admin">Admin</option>
+                            <option value="user">User</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Email Verified</label>
+                        <select
+                            className="rounded border border-gray-300 px-3 py-1.5 text-sm"
+                            value={filterEmailVerified}
+                            onChange={(e) => { setFilterEmailVerified(e.target.value); setPage(1); }}
+                        >
+                            <option value="">All</option>
+                            <option value="1">Verified</option>
+                            <option value="0">Unverified</option>
+                        </select>
+                    </div>
+                    {(search || filterRole || filterEmailVerified !== '') && (
+                        <button
+                            onClick={() => {
+                                setSearch('');
+                                setFilterRole('');
+                                setFilterEmailVerified('');
+                                setPage(1);
+                            }}
+                            className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                        >
+                            Clear
+                        </button>
+                    )}
+                </div>
+            )}
 
             {isLoading ? (
                 <div className="h-20 animate-pulse rounded-xl bg-gray-100" />
