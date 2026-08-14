@@ -6,7 +6,6 @@ import api from '../lib/api';
 import SearchModal from '../components/ui/SearchModal';
 import NotificationsDrawer from '../components/ui/NotificationsDrawer';
 import InstallAppButton from '../components/ui/InstallAppButton';
-import WhatsAppFloat from '../components/ui/WhatsAppFloat';
 
 const sidebarItems = [
     { path: '/dashboard', label: 'Home', icon: '⌂' },
@@ -404,9 +403,6 @@ export default function AppLayout({ children }) {
                ═══════════════════════════════════════════════ */}
             <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
             <NotificationsDrawer open={notifOpen} onClose={() => setNotifOpen(false)} />
-
-            {/* Floating WhatsApp support button (bottom-right, above the mobile tab bar) */}
-            <WhatsAppFloat />
         </div>
     );
 }
