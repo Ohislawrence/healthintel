@@ -85,7 +85,7 @@ export default function PeriodTracker() {
           <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">Cycle Length</p>
           <div className="flex flex-wrap gap-1.5">
             {CYCLE_LENGTHS.map(d => (
-              <button key={d} onClick={() => setCycleLen(d)} className={`px-3 py-2 rounded-lg text-xs font-bold border ${cycleLen === d ? 'border-pink-500 bg-pink-50 text-pink-600' : 'border-neutral-200 bg-neutral-50 text-neutral-500'}`}>{d}d</button>
+              <button key={d} onClick={() => setCycleLen(d)} className={`px-3 py-2 rounded-lg text-xs font-bold border ${cycleLen === d ? 'border-pink-500 bg-pink-50 text-pink-600' : 'border-neutral-200 bg-neutral-50 text-neutral-500'}`}>{d} days</button>
             ))}
           </div>
         </div>
@@ -93,7 +93,7 @@ export default function PeriodTracker() {
           <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">Period Length</p>
           <div className="flex flex-wrap gap-1.5">
             {PERIOD_LENGTHS.map(d => (
-              <button key={d} onClick={() => setPeriodLen(d)} className={`px-3 py-2 rounded-lg text-xs font-bold border ${periodLen === d ? 'border-pink-500 bg-pink-50 text-pink-600' : 'border-neutral-200 bg-neutral-50 text-neutral-500'}`}>{d}d</button>
+              <button key={d} onClick={() => setPeriodLen(d)} className={`px-3 py-2 rounded-lg text-xs font-bold border ${periodLen === d ? 'border-pink-500 bg-pink-50 text-pink-600' : 'border-neutral-200 bg-neutral-50 text-neutral-500'}`}>{d} days</button>
             ))}
           </div>
         </div>
@@ -102,8 +102,8 @@ export default function PeriodTracker() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="card p-3 text-center"><p className="text-xl font-extrabold text-pink-600">{log.length}</p><p className="text-[10px] font-bold text-neutral-400 uppercase">Days Logged</p></div>
-        <div className="card p-3 text-center"><p className="text-xl font-extrabold text-pink-600">{cycleLen}d</p><p className="text-[10px] font-bold text-neutral-400 uppercase">Cycle</p></div>
-        <div className="card p-3 text-center"><p className="text-xl font-extrabold text-pink-600">{periodLen}d</p><p className="text-[10px] font-bold text-neutral-400 uppercase">Period</p></div>
+        <div className="card p-3 text-center"><p className="text-xl font-extrabold text-pink-600">{cycleLen}</p><p className="text-[10px] font-bold text-neutral-400 uppercase">Cycle (Days)</p></div>
+        <div className="card p-3 text-center"><p className="text-xl font-extrabold text-pink-600">{periodLen}</p><p className="text-[10px] font-bold text-neutral-400 uppercase">Period (Days)</p></div>
       </div>
 
       {/* Current Phase */}

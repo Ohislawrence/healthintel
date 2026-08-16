@@ -246,7 +246,7 @@ function App() {
 
     return (
         <QueryClientProvider client={queryClient}>
-            <BrowserRouter>
+            <BrowserRouter future={{ v7_relativeSplatPath: true }}>
                 <PWALifecycle />
                 <Routes>
                     <Route path="/" element={<PwaEntry />} />

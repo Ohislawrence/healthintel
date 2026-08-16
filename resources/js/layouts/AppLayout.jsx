@@ -7,13 +7,28 @@ import SearchModal from '../components/ui/SearchModal';
 import NotificationsDrawer from '../components/ui/NotificationsDrawer';
 import InstallAppButton from '../components/ui/InstallAppButton';
 
+const LabTestsIcon = (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 3h6" />
+        <path d="M10 3v5.4l-4.9 9.8A2 2 0 0 0 6.9 21h10.2a2 2 0 0 0 1.8-2.8L14 8.4V3" />
+        <path d="M8.5 15h7" />
+    </svg>
+);
+
+const DirectoryIcon = (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 21s-7-5.1-7-11a7 7 0 0 1 14 0c0 5.9-7 11-7 11z" />
+        <circle cx="12" cy="10" r="2.5" />
+    </svg>
+);
+
 const sidebarItems = [
     { path: '/dashboard', label: 'Home', icon: '⌂' },
-    { path: '/lab-results', label: 'Lab Tests', icon: '⚛' },
+    { path: '/lab-results', label: 'Lab Tests', icon: LabTestsIcon },
     { path: '/symptom-checker', label: 'Symptoms', icon: '♡' },
-    { path: '/directory', label: 'Directory', icon: '⚕' },
+    { path: '/directory', label: 'Directory', icon: DirectoryIcon },
     { path: '/blog', label: 'Blog', icon: '📝' },
-    { path: '/referral', label: 'Referrals', icon: '👥' },
+    { path: '/health-tools', label: 'Health Tools', icon: '✚' },
     { path: '/credits', label: 'Credits', icon: '◆' },
 ];
 
@@ -197,12 +212,12 @@ export default function AppLayout({ children }) {
                                         Credits ({user?.credits ?? 0})
                                     </Link>
                                     <Link
-                                        to="/referral"
+                                        to="/health-tools"
                                         onClick={() => setProfileOpen(false)}
                                         className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
                                     >
-                                        <span className="text-lg">👥</span>
-                                        Referral Program
+                                        <span className="text-lg">✚</span>
+                                        Health Tools
                                     </Link>
                                 </div>
 
@@ -302,8 +317,8 @@ export default function AppLayout({ children }) {
                                     <Link to="/credits" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors">
                                         <span className="text-lg">◆</span> Credits ({user?.credits ?? 0})
                                     </Link>
-                                    <Link to="/referral" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors">
-                                        <span className="text-lg">👥</span> Referral Program
+                                    <Link to="/health-tools" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors">
+                                        <span className="text-lg">✚</span> Health Tools
                                     </Link>
                                 </div>
 
