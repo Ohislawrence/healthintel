@@ -1157,6 +1157,42 @@ class AdminController extends BaseController
             'url' => $validated['url'] ?? null,
         ]);
 
+        // Create in-app notifications (user_notifications) so users see them
+        // in their notification page/drawer, in addition to the Web Push.
+        try {
+            $targetUserIds = null;
+
+            if (!empty($validated['user_ids'])) {
+                $targetUserIds = $validated['user_ids'];
+            } elseif ($validated['target'] === 'all') {
+                $targetUserIds = User::pluck('id')->all();
+            }
+
+            if (!empty($targetUserIds)) {
+                $rows = [];
+                $now = now();
+
+                foreach ($targetUserIds as $userId) {
+                    $rows[] = [
+                        'user_id'    => $userId,
+                        'type'       => 'admin',
+                        'title'      => $validated['title'],
+                        'body'       => $validated['body'],
+                        'data'       => json_encode(['notification_id' => $notification->id]),
+                        'action_url' => $validated['url'] ?? null,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+
+                \App\Models\UserNotification::insert($rows);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning(
+                'Admin notification in-app creation failed: ' . $e->getMessage()
+            );
+        }
+
         // Dispatch Web Push notifications to subscribed users
         if (config('webpush.send_admin_notifications', true)) {
             $webPushService = app(\App\Services\WebPushService::class);
