@@ -96,6 +96,10 @@ export default function BuyCredits() {
             >
                 {initMutation.isPending ? 'Redirecting...' : 'Pay Now'}
             </button>
+
+            <p className="text-[11px] text-neutral-400 text-center leading-relaxed">
+                HealthIntel is owned by Apex Cloud Tech. Payments are securely processed by Apex Cloud Tech.
+            </p>
         </div>
     );
 }

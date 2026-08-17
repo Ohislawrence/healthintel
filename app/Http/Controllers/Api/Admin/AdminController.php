@@ -117,7 +117,7 @@ class AdminController extends BaseController
                 'total_interpretations' => $totalInterpretations,
                 'total_payments' => $totalPayments,
                 'total_referrals' => $totalReferrals,
-                'total_revenue' => round($totalRevenue, 2),
+                'total_revenue' => round($totalRevenue / 100, 2),
                 'total_providers' => $totalProviders,
                 'total_appointments' => $totalAppointments,
                 'total_feedback' => $totalFeedback,
