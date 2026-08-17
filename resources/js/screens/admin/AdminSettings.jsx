@@ -39,6 +39,7 @@ export default function AdminSettings() {
     const activeGateway = gatewayInfo.active_gateway || 'paystack';
     const paystackConfigured = gatewayInfo.gateways?.paystack?.configured || false;
     const flutterwaveConfigured = gatewayInfo.gateways?.flutterwave?.configured || false;
+    const nombaConfigured = gatewayInfo.gateways?.nomba?.configured || false;
 
     const gatewayMutation = useMutation({
         mutationFn: (gateway) => api.post('/admin/settings/payment-gateway', { gateway }),
@@ -232,16 +233,50 @@ export default function AdminSettings() {
                                     </div>
                                 )}
                             </button>
+
+                            {/* Nomba */}
+                            <button
+                                onClick={() => gatewayMutation.mutate('nomba')}
+                                disabled={gatewayMutation.isPending || !nombaConfigured}
+                                className={`relative rounded-xl border-2 p-4 text-left transition-all ${
+                                    activeGateway === 'nomba'
+                                        ? 'border-teal-600 bg-teal-50 shadow-md'
+                                        : !nombaConfigured
+                                            ? 'border-neutral-200 bg-neutral-50 opacity-50 cursor-not-allowed'
+                                            : 'border-neutral-200 bg-white hover:border-teal-300 hover:bg-teal-50/30'
+                                }`}
+                            >
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-2xl">🏦</span>
+                                    <div>
+                                        <p className="font-bold text-neutral-900">Nomba</p>
+                                        <p className="text-xs text-neutral-400">nomba.com</p>
+                                    </div>
+                                    {activeGateway === 'nomba' && (
+                                        <span className="ml-auto bg-teal-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">Active</span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-neutral-500">Business banking & payments platform. Cards, transfers and checkout.</p>
+                                {!nombaConfigured && (
+                                    <p className="text-xs text-amber-600 mt-2 font-medium">⚠️ Not configured — add NOMBA_SECRET_KEY to .env</p>
+                                )}
+                                {gatewayMutation.isPending && gatewayMutation.variables === 'nomba' && (
+                                    <div className="mt-2 flex items-center gap-2 text-xs text-teal-700 font-medium">
+                                        <span className="animate-spin">⟳</span> Switching...
+                                    </div>
+                                )}
+                            </button>
                         </div>
                     )}
 
                     <div className="bg-neutral-50 rounded-lg p-4 text-xs text-neutral-500 space-y-1">
                         <p><strong>How it works:</strong> Selecting a provider changes which payment gateway is used for all new credit purchases. Existing transactions are not affected.</p>
-                        <p><strong>Configuration:</strong> Set API keys in your <code className="bg-neutral-200 px-1 rounded">.env</code> file — PAYSTACK_SECRET_KEY and FLUTTERWAVE_SECRET_KEY. Unconfigured providers are disabled.</p>
+                        <p><strong>Configuration:</strong> Set API keys in your <code className="bg-neutral-200 px-1 rounded">.env</code> file — PAYSTACK_SECRET_KEY, FLUTTERWAVE_SECRET_KEY, and NOMBA_SECRET_KEY. Unconfigured providers are disabled.</p>
                         <p><strong>Webhook URLs:</strong> Update your webhook URLs in the provider dashboard:</p>
                         <ul className="list-disc list-inside ml-2 mt-1 space-y-0.5">
                             <li>Paystack: <code className="bg-neutral-200 px-1 rounded">https://healthintel.app/api/payment/webhook</code></li>
                             <li>Flutterwave: <code className="bg-neutral-200 px-1 rounded">https://healthintel.app/api/payment/webhook/flutterwave</code></li>
+                            <li>Nomba: <code className="bg-neutral-200 px-1 rounded">https://healthintel.app/api/payment/webhook/nomba</code></li>
                         </ul>
                     </div>
                 </div>
@@ -260,7 +295,7 @@ export default function AdminSettings() {
                     ) : (
                         <div className="space-y-3">
                             {/* Group by provider */}
-                            {['Paystack', 'Flutterwave', 'AI / DeepSeek', 'Communication'].map(providerGroup => {
+                            {['Paystack', 'Flutterwave', 'Nomba', 'AI / DeepSeek', 'Communication'].map(providerGroup => {
                                 const providerKeys = envKeys.filter(k => k.group === providerGroup);
                                 if (providerKeys.length === 0) return null;
                                 return (

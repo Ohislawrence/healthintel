@@ -11,12 +11,14 @@ export default function PaymentCallback() {
     const [cancelled, setCancelled] = useState(false);
 
     useEffect(() => {
-        // Flutterwave uses tx_ref + transaction_id; Paystack uses reference / trxref
+        // Flutterwave uses tx_ref + transaction_id; Paystack uses reference / trxref;
+        // Nomba uses orderReference / orderId
         const txRef = searchParams.get('tx_ref');
-        const transactionId = searchParams.get('transaction_id');
+        const transactionId = searchParams.get('transaction_id') || searchParams.get('id') || searchParams.get('orderId');
         const paystackRef = searchParams.get('reference') || searchParams.get('trxref');
+        const nombaRef = searchParams.get('orderReference') || searchParams.get('orderId');
 
-        const reference = txRef || paystackRef;
+        const reference = txRef || paystackRef || nombaRef;
 
         if (!reference) {
             setStatus('error');

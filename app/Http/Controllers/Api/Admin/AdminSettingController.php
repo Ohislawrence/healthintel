@@ -37,24 +37,30 @@ class AdminSettingController extends BaseController
         // 1. config() — works when config cache was created AFTER keys existed
         // 2. $_ENV / getenv() — works if server sets them as real env vars
         // 3. Read .env file directly — always works as last resort
-        $paystackKey = config('services.paystack.secret_key');
-        $flutterwaveKey = config('services.flutterwave.secret_key');
+        $paystackKey = $this->resolveConfigValue('services.paystack.secret_key', 'PAYSTACK_SECRET_KEY');
+        $flutterwaveKey = $this->resolveConfigValue('services.flutterwave.secret_key', 'FLUTTERWAVE_SECRET_KEY');
+        $nombaKey = $this->resolveConfigValue('services.nomba.secret_key', 'NOMBA_SECRET_KEY');
 
         $paystackConfigured = !empty($paystackKey);
         $flutterwaveConfigured = !empty($flutterwaveKey);
+        $nombaConfigured = !empty($nombaKey);
 
         $activeGateway = Setting::getValue('payment.gateway', 'paystack');
 
+        if ($activeGateway === 'nomba' && !$nombaConfigured) {
+            $activeGateway = $paystackConfigured ? 'paystack' : ($flutterwaveConfigured ? 'flutterwave' : 'nomba');
+        }
+
         if ($activeGateway === 'flutterwave' && !$flutterwaveConfigured) {
-            $activeGateway = $paystackConfigured ? 'paystack' : 'flutterwave';
+            $activeGateway = $paystackConfigured ? 'paystack' : ($nombaConfigured ? 'nomba' : 'flutterwave');
         }
 
         if ($activeGateway === 'paystack' && !$paystackConfigured) {
-            $activeGateway = $flutterwaveConfigured ? 'flutterwave' : 'paystack';
+            $activeGateway = $flutterwaveConfigured ? 'flutterwave' : ($nombaConfigured ? 'nomba' : 'paystack');
         }
 
-        if ($activeGateway !== 'paystack' && $activeGateway !== 'flutterwave') {
-            $activeGateway = $paystackConfigured ? 'paystack' : ($flutterwaveConfigured ? 'flutterwave' : 'paystack');
+        if (!in_array($activeGateway, ['paystack', 'flutterwave', 'nomba'], true)) {
+            $activeGateway = $paystackConfigured ? 'paystack' : ($flutterwaveConfigured ? 'flutterwave' : 'nomba');
         }
 
         return $this->success([
@@ -68,8 +74,23 @@ class AdminSettingController extends BaseController
                     'name' => 'Flutterwave',
                     'configured' => $flutterwaveConfigured,
                 ],
+                'nomba' => [
+                    'name' => 'Nomba',
+                    'configured' => $nombaConfigured,
+                ],
             ],
         ]);
+    }
+
+    /**
+     * Resolve a service config value across config cache, real env vars, and the .env file.
+     * Needed on production servers where a stale config:cache hides newly added .env keys.
+     */
+    private function resolveConfigValue(string $configPath, string $envKey): ?string
+    {
+        return config($configPath)
+            ?: ($_ENV[$envKey] ?? getenv($envKey))
+            ?: $this->readEnvFile($envKey);
     }
 
     /**
@@ -146,6 +167,10 @@ class AdminSettingController extends BaseController
             'FLUTTERWAVE_SECRET_KEY' => 'services.flutterwave.secret_key',
             'FLUTTERWAVE_PUBLIC_KEY' => 'services.flutterwave.public_key',
             'FLUTTERWAVE_SECRET_HASH' => 'services.flutterwave.secret_hash',
+            'NOMBA_SECRET_KEY' => 'services.nomba.secret_key',
+            'NOMBA_CLIENT_ID' => 'services.nomba.client_id',
+            'NOMBA_PUBLIC_KEY' => 'services.nomba.account_id',
+            'NOMBA_WEBHOOK_SECRET' => 'services.nomba.webhook_secret',
             'DEEPSEEK_API_KEY' => 'services.deepseek.api_key',
             'TERMII_API_KEY' => 'services.termii.api_key',
         ];
@@ -156,6 +181,10 @@ class AdminSettingController extends BaseController
             ['key' => 'FLUTTERWAVE_SECRET_KEY', 'label' => 'Flutterwave Secret Key', 'group' => 'Flutterwave'],
             ['key' => 'FLUTTERWAVE_PUBLIC_KEY', 'label' => 'Flutterwave Public Key', 'group' => 'Flutterwave'],
             ['key' => 'FLUTTERWAVE_SECRET_HASH', 'label' => 'Flutterwave Secret Hash', 'group' => 'Flutterwave'],
+            ['key' => 'NOMBA_SECRET_KEY', 'label' => 'Nomba Client Secret', 'group' => 'Nomba'],
+            ['key' => 'NOMBA_CLIENT_ID', 'label' => 'Nomba Client ID', 'group' => 'Nomba'],
+            ['key' => 'NOMBA_PUBLIC_KEY', 'label' => 'Nomba Account ID', 'group' => 'Nomba'],
+            ['key' => 'NOMBA_WEBHOOK_SECRET', 'label' => 'Nomba Webhook Secret', 'group' => 'Nomba'],
             ['key' => 'DEEPSEEK_API_KEY', 'label' => 'DeepSeek API Key', 'group' => 'AI / DeepSeek'],
             ['key' => 'TERMII_API_KEY', 'label' => 'Termii API Key (SMS)', 'group' => 'Communication'],
         ];
@@ -188,6 +217,7 @@ class AdminSettingController extends BaseController
         $allowedKeys = [
             'PAYSTACK_SECRET_KEY', 'PAYSTACK_PUBLIC_KEY',
             'FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_PUBLIC_KEY', 'FLUTTERWAVE_SECRET_HASH',
+            'NOMBA_SECRET_KEY', 'NOMBA_CLIENT_ID', 'NOMBA_PUBLIC_KEY', 'NOMBA_WEBHOOK_SECRET',
             'DEEPSEEK_API_KEY', 'TERMII_API_KEY',
         ];
 
@@ -292,7 +322,7 @@ class AdminSettingController extends BaseController
     public function setPaymentGateway(Request $request)
     {
         $validated = $request->validate([
-            'gateway' => ['required', 'string', 'in:paystack,flutterwave'],
+            'gateway' => ['required', 'string', 'in:paystack,flutterwave,nomba'],
         ]);
 
         Setting::setValue('payment.gateway', $validated['gateway']);

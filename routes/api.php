@@ -65,9 +65,10 @@ Route::get('/panels/{slug}', [LabSubmissionController::class, 'panelShow']);
 // Symptoms (public listing)
 Route::get('/symptoms', [SymptomCheckerController::class, 'index']);
 
-// Payments (Paystack & Flutterwave webhooks are public, require no auth)
+// Payments (Paystack, Flutterwave & Nomba webhooks are public, require no auth)
 Route::post('/payment/webhook', [PaymentController::class, 'webhook']);
 Route::post('/payment/webhook/flutterwave', [PaymentController::class, 'flutterwaveWebhook']);
+Route::post('/payment/webhook/nomba', [PaymentController::class, 'nombaWebhook']);
 
 // Partnership inquiry (public — from the /partnerships page modal)
 Route::post('/partnership-inquiry', [\App\Http\Controllers\Api\PartnershipInquiryController::class, 'store'])

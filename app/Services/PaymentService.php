@@ -14,19 +14,41 @@ class PaymentService
     public function __construct(
         private PaystackService $paystack,
         private FlutterwaveService $flutterwave,
+        private NombaService $nomba,
         private CreditService $credits,
         private ReferralProgramService $referralProgram,
     ) {}
 
     public function getActiveGateway(): string
     {
-        return 'flutterwave';
+        $gateway = \App\Models\Setting::getValue('payment.gateway', 'paystack');
+
+        $configured = match ($gateway) {
+            'flutterwave' => $this->flutterwave->isConfigured(),
+            'nomba' => $this->nomba->isConfigured(),
+            default => $this->paystack->isConfigured(),
+        };
+
+        if (!$configured) {
+            // Fall back to the first configured provider so payments never break.
+            if ($this->paystack->isConfigured()) {
+                return 'paystack';
+            }
+            if ($this->flutterwave->isConfigured()) {
+                return 'flutterwave';
+            }
+            if ($this->nomba->isConfigured()) {
+                return 'nomba';
+            }
+        }
+
+        return $gateway;
     }
 
     public function initialize(User $user, CreditPackage $package, string $callbackUrl): ?string
     {
         $gateway = $this->getActiveGateway();
-        $providerName = $gateway === 'flutterwave' ? 'flutterwave' : 'paystack';
+        $providerName = $gateway;
 
         $payment = Payment::create([
             'user_id' => $user->id,
@@ -39,15 +61,15 @@ class PaymentService
             'status' => 'pending',
         ]);
 
-        if ($gateway === 'flutterwave') {
-            if (!$this->flutterwave->isConfigured()) {
-                Log::warning('Flutterwave not configured — skipping payment initialization.');
-                $payment->update(['status' => 'failed']);
-                return null;
-            }
-            return $this->flutterwave->initialize($payment, $user, $callbackUrl);
-        }
+        return match ($gateway) {
+            'flutterwave' => $this->initializeFlutterwave($payment, $user, $callbackUrl),
+            'nomba' => $this->initializeNomba($payment, $user, $callbackUrl),
+            default => $this->initializePaystack($payment, $user, $callbackUrl),
+        };
+    }
 
+    private function initializePaystack(Payment $payment, User $user, string $callbackUrl): ?string
+    {
         if (!$this->paystack->isConfigured()) {
             Log::warning('Paystack not configured — skipping payment initialization.');
             $payment->update(['status' => 'failed']);
@@ -55,6 +77,28 @@ class PaymentService
         }
 
         return $this->paystack->initialize($payment, $user, $callbackUrl);
+    }
+
+    private function initializeFlutterwave(Payment $payment, User $user, string $callbackUrl): ?string
+    {
+        if (!$this->flutterwave->isConfigured()) {
+            Log::warning('Flutterwave not configured — skipping payment initialization.');
+            $payment->update(['status' => 'failed']);
+            return null;
+        }
+
+        return $this->flutterwave->initialize($payment, $user, $callbackUrl);
+    }
+
+    private function initializeNomba(Payment $payment, User $user, string $callbackUrl): ?string
+    {
+        if (!$this->nomba->isConfigured()) {
+            Log::warning('Nomba not configured — skipping payment initialization.');
+            $payment->update(['status' => 'failed']);
+            return null;
+        }
+
+        return $this->nomba->initialize($payment, $user, $callbackUrl);
     }
 
     /**
@@ -67,7 +111,16 @@ class PaymentService
     public function verify(string $reference, ?string $flwTransactionId = null, ?array $preVerifiedResult = null): Payment
     {
         return DB::transaction(function () use ($reference, $flwTransactionId, $preVerifiedResult) {
-            $payment = Payment::where('reference', $reference)->lockForUpdate()->firstOrFail();
+            // Nomba returns its own orderReference (not our internal LD-... reference),
+            // which we persist in provider_reference. Allow lookup by either value.
+            $payment = Payment::where('reference', $reference)
+                ->orWhere('provider_reference', $reference)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$payment) {
+                throw new \Illuminate\Database\Eloquent\ModelNotFoundException('Payment not found.');
+            }
 
             if ($payment->status === 'success') {
                 return $payment;
@@ -82,6 +135,9 @@ class PaymentService
             $result = $preVerifiedResult ?? match ($payment->provider) {
                 'flutterwave' => $this->flutterwave->verify(
                     $flwTransactionId ?? $payment->provider_reference ?? $reference
+                ),
+                'nomba' => $this->nomba->verify(
+                    $payment->provider_reference ?? $reference
                 ),
                 default => $this->paystack->verify($reference),
             };
@@ -115,6 +171,25 @@ class PaymentService
                         && abs($chargedAmount - $expectedAmount) < 0.01
                         && $chargedCurrency === $expectedCurrency;
                 }
+            } elseif ($payment->provider === 'nomba') {
+                // Nomba /v1/checkout/transaction returns:
+                // { code, description, data: { success:bool, message, order:{ amount, currency, ... }, ... } }
+                $nombaData = $result['data'] ?? $result;
+                $order = $nombaData['order'] ?? $nombaData['orderDetails'] ?? [];
+
+                $success = (bool) ($nombaData['success'] ?? false);
+                $chargedAmount = (float) ($order['amount'] ?? 0);
+                $chargedCurrency = strtoupper($order['currency'] ?? '');
+                $message = $nombaData['message'] ?? $nombaData['description'] ?? null;
+
+                $expectedAmount = $payment->amount_kobo / 100;
+                $expectedCurrency = strtoupper($payment->currency);
+
+                $wasCancelled = stripos($message ?? '', 'cancel') !== false;
+
+                $isSuccess = $success
+                    && ($chargedAmount <= 0 || abs($chargedAmount - $expectedAmount) < 0.01)
+                    && ($chargedCurrency === '' || $chargedCurrency === $expectedCurrency);
             } else {
                 $paystackStatus = $result['data']['status'] ?? null;
                 $wasCancelled = in_array($paystackStatus, ['cancelled', 'abandoned'], true);
@@ -143,7 +218,39 @@ class PaymentService
             return;
         }
 
+        if ($provider === 'nomba') {
+            $this->handleNombaWebhook($payload);
+            return;
+        }
+
         $this->handlePaystackWebhook($payload);
+    }
+
+    private function handleNombaWebhook(array $payload): void
+    {
+        $data = $payload['data'] ?? $payload;
+        $reference = $data['orderReference'] ?? $data['reference'] ?? $data['tx_ref'] ?? null;
+        $transactionId = $data['id'] ?? $data['transactionId'] ?? null;
+
+        if (!$reference) {
+            return;
+        }
+
+        $payment = Payment::where('reference', $reference)->first();
+        if ($payment) {
+            $payment->update([
+                'provider_reference' => $transactionId ?? $payment->provider_reference,
+                'webhook_log' => $payload,
+            ]);
+        }
+
+        $status = $data['transactionStatus'] ?? $data['status'] ?? null;
+
+        if (in_array($status, ['success', 'successful', 'completed'], true)) {
+            $result = $this->nomba->verify($transactionId ?? $reference);
+
+            $this->verify(reference: $reference, preVerifiedResult: $result);
+        }
     }
 
     private function handlePaystackWebhook(array $payload): void

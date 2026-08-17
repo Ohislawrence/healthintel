@@ -59,10 +59,14 @@ class PaymentController extends BaseController
         // Paystack uses reference / trxref
         $reference = $request->query('tx_ref')
             ?? $request->query('reference')
-            ?? $request->query('trxref');
+            ?? $request->query('trxref')
+            ?? $request->query('orderReference')
+            ?? $request->query('orderId');
 
-        // Flutterwave redirect passes the numeric transaction ID
-        $transactionId = $request->query('transaction_id') ?? $request->query('id');
+        // Flutterwave/Nomba redirect passes the numeric transaction ID
+        $transactionId = $request->query('transaction_id')
+            ?? $request->query('id')
+            ?? $request->query('orderId');
 
         if (!$reference) {
             return $this->error('Verification failed. No payment reference found in callback URL.', 422);
@@ -124,6 +128,26 @@ class PaymentController extends BaseController
     }
 
     /**
+     * Handle Nomba webhook.
+     */
+    public function nombaWebhook(Request $request)
+    {
+        $payload = $request->getContent();
+        $signature = $request->header(
+            config('services.nomba.webhook_header', 'x-nomba-signature')
+        );
+
+        if (!app(\App\Services\NombaService::class)->isValidWebhook($payload, $signature ?? '')) {
+            return response()->json(['status' => 'invalid_signature'], 401);
+        }
+
+        $data = json_decode($payload, true);
+        $this->paymentService->handleWebhook($data, 'nomba');
+
+        return response()->json(['status' => 'received']);
+    }
+
+    /**
      * Get active payment gateway.
      */
     public function gateway(Request $request)
@@ -134,6 +158,7 @@ class PaymentController extends BaseController
             'gateway' => $gateway,
             'is_flutterwave' => $gateway === 'flutterwave',
             'is_paystack' => $gateway === 'paystack',
+            'is_nomba' => $gateway === 'nomba',
         ]);
     }
 

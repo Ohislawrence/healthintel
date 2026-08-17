@@ -65,6 +65,18 @@ return [
         'base_url' => env('FLUTTERWAVE_BASE_URL', 'https://api.flutterwave.com'),
     ],
 
+    'nomba' => [
+        'base_url' => env('NOMBA_BASE_URL', 'https://api.nomba.com'),
+        'client_id' => env('NOMBA_CLIENT_ID'),
+        'secret_key' => env('NOMBA_SECRET_KEY'),
+        'account_id' => env('NOMBA_PUBLIC_KEY'),
+        'token_path' => env('NOMBA_TOKEN_PATH', '/v1/auth/token/issue'),
+        'initialize_path' => env('NOMBA_INITIALIZE_PATH', '/v1/checkout/order'),
+        'verify_path' => env('NOMBA_VERIFY_PATH', '/v1/checkout/transaction'),
+        'webhook_secret' => env('NOMBA_WEBHOOK_SECRET'),
+        'webhook_header' => env('NOMBA_WEBHOOK_HEADER', 'x-nomba-signature'),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
