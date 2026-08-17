@@ -51,15 +51,15 @@ export default function BMICalculator() {
                     <div>
                         <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-1">Height</p>
                         <div className="flex items-center bg-neutral-50 rounded-xl border border-neutral-200 overflow-hidden">
-                            <input type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder="0" className="flex-1 px-4 py-3 text-lg font-bold text-neutral-900 bg-transparent outline-none" maxLength={5} />
-                            <span className="text-sm font-semibold text-neutral-400 pr-4">cm</span>
+                            <input type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder="0" className="flex-1 min-w-0 px-4 py-3 text-lg font-bold text-neutral-900 bg-transparent outline-none" maxLength={5} />
+                            <span className="shrink-0 text-sm font-semibold text-neutral-400 pr-4">cm</span>
                         </div>
                     </div>
                     <div>
                         <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-1">Weight</p>
                         <div className="flex items-center bg-neutral-50 rounded-xl border border-neutral-200 overflow-hidden">
-                            <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="0" className="flex-1 px-4 py-3 text-lg font-bold text-neutral-900 bg-transparent outline-none" maxLength={5} />
-                            <span className="text-sm font-semibold text-neutral-400 pr-4">kg</span>
+                            <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="0" className="flex-1 min-w-0 px-4 py-3 text-lg font-bold text-neutral-900 bg-transparent outline-none" maxLength={5} />
+                            <span className="shrink-0 text-sm font-semibold text-neutral-400 pr-4">kg</span>
                         </div>
                     </div>
                 </div>

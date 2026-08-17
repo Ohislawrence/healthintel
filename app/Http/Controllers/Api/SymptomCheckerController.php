@@ -73,12 +73,19 @@ class SymptomCheckerController extends BaseController
     public function check(Request $request)
     {
         $validated = $request->validate([
-            'symptoms' => 'required|array|min:1',
+            'symptoms' => 'nullable|array',
             'symptoms.*' => 'required|string|exists:symptoms,slug',
             'patient_context' => 'nullable|string|max:500',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
         ]);
+
+        $symptoms = $validated['symptoms'] ?? [];
+        $patientContext = isset($validated['patient_context']) ? trim($validated['patient_context']) : '';
+
+        if (empty($symptoms) && $patientContext === '') {
+            return $this->error('Please describe your symptoms or select at least one symptom.', 422);
+        }
 
         $user = $request->user();
         $cost = config('credits.costs.symptom_check', 1);
@@ -87,25 +94,40 @@ class SymptomCheckerController extends BaseController
             return $this->error('Insufficient credits. Please top up.', 402);
         }
 
-        $selected = Symptom::whereIn('slug', $validated['symptoms'])->get();
+        $selected = !empty($symptoms)
+            ? Symptom::whereIn('slug', $symptoms)->get()
+            : collect();
 
         // Get matching test panels with health-profile boosting
-        $panelIds = DB::table('symptom_test_panels')
-            ->whereIn('symptom_id', $selected->pluck('id'))
-            ->select('test_panel_id', DB::raw('SUM(relevance_score) as total_relevance'))
-            ->groupBy('test_panel_id')
-            ->orderByDesc('total_relevance')
-            ->pluck('test_panel_id');
+        if ($selected->isNotEmpty()) {
+            $panelIds = DB::table('symptom_test_panels')
+                ->whereIn('symptom_id', $selected->pluck('id'))
+                ->select('test_panel_id', DB::raw('SUM(relevance_score) as total_relevance'))
+                ->groupBy('test_panel_id')
+                ->orderByDesc('total_relevance')
+                ->pluck('test_panel_id');
 
-        $panels = TestPanel::whereIn('id', $panelIds)
-            ->where('is_active', true)
-            ->get()
-            ->map(function($p) use ($panelIds) {
-                $p->base_rank = array_search($p->id, $panelIds->toArray());
-                return $p;
-            })
-            ->sortBy(fn($p) => array_search($p->id, $panelIds->toArray()))
-            ->values();
+            $panels = TestPanel::whereIn('id', $panelIds)
+                ->where('is_active', true)
+                ->get()
+                ->map(function($p) use ($panelIds) {
+                    $p->base_rank = array_search($p->id, $panelIds->toArray());
+                    return $p;
+                })
+                ->sortBy(fn($p) => array_search($p->id, $panelIds->toArray()))
+                ->values();
+        } else {
+            // Text-only submission: expose the full active catalog so the AI
+            // can still recommend relevant panels by name.
+            $panels = TestPanel::where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->map(function($p) {
+                    $p->base_rank = null;
+                    return $p;
+                })
+                ->values();
+        }
 
         // ── Personalized ranking boost by health profile ──
         $profile = $user->healthProfile;
@@ -155,14 +177,18 @@ class SymptomCheckerController extends BaseController
         }
 
         // Build context from health profile
-        $context = $validated['patient_context'] ?? $this->buildContextFromProfile($user);
+        $context = $patientContext !== '' ? $patientContext : $this->buildContextFromProfile($user);
 
         // Build prompt with panel names for AI to reference
         $panelNames = $panels->pluck('name')->implode(', ');
         $symptomNames = $selected->pluck('name')->implode(', ');
 
-        $prompt = "Patient symptoms: {$symptomNames}\n";
-        $prompt .= "Patient context: {$context}\n";
+        if ($symptomNames !== '') {
+            $prompt = "Patient symptoms: {$symptomNames}\n";
+            $prompt .= "Patient context: {$context}\n";
+        } else {
+            $prompt = "Patient's description of their symptoms: {$context}\n";
+        }
         $prompt .= "Available relevant test panels: {$panelNames}\n\n";
         $prompt .= "Based on the symptoms and patient context above, provide:\n";
         $prompt .= "1. A brief, plain-language explanation of what these symptoms MIGHT indicate (never diagnose)\n";

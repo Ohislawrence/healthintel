@@ -1,7 +1,7 @@
 import './bootstrap';
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import useAuthStore from './stores/authStore';
 import usePartnerAuthStore from './stores/partnerAuthStore';
@@ -231,6 +231,16 @@ function PWALifecycle() {
     );
 }
 
+function ScrollToTop() {
+    const { pathname } = useLocation();
+
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, [pathname]);
+
+    return null;
+}
+
 function App() {
     const fetchUser = useAuthStore((s) => s.fetchUser);
 
@@ -247,6 +257,7 @@ function App() {
     return (
         <QueryClientProvider client={queryClient}>
             <BrowserRouter future={{ v7_relativeSplatPath: true }}>
+                <ScrollToTop />
                 <PWALifecycle />
                 <Routes>
                     <Route path="/" element={<PwaEntry />} />

@@ -15,6 +15,7 @@ export default function SymptomChecker() {
     const [result, setResult] = useState(null);
     const [showSymptoms, setShowSymptoms] = useState(true);
     const [checkCompleted, setCheckCompleted] = useState(false);
+    const [notice, setNotice] = useState('');
 
     const { data } = useQuery({
         queryKey: ['symptoms'],
@@ -32,10 +33,13 @@ export default function SymptomChecker() {
             setResult(res.data);
             setShowSymptoms(false);
             setCheckCompleted(true);
+            setNotice('');
             await fetchUser();
         },
         onError: (err) => {
-            alert(err?.message || 'Check failed. Please try again.');
+            const msg = err?.message || 'Check failed. Please try again.';
+            setNotice(msg);
+            alert(msg);
         },
     });
 
@@ -43,6 +47,7 @@ export default function SymptomChecker() {
         setSelected(prev => prev.includes(slug) ? prev.filter(s => s !== slug) : [...prev, slug]);
         setResult(null);
         setCheckCompleted(false);
+        setNotice('');
     };
 
     const filteredCategories = search
@@ -54,7 +59,11 @@ export default function SymptomChecker() {
         : symptomsData;
 
     const handleCheck = () => {
-        if (selected.length === 0 && !description.trim()) return;
+        if (selected.length === 0 && !description.trim()) {
+            setNotice('Please describe your symptoms or select at least one symptom to analyze.');
+            return;
+        }
+        setNotice('');
         checkMutation.mutate({
             symptoms: selected,
             patient_context: description.trim() || undefined,
@@ -67,6 +76,7 @@ export default function SymptomChecker() {
         setResult(null);
         setShowSymptoms(true);
         setCheckCompleted(false);
+        setNotice('');
     };
 
     // ── Show Results (matching mobile SymptomCheckerScreen result view) ──
@@ -174,7 +184,7 @@ export default function SymptomChecker() {
                             </div>
                             <div className="space-y-2">
                                 {tools.map((tool) => (
-                                        <Link
+                                    <Link
                                         key={tool.title}
                                         to={tool.to}
                                         className="flex items-center gap-3 bg-neutral-50 rounded-xl p-3 hover:bg-neutral-100 transition-colors"
@@ -217,6 +227,14 @@ export default function SymptomChecker() {
                 <p className="text-2xl font-extrabold text-neutral-900 tracking-tight">Symptom Checker</p>
                 <p className="text-sm font-medium text-neutral-500 mt-0.5">Describe your symptoms for AI-powered guidance</p>
             </div>
+
+            {/* Validation / error notice */}
+            {notice && (
+                <div className="card p-3 bg-amber-50 border-amber-200 flex items-start gap-2">
+                    <span className="text-base text-amber-500 mt-0.5">⚠</span>
+                    <p className="text-sm text-amber-700">{notice}</p>
+                </div>
+            )}
 
             {/* Description Input */}
             <div className="card p-4">
@@ -302,7 +320,7 @@ export default function SymptomChecker() {
         <div className="md:hidden fixed bottom-24 left-0 right-0 px-4 z-40">
             <button
                 onClick={handleCheck}
-                disabled={checkMutation.isPending || (selected.length === 0 && !description.trim())}
+                disabled={checkMutation.isPending}
                 className="btn btn-primary w-full shadow-lg"
             >
                 {checkMutation.isPending ? (
@@ -319,7 +337,7 @@ export default function SymptomChecker() {
         <div className="hidden md:block max-w-lg mx-auto px-4 pb-4">
             <button
                 onClick={handleCheck}
-                disabled={checkMutation.isPending || (selected.length === 0 && !description.trim())}
+                disabled={checkMutation.isPending}
                 className="btn btn-primary w-full"
             >
                 {checkMutation.isPending ? (
