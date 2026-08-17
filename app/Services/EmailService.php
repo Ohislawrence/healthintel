@@ -219,6 +219,136 @@ class EmailService
     }
 
     /**
+     * Send the credit guide email: what credits are used for + how to buy them.
+     */
+    public function sendCreditGuideEmail(User $user): void
+    {
+        $credits = app(CreditService::class)->getBalance($user);
+
+        // Build the "what credits are for" list from config
+        $usages = [
+            ['name' => 'Lab Test Interpretation', 'credits' => config('credits.costs.lab_interpretation', 2), 'desc' => 'Get a plain-language explanation of your lab panel results.'],
+            ['name' => 'Single Test Interpretation', 'credits' => config('credits.costs.single_test_interpretation', 1), 'desc' => 'Understand one value (e.g. blood sugar) without a full panel.'],
+            ['name' => 'PDF Lab Report Upload', 'credits' => config('credits.costs.pdf_interpretation', 3), 'desc' => 'Snap a photo or upload a PDF and we interpret the whole report.'],
+            ['name' => 'AI Symptom Check', 'credits' => config('credits.costs.symptom_check', 1), 'desc' => 'Get AI-powered guidance on possible causes and recommended tests.'],
+        ];
+
+        // Build the purchase packages list from config
+        $packages = collect(config('credits.packages', []))->values()->map(function ($pkg) {
+            return [
+                'name'    => $pkg['name'] ?? 'Credit Package',
+                'credits' => $pkg['credits'] ?? 0,
+                'naira'   => number_format(($pkg['price_kobo'] ?? 0) / 100),
+            ];
+        })->all();
+
+        $html = $this->buildCreditGuideHtml($user, $credits, $usages, $packages);
+
+        try {
+            Mail::send([], [], function ($message) use ($user, $html) {
+                $message->to($user->email, $user->name)
+                    ->subject('Your HealthIntel credits and how to use them 🎉')
+                    ->html($html);
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send credit guide email to user ' . $user->id . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Build the HTML for the credit guide email.
+     *
+     * @param string[] $usages   list of ['name','credits','desc']
+     * @param array    $packages list of ['name','credits','naira']
+     */
+    private function buildCreditGuideHtml(User $user, int $credits, array $usages, array $packages): string
+    {
+        $usageRows = implode('', array_map(function ($u) {
+            return '<tr>'
+                . '<td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:14px;color:#1B2622;"><strong>' . $this->e($u['name']) . '</strong></td>'
+                . '<td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:13px;color:#57645D;">' . $this->e($u['desc']) . '</td>'
+                . '<td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:13px;color:#0E6B5C;font-weight:700;white-space:nowrap;text-align:right;">' . $u['credits'] . ' credit' . ($u['credits'] == 1 ? '' : 's') . '</td>'
+                . '</tr>';
+        }, $usages));
+
+        $packageRows = implode('', array_map(function ($p) {
+            return '<tr>'
+                . '<td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:14px;color:#1B2622;"><strong>' . $this->e($p['name']) . '</strong></td>'
+                . '<td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:13px;color:#57645D;">' . $p['credits'] . ' credit' . ($p['credits'] == 1 ? '' : 's') . '</td>'
+                . '<td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:13px;color:#0E6B5C;font-weight:700;white-space:nowrap;text-align:right;">₦' . $this->e($p['naira']) . '</td>'
+                . '</tr>';
+        }, $packages));
+
+        $firstName = $this->e($user->name ? explode(' ', $user->name)[0] : 'there');
+        $buyCreditsUrl = config('app.url') . '/credits';
+        $dashboardUrl = config('app.url') . '/dashboard';
+
+        return <<<HTML
+        <!DOCTYPE html>
+        <html lang="en">
+        <head><meta charset="UTF-8"></head>
+        <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#1B2622;background:#F4F6F3;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border-radius:14px;overflow:hidden;border:1px solid #DCE3DE;">
+                <tr>
+                    <td style="padding:32px 28px 24px;background:linear-gradient(135deg,#0E6B5C,#0a5548);">
+                        <h1 style="color:#FFFFFF;margin:0;font-size:22px;">Your credits, explained</h1>
+                        <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Here's what you can do with them — and how to get more.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:28px;">
+                        <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">Hi <strong>{$firstName}</strong>,</p>
+
+                        <table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(14,107,92,0.06);border-radius:10px;margin-bottom:24px;">
+                            <tr>
+                                <td style="padding:16px 20px;text-align:center;">
+                                    <p style="font-size:13px;color:#57645D;margin:0 0 4px;">Your current balance</p>
+                                    <p style="font-size:28px;font-weight:700;color:#0E6B5C;margin:0;line-height:1;">{$credits}</p>
+                                    <p style="font-size:13px;color:#57645D;margin:4px 0 0;">credits</p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <h2 style="font-size:16px;color:#0E6B5C;margin:0 0 12px;">What you can use credits for</h2>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:24px;">
+                            <tr style="background:#F9FAFB;">
+                                <td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:12px;color:#57645D;font-weight:700;">Feature</td>
+                                <td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:12px;color:#57645D;font-weight:700;">What it does</td>
+                                <td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:12px;color:#57645D;font-weight:700;text-align:right;">Cost</td>
+                            </tr>
+                            {$usageRows}
+                        </table>
+
+                        <h2 style="font-size:16px;color:#0E6B5C;margin:0 0 12px;">How to buy more credits</h2>
+                        <p style="font-size:14px;line-height:1.7;color:#57645D;margin:0 0 12px;">Open the app, go to <strong>Credits</strong> (the ◆ icon) and tap <strong>Buy Credits</strong>, or use the button below. Pick a package and pay securely — your credits are added instantly.</p>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:24px;">
+                            <tr style="background:#F9FAFB;">
+                                <td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:12px;color:#57645D;font-weight:700;">Package</td>
+                                <td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:12px;color:#57645D;font-weight:700;">Credits</td>
+                                <td style="padding:10px 12px;border-bottom:1px solid #E8EBE7;font-size:12px;color:#57645D;font-weight:700;text-align:right;">Price</td>
+                            </tr>
+                            {$packageRows}
+                        </table>
+
+                        <p style="margin:0 0 24px;">
+                            <a href="{$buyCreditsUrl}" style="display:inline-block;background:#0E6B5C;color:#FFFFFF;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">Buy Credits →</a>
+                            <a href="{$dashboardUrl}" style="display:inline-block;color:#0E6B5C;padding:14px 16px;text-decoration:none;font-weight:600;font-size:15px;">Go to Dashboard</a>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:16px 28px;background:#F9FAFB;border-top:1px solid #E8EBE7;font-size:12px;color:#9CA3AF;line-height:1.6;">
+                        HealthIntel — Understand your health, in plain language.<br>
+                        This is an automated message sent because you created an account.
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        HTML;
+    }
+
+    /**
      * Build the HTML for the welcome email.
      */
     private function buildWelcomeHtml(User $user, array $featuresList, int $credits): string

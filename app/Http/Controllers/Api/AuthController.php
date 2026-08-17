@@ -107,7 +107,11 @@ class AuthController extends BaseController
         $token = $user->createToken('auth_token')->plainTextToken;
 
         // Send welcome email with features overview and navigation guide
-        app(\App\Services\EmailService::class)->sendWelcomeEmail($user);
+        $emailService = app(\App\Services\EmailService::class);
+        $emailService->sendWelcomeEmail($user);
+
+        // Send credit guide email (what credits are for + how to buy)
+        $emailService->sendCreditGuideEmail($user);
 
         return $this->success([
             'user' => $this->formatUser($user),

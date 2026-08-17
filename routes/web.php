@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [FrontendController::class, 'home'])->name('home');
 Route::get('/offline', fn () => view('app'))->name('offline');
+Route::get('/login', fn () => view('app'))->name('login');
 Route::get('/about', [FrontendController::class, 'about'])->name('about');
 Route::get('/how-it-works', [FrontendController::class, 'howItWorks'])->name('how-it-works');
 Route::get('/features', [FrontendController::class, 'features'])->name('features');
