@@ -8,6 +8,7 @@ export default function PaymentCallback() {
     const { fetchUser } = useAuthStore();
     const [status, setStatus] = useState('verifying');
     const [message, setMessage] = useState('');
+    const [cancelled, setCancelled] = useState(false);
 
     useEffect(() => {
         // Flutterwave uses tx_ref + transaction_id; Paystack uses reference / trxref
@@ -33,8 +34,13 @@ export default function PaymentCallback() {
                 await fetchUser();
                 setStatus('success');
             } catch (err) {
+                const msg = err?.message || '';
+                const isCancelled = /cancell/i.test(msg);
+                setCancelled(isCancelled);
                 setStatus('error');
-                setMessage(err?.message || 'Payment verification failed. If you were debited, credits will be added automatically.');
+                setMessage(msg || (isCancelled
+                    ? 'Your payment was cancelled. No credits were added.'
+                    : 'Payment verification failed. If you were debited, credits will be added automatically.'));
             }
         };
 
@@ -75,8 +81,8 @@ export default function PaymentCallback() {
                     {status === 'error' && (
                         <>
                             <div className="w-16 h-16 rounded-full bg-danger-50 flex items-center justify-center text-2xl text-danger-600 font-bold mx-auto mb-4">✕</div>
-                            <h2 className="text-lg font-bold text-neutral-900">Verification Failed</h2>
-                            <p className="text-sm text-neutral-500 mt-2">{message || 'We could not verify your payment.'}</p>
+                            <h2 className="text-lg font-bold text-neutral-900">{cancelled ? 'Payment Cancelled' : 'Verification Failed'}</h2>
+                            <p className="text-sm text-neutral-500 mt-2">{message || (cancelled ? 'Your payment was cancelled. No credits were added.' : 'We could not verify your payment.')}</p>
                             <div className="mt-5 space-y-2">
                                 <Link to="/credits/buy" className="btn btn-outline w-full">
                                     Try Again

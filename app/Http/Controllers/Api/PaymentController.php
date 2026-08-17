@@ -73,6 +73,14 @@ class PaymentController extends BaseController
             flwTransactionId: $transactionId ? (string) $transactionId : null
         );
 
+        if ($payment->status === 'cancelled') {
+            return $this->error('Payment was cancelled. No credits were added.', 422);
+        }
+
+        if ($payment->status !== 'success') {
+            return $this->error('Payment verification failed. No credits were added.', 422);
+        }
+
         return $this->success([
             'payment' => $payment,
             'credits' => $this->creditService->getBalance($request->user()),

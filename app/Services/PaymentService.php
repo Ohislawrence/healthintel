@@ -90,6 +90,7 @@ class PaymentService
 
             // Amount and Currency validation
             $isSuccess = false;
+            $wasCancelled = false;
             
             if ($payment->provider === 'flutterwave') {
                 $flwData = $result['data'] ?? [];
@@ -104,6 +105,8 @@ class PaymentService
                 $expectedAmount = $payment->amount_kobo / 100;
                 $expectedCurrency = strtoupper($payment->currency);
 
+                $wasCancelled = $txStatus === 'cancelled';
+
                 if ($txStatus === null || $chargedAmount <= 0) {
                     // Verification response is missing required fields — do NOT credit
                     $isSuccess = false;
@@ -113,7 +116,9 @@ class PaymentService
                         && $chargedCurrency === $expectedCurrency;
                 }
             } else {
-                $isSuccess = ($result['data']['status'] ?? null) === 'success';
+                $paystackStatus = $result['data']['status'] ?? null;
+                $wasCancelled = in_array($paystackStatus, ['cancelled', 'abandoned'], true);
+                $isSuccess = $paystackStatus === 'success';
             }
 
             if ($isSuccess) {
@@ -123,7 +128,7 @@ class PaymentService
 
                 $this->grantCreditsForPayment($payment);
             } else {
-                $payment->status = 'failed';
+                $payment->status = $wasCancelled ? 'cancelled' : 'failed';
                 $payment->save();
             }
 
