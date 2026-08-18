@@ -275,60 +275,19 @@ class WebPushService
      */
     public static function generateVapidKeys(): array
     {
-        if (function_exists('sodium_crypto_box_keypair')) {
-            $keypair = sodium_crypto_box_keypair();
-            $publicKey = sodium_crypto_box_publickey($keypair);
-            $privateKey = sodium_crypto_box_secretkey($keypair);
+        // VAPID requires a P-256 ECDSA keypair. The hand-rolled sodium (X25519)
+        // and OpenSSL "last 32 bytes of DER" approaches below produced invalid
+        // keys, so delegate to the web-push library's correct implementation
+        // (it derives `d`, `x`, `y` from OpenSSL via JWKFactory).
+        if (class_exists(\Minishlink\WebPush\VAPID::class)) {
+            $keys = \Minishlink\WebPush\VAPID::createVapidKeys();
 
             return [
-                'publicKey' => self::base64urlEncode($publicKey),
-                'privateKey' => self::base64urlEncode($privateKey),
+                'publicKey' => $keys['publicKey'],
+                'privateKey' => $keys['privateKey'],
             ];
         }
 
-        // Fallback for environments without sodium
-        $config = [
-            'curve_name' => 'prime256v1',
-            'private_key_type' => OPENSSL_KEYTYPE_EC,
-        ];
-
-        $key = openssl_pkey_new($config);
-
-        if (!$key) {
-            throw new \RuntimeException('Failed to generate VAPID keys. Ensure openssl or sodium extension is available.');
-        }
-
-        $details = openssl_pkey_get_details($key);
-
-        // P-256 public key is 65 bytes (0x04 || X || Y)
-        $publicKey = substr($details['key'], 0, 65); // Just get the raw EC point
-
-        openssl_pkey_export($key, $privateKeyString);
-
-        // Extract raw private key from PEM
-        $privateKeyRaw = self::extractRawPrivateKey($privateKeyString);
-
-        return [
-            'publicKey' => self::base64urlEncode($publicKey),
-            'privateKey' => self::base64urlEncode($privateKeyRaw),
-        ];
-    }
-
-    private static function base64urlEncode(string $data): string
-    {
-        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
-    }
-
-    private static function extractRawPrivateKey(string $pemKey): string
-    {
-        // Remove PEM headers and decode
-        $pemKey = str_replace(['-----BEGIN PRIVATE KEY-----', '-----END PRIVATE KEY-----', "\n", "\r"], '', $pemKey);
-        $der = base64_decode($pemKey);
-
-        // For P-256, the raw private key is the last 32 bytes of the DER structure
-        // This is a simplified extraction — in production, use a proper ASN.1 parser
-        // or rely on the minishlink/web-push library instead.
-        $privateKeyLength = 32;
-        return substr($der, -$privateKeyLength);
+        throw new \RuntimeException('Unable to generate VAPID keys: minishlink/web-push is not installed.');
     }
 }
