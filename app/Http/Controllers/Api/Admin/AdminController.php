@@ -1127,6 +1127,15 @@ class AdminController extends BaseController
         ]);
     }
 
+    // ── AI Analyzer (DeepSeek-powered growth & marketing insights) ──
+
+    public function aiAnalyzer()
+    {
+        $result = app(\App\Services\AiAnalyzerService::class)->analyze();
+
+        return $this->success($result, 'AI analysis generated');
+    }
+
     // ── Notifications ──
 
     public function notifications()

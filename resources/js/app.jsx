@@ -75,6 +75,7 @@ import AdminCreditPackages from './screens/admin/AdminCreditPackages';
 import AdminUsers from './screens/admin/AdminUsers';
 import AdminUserDetail from './screens/admin/AdminUserDetail';
 import AdminAnalytics from './screens/admin/AdminAnalytics';
+import AdminAiAnalyzer from './screens/admin/AdminAiAnalyzer';
 import AdminAppointments from './screens/admin/AdminAppointments';
 import AdminFeedback from './screens/admin/AdminFeedback';
 import AdminSubmissions from './screens/admin/AdminSubmissions';
@@ -309,6 +310,7 @@ function App() {
                     <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
                         <Route index element={<AdminDashboard />} />
                         <Route path="analytics" element={<AdminAnalytics />} />
+                        <Route path="ai-analyzer" element={<AdminAiAnalyzer />} />
                         <Route path="users" element={<AdminUsers />} />
                         <Route path="users/:id" element={<AdminUserDetail />} />
                         <Route path="appointments" element={<AdminAppointments />} />

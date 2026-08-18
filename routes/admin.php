@@ -13,6 +13,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // Analytics
     Route::get('/analytics', [AdminController::class, 'analytics']);
 
+    // AI Analyzer (DeepSeek-powered growth/marketing insights)
+    Route::get('/ai-analyzer', [AdminController::class, 'aiAnalyzer']);
+
     // Test Panels
     Route::get('/panels', [AdminController::class, 'panels']);
     Route::get('/panels/{slug}', [AdminController::class, 'panelShow']);

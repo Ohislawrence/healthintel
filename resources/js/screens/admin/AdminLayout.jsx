@@ -8,6 +8,7 @@ export default function AdminLayout() {
     const links = [
         { to: '/admin', label: 'Dashboard', icon: '📊' },
         { to: '/admin/analytics', label: 'Analytics', icon: '📈' },
+        { to: '/admin/ai-analyzer', label: 'AI Analyzer', icon: '🤖' },
         { to: '/admin/users', label: 'Users', icon: '👥' },
         { to: '/admin/appointments', label: 'Appointments', icon: '📅' },
         { to: '/admin/feedback', label: 'Feedback', icon: '💬' },
