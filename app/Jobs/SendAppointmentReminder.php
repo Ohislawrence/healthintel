@@ -51,6 +51,8 @@ class SendAppointmentReminder implements ShouldQueue
                 'url' => '/health-tools/appointments',
                 'tag' => "appointment-{$appointment->id}",
                 'requireInteraction' => true,
+                'in_app' => true,
+                'in_app_type' => 'appointment',
             ]
         );
 

@@ -31,6 +31,8 @@ class SendImmunizationReminder implements ShouldQueue
                 'url' => '/health-tools/immunization',
                 'tag' => 'immunization-' . $this->childName,
                 'requireInteraction' => true,
+                'in_app' => true,
+                'in_app_type' => 'immunization',
             ]
         );
     }

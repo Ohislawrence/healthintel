@@ -32,6 +32,8 @@ class SendMedicationReminder implements ShouldQueue
                 'url' => '/health-tools/medication',
                 'tag' => 'medication-' . $this->name,
                 'requireInteraction' => true,
+                'in_app' => true,
+                'in_app_type' => 'medication',
             ]
         );
     }

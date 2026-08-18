@@ -115,6 +115,8 @@ class SendReminderNotifications extends Command
                             'url' => '/health-tools',
                             'tag' => 'health-tracker-reminder',
                             'requireInteraction' => false,
+                            'in_app' => true,
+                            'in_app_type' => 'health_update',
                         ]
                     );
                     $trackerReminders++;

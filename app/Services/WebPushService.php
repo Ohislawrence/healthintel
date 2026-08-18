@@ -45,6 +45,13 @@ class WebPushService
      */
     public function sendToUser(int $userId, string $title, string $body, array $options = []): array
     {
+        // Also persist an in-app notification (shown in the bell dropdown)
+        // when requested, so reminders aren't lost if the browser push is
+        // missed. Best-effort: a failure here must not block the push.
+        if (!empty($options['in_app'])) {
+            $this->recordInAppNotification($userId, $title, $body, $options);
+        }
+
         $subscriptions = PushSubscription::where('user_id', $userId)
             ->where('is_active', true)
             ->get();
@@ -115,6 +122,28 @@ class WebPushService
         ]);
 
         return compact('sent', 'failed');
+    }
+
+    /**
+     * Persist an in-app notification row for the user.
+     */
+    private function recordInAppNotification(int $userId, string $title, string $body, array $options = []): void
+    {
+        try {
+            \App\Models\UserNotification::create([
+                'user_id' => $userId,
+                'type' => $options['in_app_type'] ?? 'reminder',
+                'title' => $title,
+                'body' => $body,
+                'data' => $options['data'] ?? null,
+                'action_url' => $options['url'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('WebPush: Failed to record in-app notification', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
