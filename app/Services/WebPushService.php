@@ -216,7 +216,7 @@ class WebPushService
                         return true;
                     }
 
-                    if ($report->isSubscriptionExpired()) {
+                    if ($report->isSubscriptionExpired() || $this->isDeadSubscription($report->getReason())) {
                         $subscription->update(['is_active' => false]);
                         return false;
                     }
@@ -250,8 +250,20 @@ class WebPushService
      */
     private function isDeadSubscription(string $reason): bool
     {
-        return str_contains($reason, '403')
-            && str_contains($reason, 'VAPID');
+        // VAPID key mismatch (FCM responds 403 when the subscription was
+        // created under a different application-server key).
+        if (str_contains($reason, '403') && str_contains($reason, 'VAPID')) {
+            return true;
+        }
+
+        // A 401 means the channel/token is no longer authorised — e.g. an
+        // expired Windows WNS channel URI, or a revoked subscription. These
+        // will never succeed again, so retire them.
+        if (str_contains($reason, '401')) {
+            return true;
+        }
+
+        return false;
     }
 
     private function sendRaw(PushSubscription $subscription, array $payload): bool
