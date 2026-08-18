@@ -691,7 +691,8 @@ class AdminController extends BaseController
 
         // Send congratulatory email to the user
         $creditsText = $validated['credits'] . ' ' . \Illuminate\Support\Str::plural('credit', $validated['credits']);
-        $reasonText = !empty($validated['reason']) ? e($validated['reason']) : 'to help you get the most out of HealthIntel';
+        $hasReason = !empty($validated['reason']);
+        $reasonText = $hasReason ? e($validated['reason']) : 'to help you get the most out of HealthIntel';
         $appUrl = config('app.url');
 
         $plainText = "Hi " . $user->name . ",\n\n"
@@ -702,7 +703,7 @@ class AdminController extends BaseController
             . "The HealthIntel Team";
 
         try {
-            \Mail::send([], [], function ($message) use ($user, $plainText, $creditsText, $reasonText, $newBalance, $appUrl) {
+            \Mail::send([], [], function ($message) use ($user, $plainText, $creditsText, $reasonText, $hasReason, $newBalance, $appUrl) {
                 $message->to($user->email, $user->name)
                     ->subject($creditsText . ' added to your HealthIntel account')
                     ->text($plainText)
@@ -713,7 +714,7 @@ class AdminController extends BaseController
                             . '<tr><td style="padding: 32px 28px 24px;">'
                                 . '<p style="font-size: 14px; color: #57645D; margin: 0 0 8px;">Hello ' . e($user->name) . ',</p>'
                                 . '<p style="font-size: 16px; line-height: 1.6; color: #1B2622; margin: 0 0 24px;">'
-                                    . 'We wanted to let you know that <strong>' . e($creditsText) . '</strong> ' . ($validated['reason'] ? 'have been added to your account ' . e($reasonText) : 'have been added to your account.') . '</p>'
+                                    . 'We wanted to let you know that <strong>' . e($creditsText) . '</strong> ' . ($hasReason ? 'have been added manually to your account.' : 'have been added to your account.') . '</p>'
                                 . '<table width="100%" cellpadding="0" cellspacing="0" style="background: rgba(14,107,92,0.06); border-radius: 10px; margin-bottom: 24px;">'
                                     . '<tr><td style="padding: 20px 24px; text-align: center;">'
                                         . '<p style="font-size: 13px; color: #57645D; margin: 0 0 4px;">Your new balance</p>'
