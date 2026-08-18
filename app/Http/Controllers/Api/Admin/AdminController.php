@@ -1131,9 +1131,40 @@ class AdminController extends BaseController
 
     public function aiAnalyzer()
     {
-        $result = app(\App\Services\AiAnalyzerService::class)->analyze();
+        $service = app(\App\Services\AiAnalyzerService::class);
 
-        return $this->success($result, 'AI analysis generated');
+        $result = $service->analyze(request()->user()->id);
+
+        return $this->success($result, 'AI analysis generated and saved');
+    }
+
+    public function aiAnalyzerLatest()
+    {
+        $service = app(\App\Services\AiAnalyzerService::class);
+        $report = $service->latest();
+
+        if (!$report) {
+            return $this->success(null, 'No saved analysis yet');
+        }
+
+        return $this->success($report->toPayload(), 'Latest saved analysis');
+    }
+
+    public function aiAnalyzerHistory()
+    {
+        $reports = \App\Models\AiAnalyzerReport::with('admin:id,name')
+            ->latest()
+            ->take(20)
+            ->get()
+            ->map(fn($r) => [
+                'id' => $r->id,
+                'admin_name' => $r->admin?->name ?? null,
+                'ai_available' => $r->ai_available,
+                'ai_error' => $r->ai_error,
+                'generated_at' => $r->created_at?->toISOString(),
+            ]);
+
+        return $this->success(['history' => $reports], 'Analysis history');
     }
 
     // ── Notifications ──

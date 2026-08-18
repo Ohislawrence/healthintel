@@ -15,6 +15,8 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // AI Analyzer (DeepSeek-powered growth/marketing insights)
     Route::get('/ai-analyzer', [AdminController::class, 'aiAnalyzer']);
+    Route::get('/ai-analyzer/latest', [AdminController::class, 'aiAnalyzerLatest']);
+    Route::get('/ai-analyzer/history', [AdminController::class, 'aiAnalyzerHistory']);
 
     // Test Panels
     Route::get('/panels', [AdminController::class, 'panels']);

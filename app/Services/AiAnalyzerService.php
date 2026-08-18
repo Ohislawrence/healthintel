@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AiAnalyzerReport;
 use App\Models\AiInterpretation;
 use App\Models\Appointment;
 use App\Models\HealthProfile;
@@ -171,9 +172,9 @@ class AiAnalyzerService
     }
 
     /**
-     * Run the AI analysis and return structured recommendations.
+     * Run the AI analysis, persist it, and return structured recommendations.
      */
-    public function analyze(): array
+    public function analyze(?int $adminId = null): array
     {
         $metrics = $this->metrics();
 
@@ -181,13 +182,23 @@ class AiAnalyzerService
 
         $analysis = $this->parseAnalysis($raw);
 
-        return [
+        $report = AiAnalyzerReport::create([
+            'admin_id' => $adminId,
             'metrics' => $metrics,
             'analysis' => $analysis,
             'ai_available' => !empty($raw),
             'ai_error' => $error,
-            'generated_at' => now()->toISOString(),
-        ];
+        ]);
+
+        return $report->toPayload();
+    }
+
+    /**
+     * Return the most recently saved analysis report (if any).
+     */
+    public function latest(): ?AiAnalyzerReport
+    {
+        return AiAnalyzerReport::latest()->first();
     }
 
     /**

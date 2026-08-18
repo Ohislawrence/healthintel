@@ -1,21 +1,46 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
 
 export default function AdminAiAnalyzer() {
     const [copiedIndex, setCopiedIndex] = useState(null);
-    const [hasRun, setHasRun] = useState(false);
+    const queryClient = useQueryClient();
+    const [generating, setGenerating] = useState(false);
+    const [generateError, setGenerateError] = useState(null);
 
-    // enabled:false — no auto-run. The analysis only triggers on button click.
-    const { data, isFetching, refetch, error } = useQuery({
-        queryKey: ['admin-ai-analyzer'],
-        queryFn: () => api.get('/admin/ai-analyzer'),
-        enabled: false,
-        staleTime: 0,
-        retry: 0,
+    // Load the latest saved report on mount (so reports persist across reloads).
+    const latestQuery = useQuery({
+        queryKey: ['admin-ai-analyzer-latest'],
+        queryFn: () => api.get('/admin/ai-analyzer/latest'),
+        staleTime: 1000 * 60 * 5,
     });
 
-    const payload = data?.data || {};
+    const historyQuery = useQuery({
+        queryKey: ['admin-ai-analyzer-history'],
+        queryFn: () => api.get('/admin/ai-analyzer/history'),
+        staleTime: 1000 * 60 * 5,
+    });
+
+    const generateMutation = useMutation({
+        mutationFn: () => api.get('/admin/ai-analyzer'),
+        onSuccess: () => {
+            setGenerateError(null);
+            // Invalidate so the latest + history refresh automatically.
+            queryClient.invalidateQueries({ queryKey: ['admin-ai-analyzer-latest'] });
+            queryClient.invalidateQueries({ queryKey: ['admin-ai-analyzer-history'] });
+        },
+        onError: (err) => {
+            setGenerateError(err?.message || 'Generation failed');
+        },
+        onSettled: () => setGenerating(false),
+    });
+
+    // Determine current payload: the freshly generated one (if any) or the latest saved one.
+    const generatedPayload = generateMutation.data?.data;
+    const latestPayload = latestQuery.data?.data;
+    const payload = generatedPayload || latestPayload || {};
+    const hasSavedReport = latestPayload && latestPayload.generated_at;
+
     const analysis = payload.analysis || {};
     const aiAvailable = payload.ai_available;
     const aiError = payload.ai_error;
@@ -26,9 +51,12 @@ export default function AdminAiAnalyzer() {
     const channels = Array.isArray(analysis.channels) ? analysis.channels : [];
     const quickWins = Array.isArray(analysis.quick_wins) ? analysis.quick_wins : [];
 
-    const runAnalysis = async () => {
-        setHasRun(true);
-        await refetch();
+    const history = historyQuery.data?.data?.history || [];
+
+    const runAnalysis = () => {
+        setGenerateError(null);
+        setGenerating(true);
+        generateMutation.mutate();
     };
 
     const copyEmail = async (email, index) => {
@@ -42,26 +70,18 @@ export default function AdminAiAnalyzer() {
         }
     };
 
-    // Initial state: nothing run yet
-    if (!hasRun) {
+    // ── No report yet ──
+    if (!generating && !payload.generated_at && !latestQuery.isFetching && !hasSavedReport) {
         return (
             <div className="space-y-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h2 className="text-xl font-semibold text-gray-900">🤖 AI Growth Analyzer</h2>
-                        <p className="text-sm text-gray-500">
-                            DeepSeek-powered recommendations based on your live platform analytics.
-                        </p>
-                    </div>
-                </div>
+                <Header />
                 <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-teal-50 text-3xl">
-                        🤖
-                    </div>
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-teal-50 text-3xl">🤖</div>
                     <h3 className="text-lg font-semibold text-gray-900">Analyze your platform</h3>
                     <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
                         The AI will review your user growth, revenue, engagement, referrals and provider data, then
                         suggest marketing emails, retention tactics, user-acquisition ideas, and communication channels.
+                        Each report is saved so you can revisit it.
                     </p>
                     <button
                         onClick={runAnalysis}
@@ -74,22 +94,13 @@ export default function AdminAiAnalyzer() {
         );
     }
 
-    // Loading state
-    if (isFetching) {
+    // ── Generating state ──
+    if (generating) {
         return (
             <div className="space-y-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h2 className="text-xl font-semibold text-gray-900">🤖 AI Growth Analyzer</h2>
-                        <p className="text-sm text-gray-500">
-                            DeepSeek-powered recommendations based on your live platform analytics.
-                        </p>
-                    </div>
-                </div>
+                <Header />
                 <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-teal-50 text-3xl">
-                        🤖
-                    </div>
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-teal-50 text-3xl">🤖</div>
                     <h3 className="text-lg font-semibold text-gray-900">Analyzing your platform data…</h3>
                     <p className="mt-2 text-sm text-gray-500">
                         The AI is reviewing your metrics and drafting recommendations. This can take up to a minute.
@@ -100,18 +111,14 @@ export default function AdminAiAnalyzer() {
         );
     }
 
-    // Error state (network/HTTP failure)
-    if (error) {
+    // ── Generate error state ──
+    if (generateError) {
         return (
             <div className="space-y-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h2 className="text-xl font-semibold text-gray-900">🤖 AI Growth Analyzer</h2>
-                    </div>
-                </div>
+                <Header />
                 <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
-                    <p className="text-base font-semibold text-red-700">Failed to load AI analysis</p>
-                    <p className="mt-2 text-sm text-red-600">{error.message}</p>
+                    <p className="text-base font-semibold text-red-700">Failed to generate analysis</p>
+                    <p className="mt-2 text-sm text-red-600">{generateError}</p>
                     <button
                         onClick={runAnalysis}
                         className="mt-6 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
@@ -123,32 +130,9 @@ export default function AdminAiAnalyzer() {
         );
     }
 
-    // AI unavailable (DeepSeek error detail from backend)
-    if (!aiAvailable && analysis.summary) {
-        return (
-            <div className="space-y-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h2 className="text-xl font-semibold text-gray-900">🤖 AI Growth Analyzer</h2>
-                    </div>
-                </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
-                    <p className="text-base font-semibold text-amber-800">The AI could not be reached</p>
-                    {aiError && <p className="mt-2 text-sm text-amber-700">{aiError}</p>}
-                    <button
-                        onClick={runAnalysis}
-                        className="mt-6 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
-                    >
-                        Try Again
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
+    // ── Report view ──
     return (
         <div className="space-y-6">
-            {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 className="text-xl font-semibold text-gray-900">🤖 AI Growth Analyzer</h2>
@@ -158,31 +142,40 @@ export default function AdminAiAnalyzer() {
                 </div>
                 <button
                     onClick={runAnalysis}
-                    disabled={isFetching}
+                    disabled={generating}
                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
                 >
-                    {isFetching ? 'Analyzing…' : 'Refresh Analysis'}
+                    {generating ? 'Analyzing…' : '⚡ Generate New Analysis'}
                 </button>
             </div>
 
+            {/* AI unavailable banner */}
+            {!aiAvailable && analysis.summary && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    ⚠️ {aiError || 'The AI could not be reached.'}
+                </div>
+            )}
+
+            {/* Saved indicator */}
+            {payload.generated_at && (
+                <div className="rounded-lg bg-teal-50 px-4 py-2 text-xs text-teal-700">
+                    💾 Saved report · generated {new Date(payload.generated_at).toLocaleString()}
+                </div>
+            )}
+
             {/* Executive Summary */}
             {analysis.summary && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <section className="rounded-xl border border-gray-200 bg-white p-5">
                     <h3 className="font-semibold text-gray-900 mb-3">📋 Executive Summary</h3>
                     <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">{analysis.summary}</p>
-                    {payload.generated_at && (
-                        <p className="mt-3 text-xs text-gray-400">
-                            Generated {new Date(payload.generated_at).toLocaleString()}
-                        </p>
-                    )}
-                </div>
+                </section>
             )}
 
             {/* Quick Wins */}
             {quickWins.length > 0 && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <section className="rounded-xl border border-gray-200 bg-white p-5">
                     <h3 className="font-semibold text-gray-900 mb-4">⚡ Quick Wins This Week</h3>
-                    <ul className="space-y-2">
+                    <ol className="space-y-2">
                         {quickWins.map((win, i) => (
                             <li key={i} className="flex gap-3 text-sm text-gray-700">
                                 <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
@@ -191,13 +184,13 @@ export default function AdminAiAnalyzer() {
                                 <span className="leading-relaxed">{typeof win === 'string' ? win : JSON.stringify(win)}</span>
                             </li>
                         ))}
-                    </ul>
-                </div>
+                    </ol>
+                </section>
             )}
 
             {/* Marketing Emails */}
             {marketingEmails.length > 0 && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <section className="rounded-xl border border-gray-200 bg-white p-5">
                     <h3 className="font-semibold text-gray-900 mb-4">📧 Suggested Marketing Emails</h3>
                     <div className="grid gap-4 lg:grid-cols-2">
                         {marketingEmails.map((email, i) => (
@@ -212,14 +205,10 @@ export default function AdminAiAnalyzer() {
                                     </button>
                                 </div>
                                 {email.goal && (
-                                    <p className="mt-1 text-xs text-gray-500">
-                                        <strong>Goal:</strong> {email.goal}
-                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500"><strong>Goal:</strong> {email.goal}</p>
                                 )}
                                 {email.target_segment && (
-                                    <p className="mt-1 text-xs text-gray-500">
-                                        <strong>Segment:</strong> {email.target_segment}
-                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500"><strong>Segment:</strong> {email.target_segment}</p>
                                 )}
                                 <p className="mt-3 text-sm leading-relaxed text-gray-700">{email.body}</p>
                             </div>
@@ -227,19 +216,16 @@ export default function AdminAiAnalyzer() {
                     </div>
                     <p className="mt-4 text-xs text-gray-400">
                         Tip: Send these via the{' '}
-                        <a href="/admin/emails" className="text-teal-600 underline">
-                            Email Campaigns
-                        </a>{' '}
-                        section.
+                        <a href="/admin/emails" className="text-teal-600 underline">Email Campaigns</a> section.
                     </p>
-                </div>
+                </section>
             )}
 
             {/* Encourage Usage */}
             {encourageUsage.length > 0 && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <section className="rounded-xl border border-gray-200 bg-white p-5">
                     <h3 className="font-semibold text-gray-900 mb-4">🔁 Ways to Encourage Usage</h3>
-                    <ul className="space-y-2">
+                    <ol className="space-y-2">
                         {encourageUsage.map((item, i) => (
                             <li key={i} className="flex gap-3 text-sm text-gray-700">
                                 <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
@@ -248,15 +234,15 @@ export default function AdminAiAnalyzer() {
                                 <span className="leading-relaxed">{typeof item === 'string' ? item : JSON.stringify(item)}</span>
                             </li>
                         ))}
-                    </ul>
-                </div>
+                    </ol>
+                </section>
             )}
 
             {/* Grow Users */}
             {growUsers.length > 0 && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <section className="rounded-xl border border-gray-200 bg-white p-5">
                     <h3 className="font-semibold text-gray-900 mb-4">🚀 How to Get More Users</h3>
-                    <ul className="space-y-2">
+                    <ol className="space-y-2">
                         {growUsers.map((item, i) => (
                             <li key={i} className="flex gap-3 text-sm text-gray-700">
                                 <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">
@@ -265,33 +251,60 @@ export default function AdminAiAnalyzer() {
                                 <span className="leading-relaxed">{typeof item === 'string' ? item : JSON.stringify(item)}</span>
                             </li>
                         ))}
-                    </ul>
-                </div>
+                    </ol>
+                </section>
             )}
 
             {/* Communication Channels */}
             {channels.length > 0 && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <section className="rounded-xl border border-gray-200 bg-white p-5">
                     <h3 className="font-semibold text-gray-900 mb-4">📡 Communication Channels</h3>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {channels.map((ch, i) => (
                             <div key={i} className="rounded-lg border border-gray-100 bg-gray-50 p-4">
                                 <h4 className="text-sm font-semibold text-gray-900 capitalize">{ch.channel}</h4>
                                 {ch.strategy && (
-                                    <p className="mt-2 text-xs leading-relaxed text-gray-600">
-                                        <strong>Strategy:</strong> {ch.strategy}
-                                    </p>
+                                    <p className="mt-2 text-xs leading-relaxed text-gray-600"><strong>Strategy:</strong> {ch.strategy}</p>
                                 )}
                                 {ch.why && (
-                                    <p className="mt-2 text-xs leading-relaxed text-gray-500">
-                                        <strong>Why:</strong> {ch.why}
-                                    </p>
+                                    <p className="mt-2 text-xs leading-relaxed text-gray-500"><strong>Why:</strong> {ch.why}</p>
                                 )}
                             </div>
                         ))}
                     </div>
-                </div>
+                </section>
             )}
+
+            {/* History */}
+            {history.length > 0 && (
+                <section className="rounded-xl border border-gray-200 bg-white p-5">
+                    <h3 className="font-semibold text-gray-900 mb-4">🗂️ Previous Reports</h3>
+                    <ul className="divide-y divide-gray-100">
+                        {history.map((h) => (
+                            <li key={h.id} className="flex items-center justify-between py-2 text-sm">
+                                <span className="text-gray-600">
+                                    {h.admin_name ? `by ${h.admin_name} · ` : ''}
+                                    {new Date(h.generated_at).toLocaleString()}
+                                </span>
+                                <span className={`text-xs font-medium ${h.ai_available ? 'text-teal-600' : 'text-amber-600'}`}>
+                                    {h.ai_available ? '✓ successful' : '⚠️ ' + h.ai_error}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
+        </div>
+    );
+}
+
+function Header() {
+    return (
+        <div>
+            <h2 className="text-xl font-semibold text-gray-900">🤖 AI Growth Analyzer</h2>
+            <p className="text-sm text-gray-500">
+                DeepSeek-powered recommendations based on your live platform analytics.
+            </p>
         </div>
     );
 }
