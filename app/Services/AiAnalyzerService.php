@@ -214,44 +214,69 @@ class AiAnalyzerService
             . "Analyze the data and return ONLY a valid JSON object following the schema in your instructions. "
             . "Do not include markdown code fences, commentary, or trailing commas.";
 
-        try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $apiKey,
-                'Content-Type' => 'application/json',
-            ])->timeout(120)->post($baseUrl . '/v1/chat/completions', [
-                'model' => $model,
-                'messages' => [
-                    ['role' => 'system', 'content' => $this->systemPrompt()],
-                    ['role' => 'user', 'content' => $userPrompt],
-                ],
-                'max_tokens' => 3000,
-                'temperature' => 0.3,
-            ]);
+        $systemPrompt = $this->systemPrompt();
 
-            if (!$response->successful()) {
-                $status = $response->status();
-                $body = $response->json();
-                Log::warning('AiAnalyzer DeepSeek HTTP error', [
-                    'status' => $status,
-                    'body' => $body,
+        // The configured model is a reasoning model: it "thinks" (reasoning_content)
+        // before producing the final answer (content). If max_tokens is hit during
+        // the thinking phase, `content` comes back empty. We retry with a larger
+        // token budget to let the reasoning complete and produce the final JSON.
+        $attempts = [4096, 8192];
+
+        $lastError = null;
+
+        foreach ($attempts as $maxTokens) {
+            try {
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Content-Type' => 'application/json',
+                ])->timeout(180)->post($baseUrl . '/v1/chat/completions', [
+                    'model' => $model,
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user', 'content' => $userPrompt],
+                    ],
+                    'max_tokens' => $maxTokens,
+                    'temperature' => 0.3,
                 ]);
-                return [null, 'DeepSeek returned HTTP ' . $status . '. See Laravel logs for details.'];
+
+                if (!$response->successful()) {
+                    $status = $response->status();
+                    $body = $response->json();
+                    Log::warning('AiAnalyzer DeepSeek HTTP error', [
+                        'status' => $status,
+                        'body' => $body,
+                    ]);
+                    $lastError = 'DeepSeek returned HTTP ' . $status . '. See Laravel logs for details.';
+                    continue;
+                }
+
+                $body = $response->json();
+                $choice = $body['choices'][0] ?? null;
+                $finishReason = $choice['finish_reason'] ?? 'unknown';
+                $content = $choice['message']['content'] ?? null;
+                $reasoning = $choice['message']['reasoning_content'] ?? null;
+
+                Log::info('AiAnalyzer DeepSeek response', [
+                    'finish_reason' => $finishReason,
+                    'content_len' => strlen((string) $content),
+                    'reasoning_len' => strlen((string) $reasoning),
+                    'max_tokens' => $maxTokens,
+                ]);
+
+                if (!empty($content)) {
+                    return [trim((string) $content), null];
+                }
+
+                // If the model ran out of tokens while reasoning, `content` is empty.
+                // Retry with a bigger budget rather than returning a dead-end.
+                $lastError = 'DeepSeek returned an empty response (finish_reason: ' . $finishReason . ').';
+            } catch (\Throwable $e) {
+                Log::warning('AiAnalyzer DeepSeek exception: ' . $e->getMessage());
+                $lastError = 'DeepSeek request failed (timeout or connection issue).';
             }
-
-            $body = $response->json();
-            $content = $body['choices'][0]['message']['content']
-                ?? $body['choices'][0]['message']['reasoning_content']
-                ?? null;
-
-            if (empty($content)) {
-                return [null, 'DeepSeek returned an empty response.'];
-            }
-
-            return [$content, null];
-        } catch (\Throwable $e) {
-            Log::warning('AiAnalyzer DeepSeek exception: ' . $e->getMessage());
-            return [null, 'DeepSeek request failed (timeout or connection issue).'];
         }
+
+        return [null, $lastError ?? 'DeepSeek returned an empty response.'];
     }
 
     /**
