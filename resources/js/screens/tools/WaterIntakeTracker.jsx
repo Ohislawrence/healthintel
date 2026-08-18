@@ -1,9 +1,11 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../lib/api';
+import useAuthStore from '../../stores/authStore';
 
 const CUP_ML = 250;
-const GOAL_ML = 3000;
+const DEFAULT_GOAL_ML = 3000;
+const ML_PER_KG = 35;
 
 const quickAdds = [
     { label: 'Small glass', ml: 200, icon: '🥛' },
@@ -14,9 +16,20 @@ const quickAdds = [
 ];
 
 export default function WaterIntakeTracker() {
+    const { user } = useAuthStore();
     const [log, setLog] = useState([]);
     const [customMl, setCustomMl] = useState('');
     const [loading, setLoading] = useState(true);
+
+    const goalMl = useMemo(() => {
+        const weight = parseFloat(user?.health_profile?.weight_kg);
+        if (weight && weight > 0) {
+            const raw = Math.round(weight * ML_PER_KG);
+            // Round to nearest 50ml for a cleaner goal display.
+            return Math.max(1500, Math.round(raw / 50) * 50);
+        }
+        return DEFAULT_GOAL_ML;
+    }, [user]);
 
     useEffect(() => {
         loadToday().finally(() => setLoading(false));
@@ -53,8 +66,8 @@ export default function WaterIntakeTracker() {
     };
 
     const totalMl = useMemo(() => log.reduce((sum, e) => sum + (e.ml || 0), 0), [log]);
-    const pct = Math.min(100, Math.round((totalMl / GOAL_ML) * 100));
-    const remaining = Math.max(0, GOAL_ML - totalMl);
+    const pct = Math.min(100, Math.round((totalMl / goalMl) * 100));
+    const remaining = Math.max(0, goalMl - totalMl);
     const glassesCount = Math.round(totalMl / CUP_ML);
 
     return (
@@ -69,7 +82,7 @@ export default function WaterIntakeTracker() {
             <div className="card p-5 text-center bg-blue-50 border-blue-200">
                 <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Today's Progress</p>
                 <p className="text-5xl font-extrabold text-blue-700 tracking-tight">{totalMl}</p>
-                <p className="text-sm font-semibold text-blue-500 mt-1">ml of {GOAL_ML} ml goal</p>
+                <p className="text-sm font-semibold text-blue-500 mt-1">ml of {goalMl} ml goal</p>
                 <div className="h-3 bg-blue-100 rounded-full overflow-hidden mt-4 mb-2">
                     <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                 </div>

@@ -212,6 +212,14 @@ export default function AppLayout({ children }) {
                                         Credits ({user?.credits ?? 0})
                                     </Link>
                                     <Link
+                                        to="/referral"
+                                        onClick={() => setProfileOpen(false)}
+                                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                                    >
+                                        <span className="text-lg">🔗</span>
+                                        Affiliate Program
+                                    </Link>
+                                    <Link
                                         to="/health-tools"
                                         onClick={() => setProfileOpen(false)}
                                         className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
@@ -316,6 +324,9 @@ export default function AppLayout({ children }) {
                                     </Link>
                                     <Link to="/credits" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors">
                                         <span className="text-lg">◆</span> Credits ({user?.credits ?? 0})
+                                    </Link>
+                                    <Link to="/referral" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors">
+                                        <span className="text-lg">🔗</span> Affiliate Program
                                     </Link>
                                     <Link to="/health-tools" onClick={() => setProfileOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors">
                                         <span className="text-lg">✚</span> Health Tools

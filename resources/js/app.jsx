@@ -60,6 +60,10 @@ import FoodSymptomDiary from './screens/tools/FoodSymptomDiary';
 import PeriodTracker from './screens/tools/PeriodTracker';
 import ImmunizationTracker from './screens/tools/ImmunizationTracker';
 import AppointmentTracker from './screens/tools/AppointmentTracker';
+import BodyFatCalculator from './screens/tools/BodyFatCalculator';
+import SleepTracker from './screens/tools/SleepTracker';
+import AdultImmunizationTracker from './screens/tools/AdultImmunizationTracker';
+import MedicationReminder from './screens/tools/MedicationReminder';
 import ReferralDashboard from './screens/ReferralDashboard';
 import Offline from './screens/Offline';
 import AdminLayout from './screens/admin/AdminLayout';
@@ -287,12 +291,16 @@ function App() {
                     <Route path="/health-tools/bmr" element={<ProtectedRoute><AppLayout><BMRCalculator /></AppLayout></ProtectedRoute>} />
                     <Route path="/health-tools/due-date" element={<ProtectedRoute><AppLayout><DueDateCalculator /></AppLayout></ProtectedRoute>} />
                     <Route path="/health-tools/waist-hip" element={<ProtectedRoute><AppLayout><WaistHipCalculator /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/body-fat" element={<ProtectedRoute><AppLayout><BodyFatCalculator /></AppLayout></ProtectedRoute>} />
                     <Route path="/health-tools/blood-pressure" element={<ProtectedRoute><AppLayout><BloodPressureLog /></AppLayout></ProtectedRoute>} />
                     <Route path="/health-tools/water" element={<ProtectedRoute><AppLayout><WaterIntakeTracker /></AppLayout></ProtectedRoute>} />
                     <Route path="/health-tools/food-diary" element={<ProtectedRoute><AppLayout><FoodSymptomDiary /></AppLayout></ProtectedRoute>} />
                     <Route path="/health-tools/period" element={<ProtectedRoute><AppLayout><PeriodTracker /></AppLayout></ProtectedRoute>} />
                     <Route path="/health-tools/immunization" element={<ProtectedRoute><AppLayout><ImmunizationTracker /></AppLayout></ProtectedRoute>} />
                     <Route path="/health-tools/appointments" element={<ProtectedRoute><AppLayout><AppointmentTracker /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/sleep" element={<ProtectedRoute><AppLayout><SleepTracker /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/adult-vaccines" element={<ProtectedRoute><AppLayout><AdultImmunizationTracker /></AppLayout></ProtectedRoute>} />
+                    <Route path="/health-tools/medication" element={<ProtectedRoute><AppLayout><MedicationReminder /></AppLayout></ProtectedRoute>} />
                     <Route path="/referral" element={<ProtectedRoute><AppLayout><ReferralDashboard /></AppLayout></ProtectedRoute>} />
                     <Route path="/blog" element={<ProtectedRoute><AppLayout><BlogList /></AppLayout></ProtectedRoute>} />
                     <Route path="/blog/:slug" element={<ProtectedRoute><AppLayout><BlogPostDetail /></AppLayout></ProtectedRoute>} />

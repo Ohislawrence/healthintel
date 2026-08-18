@@ -147,6 +147,27 @@ class HealthScoreController extends BaseController
             }
         }
 
+        $latestBp = $this->latestBloodPressure($user->id);
+
+        if ($latestBp) {
+            $bpCat = $this->getBpCategory($latestBp['systolic'], $latestBp['diastolic']);
+            $trackerMetrics['blood_pressure'] = array_merge($latestBp, [
+                'category' => $bpCat['label'],
+                'category_color' => $bpCat['color'],
+            ]);
+
+            if ($bpCat['severity']) {
+                $trackerFlags[] = [
+                    'source' => 'blood_pressure',
+                    'label' => 'Blood Pressure',
+                    'value' => $latestBp['systolic'] . '/' . $latestBp['diastolic'],
+                    'category' => $bpCat['label'],
+                    'severity' => $bpCat['severity'],
+                    'color' => $bpCat['color'],
+                ];
+            }
+        }
+
         if ($latestBmr && isset($latestBmr->data['bmr'])) {
             $trackerMetrics['bmr'] = array_merge(
                 $latestBmr->data,
@@ -157,7 +178,7 @@ class HealthScoreController extends BaseController
         }
 
         // Number of trackers the user has used
-        $trackerCount = collect(['bmi', 'bmr', 'waist_hip_ratio'])
+        $trackerCount = collect(['bmi', 'bmr', 'waist_hip_ratio', 'blood_pressure'])
             ->filter(fn ($type) => !empty($trackerMetrics[$type]))
             ->count();
 
@@ -220,7 +241,7 @@ class HealthScoreController extends BaseController
     public function saveMetric(Request $request)
     {
         $validated = $request->validate([
-            'metric_type' => 'required|string|in:bmi,bmr,tdee,waist_hip_ratio,due_date',
+            'metric_type' => 'required|string|in:bmi,bmr,tdee,waist_hip_ratio,due_date,body_fat',
             'data' => 'required|array',
         ]);
 
@@ -289,6 +310,114 @@ class HealthScoreController extends BaseController
             'date' => $today,
             'trackers' => $snapshot?->data ?? [],
         ]);
+    }
+
+    /**
+     * Surface food↔symptom patterns from the user's own logged entries
+     * using a periodic DeepSeek pass. Framed as "worth discussing with a
+     * doctor", not a diagnosis.
+     */
+    public function foodInsights(Request $request)
+    {
+        $user = $request->user();
+
+        $entries = $this->recentFoodEntries($user->id, 30, 60);
+
+        if (count($entries) < 3) {
+            return $this->success([
+                'available' => false,
+                'message' => 'Log a few meals and symptoms first — patterns need at least 3 entries to surface.',
+            ]);
+        }
+
+        $deepSeek = app(\App\Services\DeepSeekService::class);
+        $insight = $deepSeek->ask(
+            $this->buildFoodInsightPrompt($entries),
+            500,
+            0.4,
+            $this->foodInsightSystemPrompt()
+        );
+
+        return $this->success([
+            'available' => (bool) $insight,
+            'insight' => $insight,
+        ]);
+    }
+
+    private function recentFoodEntries(int $userId, int $days, int $limit): array
+    {
+        $since = now()->subDays($days)->startOfDay();
+
+        $snapshots = UserTrackerSnapshot::where('user_id', $userId)
+            ->whereNotNull('data')
+            ->where('date', '>=', $since->toDateString())
+            ->orderBy('date', 'desc')
+            ->limit($days)
+            ->get();
+
+        $entries = [];
+        foreach ($snapshots as $snapshot) {
+            $foodEntries = $snapshot->data['food_symptom'] ?? [];
+            foreach ($foodEntries as $entry) {
+                $food = trim((string) ($entry['food'] ?? ''));
+                $symptoms = $entry['symptoms'] ?? [];
+                if ($food === '' && empty($symptoms)) {
+                    continue;
+                }
+
+                $entries[] = [
+                    'date' => $snapshot->date->toDateString(),
+                    'meal_type' => $entry['meal_type'] ?? 'meal',
+                    'food' => $food,
+                    'symptoms' => is_array($symptoms) ? $symptoms : [],
+                    'notes' => trim((string) ($entry['notes'] ?? '')),
+                ];
+
+                if (count($entries) >= $limit) {
+                    break 2;
+                }
+            }
+        }
+
+        return $entries;
+    }
+
+    private function buildFoodInsightPrompt(array $entries): string
+    {
+        $lines = ["Here is a user's recent food & symptom diary (most recent first):", ''];
+
+        foreach ($entries as $e) {
+            $row = "- [{$e['date']}] {$e['meal_type']}";
+            if ($e['food'] !== '') {
+                $row .= ": {$e['food']}";
+            }
+            if (!empty($e['symptoms'])) {
+                $row .= ' — symptoms: ' . implode(', ', $e['symptoms']);
+            }
+            if ($e['notes'] !== '') {
+                $row .= " (note: {$e['notes']})";
+            }
+            $lines[] = $row;
+        }
+
+        $lines[] = '';
+        $lines[] = "Identify recurring patterns between specific foods and symptoms (e.g., \"bloating after dairy 4 of the last 5 times\").";
+        $lines[] = "Return ONLY 3-5 short bullet points, each phrased as a pattern 'worth discussing with a doctor'. Do not diagnose.";
+
+        return implode("\n", $lines);
+    }
+
+    private function foodInsightSystemPrompt(): string
+    {
+        return <<<'TXT'
+You analyze a user's own food & symptom diary to surface possible patterns.
+GUARDRAILS:
+1. NEVER diagnose a condition, allergy, or intolerance. Phrase findings as "a pattern worth discussing with a doctor."
+2. NEVER recommend eliminating foods or taking medication.
+3. If no clear pattern emerges, say so honestly rather than inventing one.
+4. Use plain Grade 7-8 English.
+5. Keep it to 3-5 short bullet points.
+TXT;
     }
 
     public function reminders(Request $request)
@@ -409,6 +538,47 @@ class HealthScoreController extends BaseController
             }
         }
         return self::BMI_CATEGORIES[0];
+    }
+
+    private function getBpCategory(int $sys, int $dia): array
+    {
+        if ($sys >= 140 || $dia >= 90) {
+            return ['label' => 'High (Stage 2)', 'color' => '#EF4444', 'severity' => 'high'];
+        }
+        if ($sys >= 130 || $dia >= 85) {
+            return ['label' => 'High (Stage 1)', 'color' => '#F97316', 'severity' => 'medium'];
+        }
+        if ($sys >= 120 || $dia >= 80) {
+            return ['label' => 'Elevated', 'color' => '#F59E0B', 'severity' => null];
+        }
+        return ['label' => 'Normal', 'color' => '#22C55E', 'severity' => null];
+    }
+
+    private function latestBloodPressure(int $userId): ?array
+    {
+        $snapshots = UserTrackerSnapshot::where('user_id', $userId)
+            ->whereNotNull('data')
+            ->latest('date')
+            ->limit(30)
+            ->get();
+
+        foreach ($snapshots as $snapshot) {
+            $entries = $snapshot->data['blood_pressure'] ?? [];
+            if (empty($entries)) {
+                continue;
+            }
+
+            $latest = $entries[0];
+            if (isset($latest['systolic'], $latest['diastolic'])) {
+                return [
+                    'systolic' => (int) $latest['systolic'],
+                    'diastolic' => (int) $latest['diastolic'],
+                    'recorded_at' => $snapshot->date->toDateString(),
+                ];
+            }
+        }
+
+        return null;
     }
 
     private function getWhrRisk(float $ratio, ?string $sex): string

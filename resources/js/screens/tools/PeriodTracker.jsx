@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import api from '../../lib/api';
 
 const CYCLE_LENGTHS = [21, 25, 28, 30, 35];
 const PERIOD_LENGTHS = [3, 4, 5, 6, 7];
@@ -21,7 +22,44 @@ export default function PeriodTracker() {
   const [periodLen, setPeriodLen] = useState(5);
   const today = new Date();
 
-  const toggleDate = (ds) => setLog(prev => prev.includes(ds) ? prev.filter(d => d !== ds) : [...prev, ds]);
+  // Load persisted period data on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/health-metrics/today');
+        const period = res?.data?.trackers?.period;
+        if (period) {
+          if (Array.isArray(period.period_days)) setLog(period.period_days);
+          if (period.cycle_length) setCycleLen(period.cycle_length);
+          if (period.period_length) setPeriodLen(period.period_length);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  const persist = useCallback(async (nextLog, nextCycleLen, nextPeriodLen) => {
+    try {
+      await api.post('/health-metrics/sync', {
+        date: new Date().toISOString().split('T')[0],
+        data: {
+          period: {
+            period_days: nextLog,
+            cycle_length: nextCycleLen,
+            period_length: nextPeriodLen,
+          },
+        },
+      });
+    } catch {}
+  }, []);
+
+  const toggleDate = (ds) => {
+    const next = log.includes(ds) ? log.filter(d => d !== ds) : [...log, ds];
+    setLog(next);
+    persist(next, cycleLen, periodLen);
+  };
+
+  const setCycleLength = (d) => { setCycleLen(d); persist(log, d, periodLen); };
+  const setPeriodLength = (d) => { setPeriodLen(d); persist(log, cycleLen, d); };
 
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).getDay();
@@ -85,7 +123,7 @@ export default function PeriodTracker() {
           <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">Cycle Length</p>
           <div className="flex flex-wrap gap-1.5">
             {CYCLE_LENGTHS.map(d => (
-              <button key={d} onClick={() => setCycleLen(d)} className={`px-3 py-2 rounded-lg text-xs font-bold border ${cycleLen === d ? 'border-pink-500 bg-pink-50 text-pink-600' : 'border-neutral-200 bg-neutral-50 text-neutral-500'}`}>{d} days</button>
+              <button key={d} onClick={() => setCycleLength(d)} className={`px-3 py-2 rounded-lg text-xs font-bold border ${cycleLen === d ? 'border-pink-500 bg-pink-50 text-pink-600' : 'border-neutral-200 bg-neutral-50 text-neutral-500'}`}>{d} days</button>
             ))}
           </div>
         </div>
@@ -93,7 +131,7 @@ export default function PeriodTracker() {
           <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">Period Length</p>
           <div className="flex flex-wrap gap-1.5">
             {PERIOD_LENGTHS.map(d => (
-              <button key={d} onClick={() => setPeriodLen(d)} className={`px-3 py-2 rounded-lg text-xs font-bold border ${periodLen === d ? 'border-pink-500 bg-pink-50 text-pink-600' : 'border-neutral-200 bg-neutral-50 text-neutral-500'}`}>{d} days</button>
+              <button key={d} onClick={() => setPeriodLength(d)} className={`px-3 py-2 rounded-lg text-xs font-bold border ${periodLen === d ? 'border-pink-500 bg-pink-50 text-pink-600' : 'border-neutral-200 bg-neutral-50 text-neutral-500'}`}>{d} days</button>
             ))}
           </div>
         </div>

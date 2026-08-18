@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\ProviderDirectoryEntry;
 use App\Models\Symptom;
 use App\Models\TestPanel;
+use App\Services\HealthContextService;
 use App\Services\DeepSeekService;
 use App\Services\SymptomPromptBuilder;
 use App\Services\CreditService;
@@ -18,6 +19,7 @@ class SymptomCheckerController extends BaseController
         private DeepSeekService $deepSeek,
         private SymptomPromptBuilder $promptBuilder,
         private CreditService $creditService,
+        private HealthContextService $healthContext,
     ) {}
 
     /**
@@ -179,6 +181,9 @@ class SymptomCheckerController extends BaseController
         // Build context from health profile
         $context = $patientContext !== '' ? $patientContext : $this->buildContextFromProfile($user);
 
+        // Append tracked tool data (BMI, BP, immunization gaps, etc.)
+        $trackedBlock = $this->healthContext->buildContextBlock($user);
+
         // Build prompt with panel names for AI to reference
         $panelNames = $panels->pluck('name')->implode(', ');
         $symptomNames = $selected->pluck('name')->implode(', ');
@@ -188,6 +193,9 @@ class SymptomCheckerController extends BaseController
             $prompt .= "Patient context: {$context}\n";
         } else {
             $prompt = "Patient's description of their symptoms: {$context}\n";
+        }
+        if ($trackedBlock) {
+            $prompt .= "\n{$trackedBlock}\n";
         }
         $prompt .= "Available relevant test panels: {$panelNames}\n\n";
         $prompt .= "Based on the symptoms and patient context above, provide:\n";

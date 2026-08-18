@@ -21,6 +21,8 @@ export default function FoodSymptomDiary() {
     const [selectedSymptoms, setSelectedSymptoms] = useState([]);
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(true);
+    const [insights, setInsights] = useState(null);
+    const [insightsLoading, setInsightsLoading] = useState(false);
 
     useEffect(() => {
         loadToday().finally(() => setLoading(false));
@@ -44,6 +46,18 @@ export default function FoodSymptomDiary() {
 
     const toggleSymptom = (sym) => {
         setSelectedSymptoms(prev => prev.includes(sym) ? prev.filter(s => s !== sym) : [...prev, sym]);
+    };
+
+    const loadInsights = async () => {
+        setInsightsLoading(true);
+        try {
+            const res = await api.get('/health-metrics/food-insights');
+            setInsights(res?.data || null);
+        } catch {
+            setInsights({ available: false, message: 'Could not load insights right now.' });
+        } finally {
+            setInsightsLoading(false);
+        }
     };
 
     const addEntry = () => {
@@ -129,6 +143,29 @@ export default function FoodSymptomDiary() {
                 <button onClick={addEntry} disabled={!canAdd} className={`btn w-full ${canAdd ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'}`}>
                     Log Entry
                 </button>
+            </div>
+
+            {/* Insights */}
+            <div className="card p-5">
+                <div className="flex items-center justify-between mb-3">
+                    <p className="text-base font-bold text-neutral-900">Pattern Insights</p>
+                    <button
+                        onClick={loadInsights}
+                        disabled={insightsLoading}
+                        className="text-xs font-bold text-green-600 hover:text-green-700 disabled:text-neutral-400"
+                    >
+                        {insightsLoading ? 'Analyzing…' : insights ? 'Refresh' : 'Analyze my entries'}
+                    </button>
+                </div>
+                {insights?.available && insights?.insight ? (
+                    <div className="whitespace-pre-wrap text-sm text-neutral-700 leading-relaxed">{insights.insight}</div>
+                ) : insights ? (
+                    <p className="text-sm text-neutral-500">{insights.message || 'No patterns surfaced yet.'}</p>
+                ) : (
+                    <p className="text-sm text-neutral-500">
+                        Surface possible food↔symptom patterns from your logged entries. Always discuss with a doctor.
+                    </p>
+                )}
             </div>
 
             {/* Today's Log */}

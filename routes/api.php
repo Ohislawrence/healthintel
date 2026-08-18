@@ -103,6 +103,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::get('/health-metrics', [HealthScoreController::class, 'getMetrics']);
     Route::post('/health-metrics/sync', [HealthScoreController::class, 'syncTrackers']);
     Route::get('/health-metrics/today', [HealthScoreController::class, 'todayTrackers']);
+    Route::get('/health-metrics/food-insights', [HealthScoreController::class, 'foodInsights']);
 
     // Lab Submissions
     Route::get('/submissions', [LabSubmissionController::class, 'index']);

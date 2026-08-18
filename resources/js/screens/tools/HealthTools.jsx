@@ -7,6 +7,7 @@ const ALL_CALCULATORS = [
     { icon: '▲', color: '#F97316', title: 'BMR & TDEE Calculator', subtitle: 'Basal Metabolic Rate & Total Daily Energy Expenditure', to: '/health-tools/bmr', forSex: null },
     { icon: '⚛', color: '#EC4899', title: 'Due Date Calculator', subtitle: 'Estimate your baby due date & track pregnancy weeks', to: '/health-tools/due-date', forSex: 'female' },
     { icon: '◉', color: '#F97316', title: 'Waist-to-Hip Ratio', subtitle: 'Assess your body fat distribution and health risk', to: '/health-tools/waist-hip', forSex: null },
+    { icon: '▣', color: '#6366F1', title: 'Body Fat % Estimator', subtitle: 'Estimate body fat using the U.S. Navy tape-measure method', to: '/health-tools/body-fat', forSex: null },
 ];
 
 const ALL_TRACKERS = [
@@ -16,6 +17,9 @@ const ALL_TRACKERS = [
     { icon: '◷', color: '#EC4899', title: 'Period & Cycle Tracker', subtitle: 'Log periods, track cycles, predict ovulation & fertile windows', to: '/health-tools/period', forSex: 'female' },
     { icon: '◇', color: '#9333EA', title: 'Immunization Tracker', subtitle: "Track your child's vaccines based on NPHCDA schedule", to: '/health-tools/immunization', forSex: null },
     { icon: '◷', color: '#0EA5E9', title: 'Appointment Tracker', subtitle: 'Book, track & get reminded for medical appointments', to: '/health-tools/appointments', forSex: null },
+    { icon: '◐', color: '#8B5CF6', title: 'Sleep Tracker', subtitle: 'Log bed/wake time, duration & quality to spot correlations', to: '/health-tools/sleep', forSex: null },
+    { icon: '◇', color: '#14B8A6', title: 'Adult Vaccines', subtitle: 'Track boosters & travel vaccines (tetanus, Hep B, yellow fever)', to: '/health-tools/adult-vaccines', forSex: null },
+    { icon: '◉', color: '#E11D48', title: 'Medication Reminder', subtitle: 'Never miss a dose — get nudged at the right time', to: '/health-tools/medication', forSex: null },
 ];
 
 function ToolCard({ icon, color, title, subtitle, to }) {
@@ -62,7 +66,7 @@ export default function HealthTools() {
 
             <div>
                 <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">Calculators</p>
-                <div className="space-y-2">
+                <div className="space-y-3">
                     {CALCULATORS.map((tool) => (
                         <ToolCard key={tool.title} {...tool} />
                     ))}
@@ -71,7 +75,7 @@ export default function HealthTools() {
 
             <div>
                 <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">Trackers</p>
-                <div className="space-y-2">
+                <div className="space-y-3">
                     {TRACKERS.map((tracker) => (
                         <ToolCard key={tracker.title} {...tracker} />
                     ))}

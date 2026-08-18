@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\HealthProfile;
 use App\Models\LabSubmission;
+use App\Services\HealthContextService;
 
 class InterpretationPromptBuilder
 {
@@ -73,6 +74,8 @@ class InterpretationPromptBuilder
         }
 
         // Build the prompt
+        $trackedBlock = app(HealthContextService::class)->buildContextBlock($user);
+
         $lines = [
             "## User Context",
             "Panel: {$panel}",
@@ -80,10 +83,16 @@ class InterpretationPromptBuilder
             "Medical History: {$conditionsLine}",
             "Medications: {$medicationsLine}",
             $profileNote,
-            "",
-            "## Lab Results & Flags",
-            "",
         ];
+
+        if ($trackedBlock) {
+            $lines[] = "";
+            $lines[] = $trackedBlock;
+        }
+
+        $lines[] = "";
+        $lines[] = "## Lab Results & Flags";
+        $lines[] = "";
 
         foreach ($flaggedValues as $fv) {
             $lines[] = "- {$fv['test_name']}: {$fv['value']} {$fv['unit']} " .
