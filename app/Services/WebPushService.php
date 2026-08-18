@@ -190,7 +190,7 @@ class WebPushService
                 return true;
             }
 
-            if ($report->isSubscriptionExpired()) {
+            if ($report->isSubscriptionExpired() || $this->isDeadSubscription($report->getReason())) {
                 $subscription->update(['is_active' => false]);
                 return false;
             }
@@ -243,6 +243,17 @@ class WebPushService
      *    https://datatracker.ietf.org/doc/html/rfc8030
      *    https://datatracker.ietf.org/doc/html/rfc8291
      */
+    /**
+     * A subscription is permanently unusable if the push service rejects it
+     * with 404/410 (unsubscribed) or 403 "VAPID credentials do not
+     * correspond" (created under a different application server key).
+     */
+    private function isDeadSubscription(string $reason): bool
+    {
+        return str_contains($reason, '403')
+            && str_contains($reason, 'VAPID');
+    }
+
     private function sendRaw(PushSubscription $subscription, array $payload): bool
     {
         $endpoint = $subscription->endpoint;

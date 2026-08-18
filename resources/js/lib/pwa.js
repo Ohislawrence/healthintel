@@ -54,6 +54,16 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
+// ── Utility: Convert an ArrayBuffer/BufferSource to base64url ─
+function arrayBufferToBase64Url(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 // ── API Helper ──────────────────────────────────────────────
 async function apiPost(url, data) {
   const token = localStorage.getItem('labdoc_token');
@@ -222,19 +232,47 @@ export async function subscribeToPush() {
     const registration =
       swRegistration || (await navigator.serviceWorker.ready);
 
-    // Check existing subscription
-    let subscription = await registration.pushManager.getSubscription();
-
-    if (subscription) {
-      console.log('[PWA] Already subscribed to push');
-      return subscription;
-    }
-
-    // Fetch VAPID key first
+    // Fetch VAPID key first — needed to detect key rotation.
     const key = await fetchVapidKey();
     if (!key) {
       console.warn('[PWA] No VAPID public key available — skipping push subscription');
       return null;
+    }
+
+    // Check existing subscription
+    let subscription = await registration.pushManager.getSubscription();
+
+    // Detect whether the existing subscription was created under a different
+    // applicationServerKey. Browsers expose it via subscription.options;
+    // fall back to our own localStorage tracking when it isn't available.
+    const storedKey = localStorage.getItem('labdoc_vapid_public_key');
+    const subKey = subscription?.options?.applicationServerKey
+      ? arrayBufferToBase64Url(subscription.options.applicationServerKey)
+      : null;
+
+    const keyMismatch =
+      (subKey && subKey !== key) ||
+      (!subKey && storedKey && storedKey !== key);
+
+    if (subscription && keyMismatch) {
+      // The public key changed on the server — the old subscription is now
+      // invalid (push services reject it with 403). Discard and re-subscribe.
+      console.log('[PWA] VAPID key changed — re-subscribing to push');
+      try {
+        await apiPost('/api/push/unsubscribe', {
+          endpoint: subscription.endpoint,
+        }).catch(() => {});
+        await subscription.unsubscribe().catch(() => {});
+      } catch (e) {
+        console.warn('[PWA] Failed to clear stale subscription:', e);
+      }
+      subscription = null;
+    }
+
+    if (subscription) {
+      localStorage.setItem('labdoc_vapid_public_key', key);
+      console.log('[PWA] Already subscribed to push');
+      return subscription;
     }
 
     // Subscribe
@@ -244,6 +282,7 @@ export async function subscribeToPush() {
     });
 
     console.log('[PWA] Push subscription created');
+    localStorage.setItem('labdoc_vapid_public_key', key);
 
     // Send subscription to server
     await notifyServerOfSubscription(subscription);
