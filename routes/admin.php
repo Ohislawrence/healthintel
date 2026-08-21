@@ -45,6 +45,8 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/users/trashed', [AdminController::class, 'trashedUsers']);
     Route::get('/users/{id}', [AdminController::class, 'userShow']);
     Route::post('/users/{id}/credit', [AdminController::class, 'grantCredits']);
+    Route::post('/users/{id}/verify-email', [AdminController::class, 'verifyUserEmail']);
+    Route::post('/users/{id}/resend-verification-code', [AdminController::class, 'resendUserVerificationCode']);
     Route::delete('/users/{id}', [AdminController::class, 'softDeleteUser']);
     Route::post('/users/{id}/restore', [AdminController::class, 'restoreUser']);
     Route::delete('/users/{id}/force', [AdminController::class, 'forceDeleteUser']);

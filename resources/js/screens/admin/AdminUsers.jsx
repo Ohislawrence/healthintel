@@ -47,6 +47,33 @@ export default function AdminUsers() {
         onError: (err) => alert(err?.message || 'Failed to grant credits'),
     });
 
+    const verifyEmailMutation = useMutation({
+        mutationFn: (id) => api.post(`/admin/users/${id}/verify-email`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+            alert('User email marked as verified.');
+        },
+        onError: (err) => alert(err?.message || 'Failed to verify user'),
+    });
+
+    const resendCodeMutation = useMutation({
+        mutationFn: (id) => api.post(`/admin/users/${id}/resend-verification-code`),
+        onSuccess: (res) => {
+            const code = res?.data?.verification_code || res?.verification_code;
+            const email = res?.data?.email || res?.email;
+            if (code) {
+                navigator.clipboard.writeText(code).catch(() => {});
+                alert(`Verification code ${code} sent${email ? ` to ${email}` : ''}.\n\n(Code copied to clipboard.)`);
+            } else {
+                alert(res?.message || 'Verification code sent.');
+            }
+        },
+        onError: (err) => {
+            // "already verified" error surfaces as a message
+            alert(err?.message || 'Failed to resend verification code');
+        },
+    });
+
     const softDeleteMutation = useMutation({
         mutationFn: (id) => api.delete(`/admin/users/${id}`),
         onSuccess: () => {
@@ -182,6 +209,7 @@ export default function AdminUsers() {
                                 <th className="px-4 py-3 font-medium text-gray-500">Name</th>
                                 <th className="px-4 py-3 font-medium text-gray-500">Email</th>
                                 <th className="px-4 py-3 font-medium text-gray-500">Roles</th>
+                                <th className="px-4 py-3 font-medium text-gray-500">Email Verified</th>
                                 <th className="px-4 py-3 font-medium text-gray-500">Credits</th>
                                 {tab === 'trashed' && (
                                     <th className="px-4 py-3 font-medium text-gray-500">Deleted</th>
@@ -204,6 +232,20 @@ export default function AdminUsers() {
                                             ))}
                                         </span>
                                     </td>
+                                    <td className="px-4 py-3">
+                                        {u.email_verified_at ? (
+                                            <span className="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Verified</span>
+                                        ) : (
+                                            <div>
+                                                <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Unverified</span>
+                                                {u.email_verification_code ? (
+                                                    <div className="mt-1 text-[10px] text-gray-400 mono">code: {u.email_verification_code}</div>
+                                                ) : (
+                                                    <div className="mt-1 text-[10px] text-gray-300">no code issued</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </td>
                                     <td className="px-4 py-3 font-medium text-teal-600">{u.credits ?? 0}</td>
                                     {tab === 'trashed' && (
                                         <td className="px-4 py-3 text-gray-400 text-xs">
@@ -221,6 +263,26 @@ export default function AdminUsers() {
                                                     >
                                                         Grant Credits
                                                     </button>
+                                                    {!u.email_verified_at && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (confirm(`Mark ${u.name}'s email as verified?`)) verifyEmailMutation.mutate(u.id);
+                                                                }}
+                                                                disabled={verifyEmailMutation.isPending}
+                                                                className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                                                            >
+                                                                Verify
+                                                            </button>
+                                                            <button
+                                                                onClick={() => resendCodeMutation.mutate(u.id)}
+                                                                disabled={resendCodeMutation.isPending}
+                                                                className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                                                            >
+                                                                Resend Code
+                                                            </button>
+                                                        </>
+                                                    )}
                                                     <button
                                                         onClick={() => setConfirmAction({ type: 'delete', user: u })}
                                                         className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"

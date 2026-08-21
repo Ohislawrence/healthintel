@@ -256,15 +256,31 @@ class AdminBlogController extends BaseController
         $body = $post->excerpt ?? \Illuminate\Support\Str::limit(strip_tags($post->content), 120);
         $url = '/blog/' . $post->slug;
 
-        // 1. In-app notification for all users
+        // 1. In-app notification for every user (user_notifications.user_id is required).
         try {
-            \App\Models\UserNotification::create([
-                'title' => $title,
-                'body' => $body,
-                'type' => 'blog',
-                'url' => $url,
-                'target' => 'all',
-            ]);
+            $now = now();
+
+            \App\Models\User::query()
+                ->select('id')
+                ->orderBy('id')
+                ->chunk(500, function ($users) use ($title, $body, $url, $now) {
+                    $rows = [];
+
+                    foreach ($users as $user) {
+                        $rows[] = [
+                            'user_id' => $user->id,
+                            'type' => 'blog',
+                            'title' => $title,
+                            'body' => $body,
+                            'data' => json_encode(['type' => 'blog', 'url' => $url]),
+                            'action_url' => $url,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    }
+
+                    \App\Models\UserNotification::insert($rows);
+                });
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Blog notification creation failed: ' . $e->getMessage());
         }

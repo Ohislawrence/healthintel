@@ -747,6 +747,85 @@ class AdminController extends BaseController
         ], 'Credits granted successfully');
     }
 
+    /**
+     * Manually mark a user's email as verified (admin override for users
+     * who never received their verification code).
+     */
+    public function verifyUserEmail(int $id)
+    {
+        $user = User::findOrFail($id);
+
+        $user->update([
+            'email_verified_at' => $user->email_verified_at ?? now(),
+            'email_verification_code' => null,
+            'email_verification_code_expires_at' => null,
+        ]);
+
+        // Log for audit
+        \Illuminate\Support\Facades\DB::table('admin_audit_log')->insert([
+            'admin_id' => request()->user()->id,
+            'action' => 'verify_user_email',
+            'target_type' => 'user',
+            'target_id' => $user->id,
+            'metadata' => json_encode([
+                'target_name' => $user->name,
+                'target_email' => $user->email,
+            ]),
+            'created_at' => now(),
+        ]);
+
+        return $this->success([
+            'user' => [
+                'id' => $user->id,
+                'email_verified_at' => $user->email_verified_at?->toISOString(),
+            ],
+        ], 'User email marked as verified.');
+    }
+
+    /**
+     * Resend the 4-digit verification code to a user's email.
+     */
+    public function resendUserVerificationCode(int $id)
+    {
+        $user = User::findOrFail($id);
+
+        if ($user->email_verified_at) {
+            return $this->error('This user\'s email is already verified.', 400);
+        }
+
+        $code = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        $user->update([
+            'email_verification_code' => $code,
+            'email_verification_code_expires_at' => now()->addMinutes(30),
+        ]);
+
+        \Mail::raw(
+            "Your HealthIntel verification code is: {$code}\n\nThis code expires in 30 minutes.",
+            function ($message) use ($user) {
+                $message->to($user->email)
+                    ->subject('Your HealthIntel Verification Code');
+            }
+        );
+
+        // Log for audit
+        \Illuminate\Support\Facades\DB::table('admin_audit_log')->insert([
+            'admin_id' => request()->user()->id,
+            'action' => 'resend_user_verification_code',
+            'target_type' => 'user',
+            'target_id' => $user->id,
+            'metadata' => json_encode([
+                'target_name' => $user->name,
+                'target_email' => $user->email,
+            ]),
+            'created_at' => now(),
+        ]);
+
+        return $this->success([
+            'user_id' => $user->id,
+            'verification_code' => $code,
+        ], 'Verification code sent to ' . $user->email);
+    }
+
     public function userShow(int $id)
     {
         $user = User::with([
