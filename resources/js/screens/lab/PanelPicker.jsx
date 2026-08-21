@@ -1,125 +1,224 @@
 import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import api from '../../lib/api';
 import useAuthStore from '../../stores/authStore';
+import api from '../../lib/api';
 import CameraUpload from '../../components/upload/CameraUpload';
+
+/**
+ * Step 1 — Choose how to share the lab report.
+ *
+ * Two clear paths (photo / PDF) lead to a single review screen before any
+ * credits are charged. Manual entry is kept as a secondary option.
+ */
+
+const COST = 3;
+const MAX_PDF_MB = 10;
 
 export default function PanelPicker() {
     const navigate = useNavigate();
     const { user, fetchUser } = useAuthStore();
     const fileInputRef = useRef(null);
+
+    const [mode, setMode] = useState(null); // 'photo' | 'pdf' | null
     const [file, setFile] = useState(null);
     const [fileBase64, setFileBase64] = useState(null);
-    const [uploadLoading, setUploadLoading] = useState(false);
-    const [uploadError, setUploadError] = useState(null);
+    const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState(null);
     const [dragOver, setDragOver] = useState(false);
     const [showPanels, setShowPanels] = useState(false);
-    const [activeMode, setActiveMode] = useState(null); // 'camera' | 'pdf' | null
 
-    const { data, isLoading: panelsLoading } = useQuery({
-        queryKey: ['panels'],
-        queryFn: () => api.get('/panels'),
-        enabled: showPanels,
-    });
-    const panels = data?.data?.panels || [];
-
-    const cost = 3;
     const balance = user?.credits ?? 0;
 
-    const handleFilePick = (e) => {
-        const picked = e.target.files?.[0];
+    // ── PDF: read file and extract via draft endpoint (no charge) ──
+    const readPdfFile = (picked) => {
         if (!picked) return;
-        if (picked.type !== 'application/pdf') { setUploadError('Please select a PDF file.'); return; }
-        if (picked.size > 10 * 1024 * 1024) { setUploadError('File must be under 10MB.'); return; }
-        setUploadError(null);
+        if (picked.type !== 'application/pdf') {
+            setError('Please select a PDF file.');
+            return;
+        }
+        if (picked.size > MAX_PDF_MB * 1024 * 1024) {
+            setError(`File must be under ${MAX_PDF_MB}MB.`);
+            return;
+        }
+        setError(null);
         setFile(picked);
         const reader = new FileReader();
         reader.onloadend = () => setFileBase64(reader.result.split(',')[1]);
         reader.readAsDataURL(picked);
     };
 
-    const handleUpload = async () => {
-        if (!fileBase64) { setUploadError('Please select a PDF file first.'); return; }
-        setUploadLoading(true);
-        setUploadError(null);
+    const handleFilePick = (e) => readPdfFile(e.target.files?.[0]);
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setDragOver(false);
+        readPdfFile(e.dataTransfer.files?.[0]);
+    };
+
+    const handleUploadPdf = async () => {
+        if (!fileBase64) {
+            setError('Please select a PDF file first.');
+            return;
+        }
+        setUploading(true);
+        setError(null);
         try {
-            const res = await api.post('/submissions/pdf', { pdf_base64: fileBase64, pdf_name: file?.name || 'report.pdf' });
-            await fetchUser();
-            navigate(`/lab-results/submission/${res.data.submission.id}`);
+            const res = await api.post('/submissions/pdf/draft', {
+                pdf_base64: fileBase64,
+                pdf_name: file?.name || 'report.pdf',
+            });
+            // res = { ok, message, data: { draft_id, extracted_tests, ... } }
+            navigate('/lab-results/review', {
+                state: {
+                    draft_id: res.data.draft_id,
+                    extracted_tests: res.data.extracted_tests || [],
+                    is_image: false,
+                },
+            });
         } catch (err) {
-            setUploadError(err?.message || 'Upload failed. Please try again.');
+            setError(err?.message || 'Could not read this PDF. Please try again.');
         } finally {
-            setUploadLoading(false);
+            setUploading(false);
         }
     };
 
-    const handleCameraDraft = (draft) => {
-        if (draft?.draft_id && draft?.extracted_tests?.length > 0) {
-            setUploadError(null);
-            // Navigate to confirm extracted values — reuse existing confirm flow
-            navigate(`/lab-results`, { state: { imageDraft: draft } });
-            alert(`${draft.extracted_tests.length} test value(s) found! Please confirm them.\n\nTests: ${draft.extracted_tests.map(t => `${t.test_name}: ${t.value} ${t.unit}`).join(', ')}`);
+    // ── Photo: CameraUpload posts to /submissions/image → returns draft ──
+    const handleCameraDraft = async (draft) => {
+        if (draft?.draft_id) {
+            setError(null);
+            await fetchUser();
+            navigate('/lab-results/review', {
+                state: {
+                    draft_id: draft.draft_id,
+                    extracted_tests: draft.extracted_tests || [],
+                    is_image: true,
+                },
+            });
         }
     };
 
-    const canUpload = fileBase64 && !uploadLoading && balance >= cost;
+    // ── Manual entry: query active panels ──
+    const [panels, setPanels] = useState([]);
+    const [panelsLoading, setPanelsLoading] = useState(false);
+    const loadPanels = async () => {
+        if (showPanels) {
+            setShowPanels(false);
+            return;
+        }
+        setShowPanels(true);
+        if (panels.length) return;
+        setPanelsLoading(true);
+        try {
+            const res = await api.get('/panels');
+            setPanels(res.data?.panels || []);
+        } catch {
+            setPanels([]);
+        } finally {
+            setPanelsLoading(false);
+        }
+    };
 
     return (
         <div className="space-y-6 max-w-xl mx-auto">
             {/* ── Header ─────────────────────────────────── */}
             <div className="text-center">
-                <p className="text-2xl font-extrabold text-neutral-900 tracking-tight">Upload Lab Report</p>
+                <div className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 bg-teal-50 rounded-full px-3 py-1 mb-3">
+                    Step 1 of 2
+                </div>
+                <h1 className="text-2xl font-extrabold text-neutral-900 tracking-tight">
+                    Upload your lab report
+                </h1>
                 <p className="text-sm text-neutral-500 mt-2 max-w-md mx-auto leading-relaxed">
-                    Choose how you'd like to share your lab results — take a quick photo or upload a PDF
+                    Take a photo or upload a PDF — we'll read it and you confirm before anything is charged.
                 </p>
             </div>
 
-            {/* ── Two Upload Options ──────────────────────── */}
-            <div className="grid grid-cols-2 gap-3">
-                {/* Camera Option */}
+            {/* ── Method selector ─────────────────────────── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
-                    onClick={() => setActiveMode(activeMode === 'camera' ? null : 'camera')}
-                    className={`card p-5 text-center transition-all border-2 ${
-                        activeMode === 'camera' ? 'border-teal-500 bg-teal-50 shadow-md' : 'border-gray-200 hover:border-teal-300 hover:shadow-sm'
+                    onClick={() => { setMode(mode === 'photo' ? null : 'photo'); setError(null); }}
+                    className={`group relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-200 border-2 ${
+                        mode === 'photo'
+                            ? 'border-teal-500 bg-gradient-to-br from-teal-50 to-emerald-50 shadow-lg shadow-teal-200/60'
+                            : 'border-neutral-200 bg-white hover:border-teal-400 hover:shadow-xl hover:shadow-teal-100 hover:-translate-y-0.5'
                     }`}
                 >
-                    <span className="text-3xl block mb-2">📸</span>
-                    <p className="text-sm font-bold text-neutral-900 mb-1">Take a Photo</p>
-                    <p className="text-xs text-neutral-400">Snap a picture of your lab report</p>
+                    <div className="flex items-start gap-3">
+                        <span className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 transition-colors ${
+                            mode === 'photo' ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-600 group-hover:bg-teal-600 group-hover:text-white'
+                        }`}>
+                            📸
+                        </span>
+                        <span className="flex-1 min-w-0">
+                            <span className="block text-sm font-bold text-neutral-900">Take a photo</span>
+                            <span className="block text-xs text-neutral-500 mt-0.5">Snap your report with the camera</span>
+                        </span>
+                        <span className={`mt-1 w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-all ${
+                            mode === 'photo' ? 'bg-teal-600 text-white translate-x-0' : 'bg-neutral-100 text-neutral-400 group-hover:bg-teal-600 group-hover:text-white'
+                        }`}>
+                            ›
+                        </span>
+                    </div>
                 </button>
 
-                {/* PDF Option */}
                 <button
-                    onClick={() => setActiveMode(activeMode === 'pdf' ? null : 'pdf')}
-                    className={`card p-5 text-center transition-all border-2 ${
-                        activeMode === 'pdf' ? 'border-teal-500 bg-teal-50 shadow-md' : 'border-gray-200 hover:border-teal-300 hover:shadow-sm'
+                    onClick={() => { setMode(mode === 'pdf' ? null : 'pdf'); setError(null); }}
+                    className={`group relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-200 border-2 ${
+                        mode === 'pdf'
+                            ? 'border-teal-500 bg-gradient-to-br from-teal-50 to-emerald-50 shadow-lg shadow-teal-200/60'
+                            : 'border-neutral-200 bg-white hover:border-teal-400 hover:shadow-xl hover:shadow-teal-100 hover:-translate-y-0.5'
                     }`}
                 >
-                    <span className="text-3xl block mb-2">📄</span>
-                    <p className="text-sm font-bold text-neutral-900 mb-1">Upload PDF</p>
-                    <p className="text-xs text-neutral-400">Select a PDF from your device</p>
+                    <div className="flex items-start gap-3">
+                        <span className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 transition-colors ${
+                            mode === 'pdf' ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-600 group-hover:bg-teal-600 group-hover:text-white'
+                        }`}>
+                            📄
+                        </span>
+                        <span className="flex-1 min-w-0">
+                            <span className="block text-sm font-bold text-neutral-900">Upload a PDF</span>
+                            <span className="block text-xs text-neutral-500 mt-0.5">Select a file from your device</span>
+                        </span>
+                        <span className={`mt-1 w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-all ${
+                            mode === 'pdf' ? 'bg-teal-600 text-white translate-x-0' : 'bg-neutral-100 text-neutral-400 group-hover:bg-teal-600 group-hover:text-white'
+                        }`}>
+                            ›
+                        </span>
+                    </div>
                 </button>
             </div>
 
-            {/* ── Camera Upload Panel ─────────────────────── */}
-            {activeMode === 'camera' && (
-                <CameraUpload onDraft={handleCameraDraft} onError={(err) => setUploadError(err)} />
+            {/* ── Photo panel ─────────────────────────────── */}
+            {mode === 'photo' && (
+                <CameraUpload
+                    onDraft={handleCameraDraft}
+                    onError={(err) => setError(err)}
+                />
             )}
 
-            {/* ── PDF Upload Panel ────────────────────────── */}
-            {activeMode === 'pdf' && (
-                <>
+            {/* ── PDF panel ───────────────────────────────── */}
+            {mode === 'pdf' && (
+                <div className="space-y-4">
                     <div
                         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                         onDragLeave={() => setDragOver(false)}
-                        onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) { if (f.type !== 'application/pdf') { setUploadError('Please drop a PDF file.'); return; } setUploadError(null); setFile(f); const reader = new FileReader(); reader.onloadend = () => setFileBase64(reader.result.split(',')[1]); reader.readAsDataURL(f); } }}
+                        onDrop={handleDrop}
                         onClick={() => fileInputRef.current?.click()}
                         className={`card p-8 text-center cursor-pointer transition-all border-2 border-dashed ${
-                            dragOver ? 'border-teal-500 bg-teal-50' : file ? 'border-teal-500 bg-teal-50 border-solid' : 'border-gray-200 hover:border-teal-300'
+                            dragOver
+                                ? 'border-teal-500 bg-teal-50'
+                                : file
+                                ? 'border-teal-500 bg-teal-50 border-solid'
+                                : 'border-gray-200 hover:border-teal-300'
                         }`}
                     >
-                        <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFilePick} />
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="application/pdf"
+                            className="hidden"
+                            onChange={handleFilePick}
+                        />
                         {file ? (
                             <div className="flex items-center gap-4 text-left">
                                 <div className="w-14 h-14 rounded-xl bg-white border-2 border-teal-500 flex items-center justify-center text-2xl text-teal-600 shrink-0">📄</div>
@@ -131,54 +230,85 @@ export default function PanelPicker() {
                             </div>
                         ) : (
                             <div>
-                                <div className="w-16 h-16 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-3"><span className="text-3xl text-teal-500">⇧</span></div>
+                                <div className="w-16 h-16 rounded-full bg-teal-50 flex items-center justify-center mx-auto mb-3">
+                                    <span className="text-3xl text-teal-500">⇧</span>
+                                </div>
                                 <p className="text-base font-bold text-neutral-900 mb-1">Choose a PDF file</p>
                                 <p className="text-sm text-neutral-400">Click to browse or drag & drop</p>
-                                <span className="inline-block mt-3 bg-neutral-100 rounded-lg px-3 py-1 text-xs font-semibold text-neutral-500">PDF · Max 10MB</span>
+                                <span className="inline-block mt-3 bg-neutral-100 rounded-lg px-3 py-1 text-xs font-semibold text-neutral-500">PDF · Max {MAX_PDF_MB}MB</span>
                             </div>
                         )}
                     </div>
-                    <button onClick={handleUpload} disabled={!canUpload}
-                        className={`btn w-full py-4 text-base font-bold transition-all ${canUpload ? 'gradient-teal text-white shadow-lg shadow-teal-200 hover:shadow-xl' : 'bg-neutral-300 text-white cursor-not-allowed'}`}
+
+                    <button
+                        onClick={handleUploadPdf}
+                        disabled={!fileBase64 || uploading}
+                        className={`btn w-full py-4 text-base font-bold transition-all ${
+                            fileBase64 && !uploading
+                                ? 'gradient-teal text-white shadow-lg shadow-teal-200 hover:shadow-xl'
+                                : 'bg-neutral-300 text-white cursor-not-allowed'
+                        }`}
                     >
-                        {uploadLoading ? (<span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Processing...</span>)
-                        : balance < cost ? 'Need 3 credits — Top up first'
-                        : (<span className="flex items-center gap-2">Upload & Interpret <span className="text-xl">›</span></span>)}
+                        {uploading ? (
+                            <span className="flex items-center gap-2">
+                                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                Reading PDF…
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-2">
+                                Continue <span className="text-xl">›</span>
+                            </span>
+                        )}
                     </button>
-                </>
+                </div>
             )}
 
-            {/* ── Error Display ────────────────────────────── */}
-            {uploadError && (
-                <div className="rounded-xl bg-danger-50 border border-danger-200 px-4 py-3 text-sm text-danger-700 font-medium">{uploadError}</div>
+            {/* ── Error ───────────────────────────────────── */}
+            {error && (
+                <div className="rounded-xl bg-danger-50 border border-danger-200 px-4 py-3 text-sm text-danger-700 font-medium">
+                    {error}
+                </div>
             )}
 
-            {/* ── Info Cards ───────────────────────────────── */}
-            <div className="grid grid-cols-2 gap-3">
-                <div className="card p-4 text-center"><span className="text-2xl block mb-2">⚡</span><p className="text-sm font-bold text-neutral-900 mb-1">AI-Powered</p><p className="text-xs text-neutral-400">Smart interpretation of your lab results</p></div>
-                <div className="card p-4 text-center"><span className="text-2xl block mb-2">◆</span><p className="text-sm font-bold text-neutral-900 mb-1">Private & Secure</p><p className="text-xs text-neutral-400">Encrypted and never shared</p></div>
-            </div>
-
-            {/* ── Cost Card ────────────────────────────────── */}
-            <div className="card p-5">
-                <div className="flex items-center">
-                    <div className="flex-1 text-center"><p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Cost Per Report</p><p className="text-xl font-extrabold text-teal-600">{cost} <span className="text-sm font-semibold text-neutral-400">credits</span></p></div>
-                    <div className="w-px h-12 bg-neutral-100" />
-                    <div className="flex-1 text-center"><p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Your Balance</p><p className={`text-xl font-extrabold ${balance < cost ? 'text-danger-600' : 'text-teal-600'}`}>{balance} <span className="text-sm font-semibold text-neutral-400">credits</span></p></div>
+            {/* ── Cost / balance bar ──────────────────────── */}
+            <div className="card p-4 flex items-center justify-between">
+                <div className="flex-1 text-center">
+                    <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Cost per report</p>
+                    <p className="text-xl font-extrabold text-teal-600">{COST} <span className="text-sm font-semibold text-neutral-400">credits</span></p>
+                </div>
+                <div className="w-px h-12 bg-neutral-100" />
+                <div className="flex-1 text-center">
+                    <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Your balance</p>
+                    <p className={`text-xl font-extrabold ${balance < COST ? 'text-danger-600' : 'text-teal-600'}`}>
+                        {balance} <span className="text-sm font-semibold text-neutral-400">credits</span>
+                    </p>
                 </div>
             </div>
 
-            {/* ── Manual Entry ─────────────────────────────── */}
-            <button onClick={() => setShowPanels(!showPanels)} className="card p-4 flex items-center justify-center gap-2 text-neutral-500 hover:text-neutral-700 transition-colors">
-                <span className="text-lg">▼</span>
-                <span className="text-sm font-semibold">Enter values manually instead</span>
+            {/* ── Trust indicators (compact, non-interactive) ── */}
+            <div className="flex items-center justify-center gap-6 text-xs text-neutral-400">
+                <span className="inline-flex items-center gap-1.5">
+                    <span aria-hidden="true">⚡</span>
+                    AI-Powered
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                    <span aria-hidden="true">◆</span>
+                    Private & Secure
+                </span>
+            </div>
+
+            {/* ── Manual entry (secondary) ─────────────────── */}
+            <button
+                onClick={loadPanels}
+                className="w-full text-sm font-semibold text-neutral-400 hover:text-neutral-600 transition-colors py-1"
+            >
+                {showPanels ? 'Hide manual entry' : 'Enter values manually instead'}
             </button>
 
             {showPanels && (
-                <div className="space-y-3 pt-2">
-                    <p className="text-sm font-bold text-neutral-900">Pick a test panel</p>
+                <div className="space-y-3 pt-1">
                     {panelsLoading ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{[1,2,3,4].map(i => (<div key={i} className="card p-4 skeleton h-24 rounded-xl" />))}</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{[1, 2, 3, 4].map((i) => (<div key={i} className="card p-4 skeleton h-24 rounded-xl" />))}</div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {panels.map((panel) => (

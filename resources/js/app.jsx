@@ -5,7 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import useAuthStore from './stores/authStore';
 import usePartnerAuthStore from './stores/partnerAuthStore';
-import { initPWA, subscribeToPush, isInstalled, isOnline } from './lib/pwa';
+import { initPWA, subscribeToPush, isInstalled, isOnline, hasNotificationPermission } from './lib/pwa';
 import AppLayout from './layouts/AppLayout';
 import { useNavigate } from 'react-router-dom';
 
@@ -41,6 +41,7 @@ import OnboardingTour from './screens/onboarding/OnboardingTour';
 import PanelPicker from './screens/lab/PanelPicker';
 import ValueEntry from './screens/lab/ValueEntry';
 import ResultScreen from './screens/lab/ResultScreen';
+import ReviewLabValues from './screens/lab/ReviewLabValues';
 import TrendChart from './screens/lab/TrendChart';
 import BuyCredits from './screens/credits/BuyCredits';
 import PaymentCallback from './screens/credits/PaymentCallback';
@@ -66,6 +67,7 @@ import AdultImmunizationTracker from './screens/tools/AdultImmunizationTracker';
 import MedicationReminder from './screens/tools/MedicationReminder';
 import ReferralDashboard from './screens/ReferralDashboard';
 import Offline from './screens/Offline';
+import NotificationSubscribeModal from './components/ui/NotificationSubscribeModal';
 import AdminLayout from './screens/admin/AdminLayout';
 import AdminDashboard from './screens/admin/AdminDashboard';
 import AdminPanels from './screens/admin/AdminPanels';
@@ -203,36 +205,49 @@ function AdminRoute({ children }) {
 function PWALifecycle() {
     const { user } = useAuthStore();
     const [updateAvailable, setUpdateAvailable] = useState(false);
+    const [online, setOnline] = useState(isOnline());
 
     useEffect(() => {
         // Initialize PWA: register SW, listen for install prompt
         initPWA();
 
+        // Track online/offline state so the prompt only appears when online
+        const handleNetworkChange = (e) => setOnline(e.detail.online);
+        window.addEventListener('pwa:network-change', handleNetworkChange);
+
         // Listen for PWA update available
         const handleUpdate = () => setUpdateAvailable(true);
         window.addEventListener('pwa:update-available', handleUpdate);
-        return () => window.removeEventListener('pwa:update-available', handleUpdate);
+        return () => {
+            window.removeEventListener('pwa:network-change', handleNetworkChange);
+            window.removeEventListener('pwa:update-available', handleUpdate);
+        };
     }, []);
 
-    // Subscribe to push notifications when user logs in
+    // Silently (re)subscribe users who have already granted notification
+    // permission. Users who haven't decided yet are prompted via the modal.
     useEffect(() => {
-        if (user && 'PushManager' in window) {
+        if (user && 'PushManager' in window && hasNotificationPermission()) {
             subscribeToPush();
         }
     }, [user]);
 
-    if (!updateAvailable) return null;
-
     return (
-        <div className="fixed bottom-4 right-4 z-50 bg-teal-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
-            <span className="text-sm">New version available!</span>
-            <button
-                onClick={() => window.location.reload()}
-                className="bg-white text-teal-700 px-3 py-1 rounded text-sm font-medium hover:bg-teal-50"
-            >
-                Refresh
-            </button>
-        </div>
+        <>
+            <NotificationSubscribeModal active={!!user && online} />
+
+            {updateAvailable && (
+                <div className="fixed bottom-4 right-4 z-50 bg-teal-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
+                    <span className="text-sm">New version available!</span>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="bg-white text-teal-700 px-3 py-1 rounded text-sm font-medium hover:bg-teal-50"
+                    >
+                        Refresh
+                    </button>
+                </div>
+            )}
+        </>
     );
 }
 
@@ -277,6 +292,7 @@ function App() {
                     <Route path="/onboarding/tour" element={<ProtectedRoute><OnboardingTour /></ProtectedRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
                     <Route path="/lab-results" element={<ProtectedRoute><AppLayout><PanelPicker /></AppLayout></ProtectedRoute>} />
+                    <Route path="/lab-results/review" element={<ProtectedRoute><AppLayout><ReviewLabValues /></AppLayout></ProtectedRoute>} />
                     <Route path="/lab-results/:slug" element={<ProtectedRoute><AppLayout><ValueEntry /></AppLayout></ProtectedRoute>} />
                     <Route path="/lab-results/submission/:id" element={<ProtectedRoute><AppLayout><ResultScreen /></AppLayout></ProtectedRoute>} />
                     <Route path="/trends/:testSlug" element={<ProtectedRoute><AppLayout><TrendChart /></AppLayout></ProtectedRoute>} />

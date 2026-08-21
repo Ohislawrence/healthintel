@@ -111,6 +111,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('/submissions', [LabSubmissionController::class, 'submit']);
     Route::post('/submissions/pdf/draft', [LabSubmissionController::class, 'submitPdfDraft']);
     Route::post('/submissions/pdf/draft/{draftId}/confirm', [LabSubmissionController::class, 'confirmPdfDraft']);
+    Route::post('/submissions/draft/{draftId}/confirm', [LabSubmissionController::class, 'confirmDraft']);
     Route::post('/submissions/pdf', [LabSubmissionController::class, 'submitPdf']);
     Route::post('/submissions/image', [LabSubmissionController::class, 'submitImage']);
     Route::post('/submissions/{id}/interpret-stream', [LabSubmissionController::class, 'interpretStream']);

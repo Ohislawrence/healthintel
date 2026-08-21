@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../lib/api';
@@ -6,6 +6,9 @@ import InterpretationCards from '../../components/ui/InterpretationCards';
 import NearbyProviders from '../../components/NearbyProviders';
 import ResultChatPanel from '../../components/chat/ResultChatPanel';
 import LanguageSelector from '../../components/ui/LanguageSelector';
+import RadialGauge from '../../components/charts/RadialGauge';
+import DistributionDonut from '../../components/charts/DistributionDonut';
+import RangeBar from '../../components/charts/RangeBar';
 
 const flagStyles = {
     normal: { bg: 'bg-success-50', text: 'text-success-700', border: 'border-success-200', dot: 'bg-success-500' },
@@ -35,6 +38,7 @@ export default function ResultScreen() {
     const submission = data?.data?.submission || {};
     const interpretation = submission.interpretation || {};
     const values = submission.values || [];
+    const chartValues = data?.data?.chart_values || [];
     const panel = submission.test_panel || {};
 
     const isPending = interpretation?.status === 'pending';
@@ -45,6 +49,19 @@ export default function ResultScreen() {
     const [lang, setLang] = useState('en');
     const [translatedText, setTranslatedText] = useState(null);
     const [translating, setTranslating] = useState(false);
+    const [nearBottom, setNearBottom] = useState(false);
+
+    // Detect when the user has scrolled to (or near) the bottom of the page.
+    useEffect(() => {
+        const onScroll = () => {
+            const doc = document.documentElement;
+            const threshold = 120;
+            setNearBottom(window.innerHeight + window.scrollY >= doc.scrollHeight - threshold);
+        };
+        onScroll();
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => window.removeEventListener('scroll', onScroll);
+    }, []);
 
     const handleLanguageChange = async (newLang) => {
         setLang(newLang);
@@ -94,7 +111,7 @@ export default function ResultScreen() {
     if (isFailed) {
         return (
             <div className="max-w-xl mx-auto space-y-5">
-                <button onClick={() => navigate('/dashboard')} className="text-sm font-semibold text-neutral-400 hover:text-neutral-600 block">‹ Back</button>
+                <button onClick={() => navigate('/lab-results')} className="text-sm font-semibold text-neutral-400 hover:text-neutral-600 block">‹ Back</button>
                 <div className="flex items-center gap-2 card p-3"><span className="w-2 h-2 rounded-full bg-danger-500" /><span className="text-sm font-semibold text-neutral-600">Interpretation unavailable</span></div>
                 <div className="card p-5 bg-danger-50 border-danger-200">
                     <div className="flex gap-3 mb-4"><span className="text-2xl">⚠</span><div><p className="text-base font-bold text-danger-700 mb-1">Interpretation Unavailable</p><p className="text-sm text-danger-800 leading-relaxed">{interpretation?.error_message || 'The AI could not process this report.'}</p></div></div>
@@ -111,7 +128,10 @@ export default function ResultScreen() {
 
     return (
         <div className="max-w-xl mx-auto space-y-5">
-            <button onClick={() => navigate('/dashboard')} className="text-sm font-semibold text-neutral-400 hover:text-neutral-600 block">‹ Back</button>
+            <div className="flex items-center justify-between">
+                <button onClick={() => navigate('/lab-results')} className="text-sm font-semibold text-neutral-400 hover:text-neutral-600">‹ Back</button>
+                <LanguageSelector value={lang} onChange={handleLanguageChange} />
+            </div>
             <div className="flex items-center gap-2 card p-3"><span className="w-2 h-2 rounded-full bg-success-500" /><span className="text-sm font-semibold text-neutral-600">Interpretation complete</span></div>
             <div className="card p-5">
                 <div className="flex items-center">
@@ -122,23 +142,18 @@ export default function ResultScreen() {
                     <div className="flex-1 text-center"><p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Credits</p><p className="text-sm font-semibold text-neutral-900">{submission.credits_used || 3}</p></div>
                 </div>
             </div>
-            {values.length > 0 && (
-                <div className="card p-5">
-                    <div className="flex items-center gap-3 mb-4 pb-4 border-b border-neutral-100"><div className="w-9 h-9 rounded-lg bg-success-50 flex items-center justify-center text-base text-success-600">▼</div><div><p className="text-base font-bold text-neutral-900">Extracted Biomarkers</p><p className="text-xs text-neutral-400 mt-0.5">{values.length} value{values.length > 1 ? 's' : ''}</p></div></div>
-                    <div className="space-y-2">
-                        {values.map((v) => {
-                            const flag = v.result_flag || v.flag || 'normal';
-                            const s = flagStyles[flag] || flagStyles.normal;
-                            return (<div key={v.id || v.test_slug} className="flex items-center gap-3 bg-neutral-50 rounded-xl p-3 border-l-[3px]" style={{ borderLeftColor: flag === 'normal' ? '#22C55E' : flag.includes('low') ? '#F59E0B' : '#EF4444' }}><div className="flex-1"><p className="text-sm font-semibold text-neutral-900">{v.test?.name || v.test_name || v.name || 'Test'}</p><p className="text-xs text-neutral-400 mt-0.5">{v.value} {v.test?.unit || v.unit || ''}</p></div><span className={`badge ${s.bg} ${s.text}`}><span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{flagLabels[flag] || flag}</span></div>);
-                        })}
-                    </div>
-                </div>
-            )}
             {isCompleted && interpretation?.interpretation_text ? (
-                <div className="card p-5 lg:p-6 border-teal-100">
+                <div className="card p-5 lg:p-6 border-teal-100 relative">
                     <div className="flex items-center gap-3 mb-4 pb-4 border-b border-neutral-100"><div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center text-xl text-teal-600">◉</div><p className="text-lg font-extrabold text-neutral-900">AI Interpretation</p></div>
-                    {translating && <p className="text-xs text-gray-400 text-center py-2">Translating...</p>}
-                    <InterpretationCards markdownText={translatedText || interpretation.interpretation_text} />
+                    {translating && (
+                        <div className="flex items-center justify-center gap-3 py-6 text-neutral-500">
+                            <span className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                            <span className="text-sm font-medium">Translating…</span>
+                        </div>
+                    )}
+                    <div className={translating ? 'opacity-40 pointer-events-none select-none' : ''}>
+                        <InterpretationCards markdownText={translatedText || interpretation.interpretation_text} />
+                    </div>
                 </div>
             ) : isCompleted && (interpretation.summary || interpretation.details) ? (
                 <div className="card p-5"><p className="text-sm font-bold text-neutral-900 mb-3">📋 AI Interpretation</p><p className="text-sm text-neutral-700 leading-relaxed whitespace-pre-line">{interpretation.summary}</p></div>
@@ -189,17 +204,72 @@ export default function ResultScreen() {
                 );
             })()}
 
-            {/* ── Action Buttons ── */}
-            <div className="flex flex-col sm:flex-row gap-2">
-                <LanguageSelector value={lang} onChange={handleLanguageChange} />
-                <button onClick={() => setShowChat(true)} className="flex-1 flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm px-4 py-3 rounded-xl shadow-sm hover:shadow-md transition-all">
-                    <span className="text-lg">💬</span> Ask about results
-                </button>
-                <button onClick={handleDownloadCard} className="flex-1 flex items-center justify-center gap-2 bg-white border-2 border-teal-200 hover:border-teal-500 text-teal-700 font-semibold text-sm px-4 py-3 rounded-xl shadow-sm hover:shadow-md transition-all">
-                    <span className="text-lg">📄</span> Download Report Card
-                </button>
-            </div>
+            {/* ── Charts: Results at a Glance (last card) ── */}
+            {chartValues.length > 0 && (
+                <div className="card p-5">
+                    <div className="flex items-center gap-3 mb-4 pb-4 border-b border-neutral-100">
+                        <div className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center text-base text-teal-600">◔</div>
+                        <div>
+                            <p className="text-base font-bold text-neutral-900">Your Results at a Glance</p>
+                            <p className="text-xs text-neutral-400 mt-0.5">How each value compares to the normal range</p>
+                        </div>
+                    </div>
+
+                    {/* Summary donut */}
+                    {chartValues.length >= 2 && (
+                        <div className="mb-5">
+                            <DistributionDonut values={chartValues} />
+                        </div>
+                    )}
+
+                    {/* Per-value gauges */}
+                    <div className="space-y-5">
+                        {chartValues.map((cv, idx) => (
+                            <div key={`${cv.test_slug || cv.test_name}-${idx}`} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-4">
+                                <p className="text-sm font-semibold text-neutral-900 text-center mb-2">{cv.test_name}</p>
+                                <div className="flex flex-col items-center">
+                                    <RadialGauge item={cv} width={220} height={140} />
+                                    <div className="w-full max-w-[300px] mt-2">
+                                        <RangeBar item={cv} />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Bottom spacer so content isn't hidden behind the floating bar */}
+            <div className="h-24" />
+
+            {/* Disclaimer */}
             <div className="card p-4 bg-teal-50 border-teal-200 flex gap-2.5 items-start"><span className="text-lg text-teal-600 mt-0.5">ℹ</span><p className="text-sm text-teal-700 leading-relaxed">This is not a medical diagnosis. Please consult a licensed healthcare professional.</p></div>
+
+            {/* ── Floating Action Bar (translucent → solid) ── */}
+            <div className="fixed bottom-[92px] md:bottom-0 inset-x-0 z-[60] flex justify-center px-3 pb-3 pt-1 pointer-events-none bg-gradient-to-t from-neutral-900/5 to-transparent">
+                <div className="flex w-full max-w-xl gap-2 pointer-events-auto">
+                    <button
+                        onClick={() => setShowChat(true)}
+                        className={`flex-1 flex items-center justify-center font-semibold text-sm px-4 py-3 rounded-xl transition-all ${
+                            nearBottom
+                                ? 'bg-teal-600 text-white shadow-lg hover:bg-teal-700'
+                                : 'bg-teal-600/40 text-white backdrop-blur-sm border border-white/30 hover:bg-teal-600 focus:bg-teal-600 focus:outline-none'
+                        }`}
+                    >
+                        Ask about results
+                    </button>
+                    <button
+                        onClick={handleDownloadCard}
+                        className={`flex-1 flex items-center justify-center font-semibold text-sm px-4 py-3 rounded-xl transition-all ${
+                            nearBottom
+                                ? 'bg-white text-teal-700 border-2 border-teal-500 shadow-lg hover:bg-teal-50'
+                                : 'bg-white/40 text-teal-700 backdrop-blur-sm border border-teal-300/50 hover:bg-white focus:bg-white focus:outline-none'
+                        }`}
+                    >
+                        Download Report Card
+                    </button>
+                </div>
+            </div>
             {showChat && <ResultChatPanel submissionId={parseInt(id)} onClose={() => setShowChat(false)} />}
         </div>
     );

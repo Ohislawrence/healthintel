@@ -13,6 +13,7 @@ use App\Services\DeepSeekService;
 use App\Services\InterpretationPromptBuilder;
 use App\Services\ReferenceRangeEngine;
 use App\Services\ReferenceRangeService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Spatie\PdfToText\Pdf;
 use Illuminate\Support\Facades\Storage;
@@ -53,11 +54,17 @@ class LabSubmissionController extends BaseController
 
     public function show(int $id, Request $request)
     {
-        $submission = $request->user()
-            ->labSubmissions()
+        $user = $request->user();
+        $submission = $user->labSubmissions()
             ->with(['testPanel', 'values', 'interpretation'])
             ->findOrFail($id);
-        return $this->success(['submission' => $submission]);
+
+        $chartValues = $this->buildChartValues($user, $submission->values);
+
+        return $this->success([
+            'submission' => $submission,
+            'chart_values' => $chartValues,
+        ]);
     }
 
     public function submit(Request $request)
@@ -261,7 +268,7 @@ class LabSubmissionController extends BaseController
         try {
             $parser = new \Smalot\PdfParser\Parser();
             $pdf = $parser->parseFile($fullPath);
-            $pdfText = $pdf->getText();
+            $pdfText = $this->cleanUtf8($pdf->getText());
         } catch (\Throwable) {
             return $this->error('Could not parse this PDF.', 422);
         }
@@ -284,7 +291,7 @@ class LabSubmissionController extends BaseController
         return $this->success([
             'draft_id' => $draft->id,
             'extracted_tests' => $extractedTests,
-            'raw_text_preview' => substr($pdfText, 0, 500),
+            'raw_text_preview' => $this->cleanUtf8(mb_substr($pdfText, 0, 500)),
             'message' => count($extractedTests) > 0
                 ? 'We found ' . count($extractedTests) . ' test values. Please review and confirm before interpretation.'
                 : 'No test values could be automatically detected. You can manually enter them below.',
@@ -365,6 +372,145 @@ class LabSubmissionController extends BaseController
         ], 'Values confirmed and interpretation generated', 201);
     }
 
+    /**
+     * Confirm a document draft (PDF or image) and generate an interpretation.
+     *
+     * Both the PDF two-step flow and the camera/image flow store their
+     * extracted tests in the same PdfSubmissionDraft table. This endpoint
+     * reviews the user-confirmed values and generates the AI interpretation.
+     */
+    public function confirmDraft(Request $request, int $draftId)
+    {
+        $validated = $request->validate([
+            'confirmed_values' => 'nullable|array',
+            'confirmed_values.*.test_name' => 'required|string|max:255',
+            'confirmed_values.*.value' => 'required|numeric',
+            'confirmed_values.*.unit' => 'nullable|string|max:50',
+        ]);
+
+        $confirmedValues = $validated['confirmed_values'] ?? [];
+
+        $user = $request->user();
+        $draft = \App\Models\PdfSubmissionDraft::where('user_id', $user->id)->findOrFail($draftId);
+
+        // Image drafts are stored under lab-reports/images/…, PDF drafts under lab-reports/…
+        $isImage = str_contains($draft->pdf_path ?? '', '/images/');
+        $submissionType = $isImage ? 'image' : 'pdf';
+        $cost = (int) config('credits.costs.pdf_interpretation', 3);
+
+        if (!$this->creditService->hasCredits($user, $cost)) {
+            return $this->error('Insufficient credits. Please top up.', 402);
+        }
+
+        $submission = LabSubmission::create([
+            'user_id' => $user->id,
+            'submission_type' => $submissionType,
+            'credits_used' => $cost,
+            'pdf_report_url' => $isImage ? null : $draft->pdf_path,
+            'pdf_text' => $draft->raw_ocr_text,
+            'submitted_at' => now(),
+        ]);
+
+        // Narrative report (imaging / radiology / clinical text with no
+        // structured lab values) → interpret the raw text directly.
+        if (empty($confirmedValues)) {
+            $interpretation = AiInterpretation::create([
+                'lab_submission_id' => $submission->id,
+                'prompt_input' => $draft->raw_ocr_text,
+                'guardrail_flags' => [],
+                'status' => 'pending',
+            ]);
+
+            $interpText = $this->deepSeek->interpretNarrative($interpretation, $draft->raw_ocr_text);
+            if (!$interpText) {
+                return $this->error('AI interpretation unavailable. Please try again.', 503);
+            }
+
+            if (str_contains($interpText, 'NOT_A_MEDICAL_DOCUMENT')) {
+                $interpretation->update(['status' => 'failed', 'error_message' => 'The uploaded file does not appear to be a medical report.']);
+                return $this->error('This file does not appear to be a medical report. Please upload a document containing health or lab result information.', 422);
+            }
+
+            $this->creditService->debit($user, $cost, 'pdf_interpretation');
+            $draft->update([
+                'confirmation_status' => 'confirmed',
+                'confirmed_by' => $user->id,
+                'confirmed_at' => now(),
+                'extracted_tests' => [],
+            ]);
+
+            $submission->load(['values', 'interpretation']);
+            return $this->success([
+                'submission' => $submission,
+                'interpretation' => $interpretation->fresh(),
+                'has_interpretation' => !is_null($interpText),
+            ], 'Report interpreted', 201);
+        }
+
+        $profile = $user->healthProfile;
+        $sex = $profile?->sex;
+        $isPregnant = (bool) ($profile?->is_pregnant ?? false);
+        $age = $profile?->date_of_birth ? Carbon::parse($profile->date_of_birth)->age : null;
+
+        foreach ($confirmedValues as $item) {
+            $status = $this->referenceRangeService->classify(
+                testName: $item['test_name'],
+                value: (float) $item['value'],
+                unit: $item['unit'] ?? '',
+                sex: $sex,
+                age: $age,
+                isPregnant: $isPregnant,
+            )['status'];
+
+            LabSubmissionValue::create([
+                'lab_submission_id' => $submission->id,
+                'test_slug' => \Illuminate\Support\Str::slug($item['test_name']),
+                'test_name' => $item['test_name'],
+                'unit' => $item['unit'] ?? '',
+                'value' => $item['value'],
+                'flag' => $this->mapStatusToFlag($status),
+            ]);
+        }
+
+        $prompt = "The following lab values were extracted from the user's report and confirmed:\n\n";
+        foreach ($confirmedValues as $item) {
+            $prompt .= "- {$item['test_name']}: {$item['value']} {$item['unit']}\n";
+        }
+        $prompt .= "\nProvide a plain-language interpretation for the patient.";
+
+        $interpretation = AiInterpretation::create([
+            'lab_submission_id' => $submission->id,
+            'prompt_input' => $prompt,
+            'guardrail_flags' => [],
+            'status' => 'pending',
+        ]);
+
+        $interpText = $this->deepSeek->interpretPdf($interpretation, $prompt);
+        if (!$interpText) {
+            return $this->error('AI interpretation unavailable. Please try again.', 503);
+        }
+
+        if (str_contains($interpText, 'NOT_A_LAB_REPORT')) {
+            $interpretation->update(['status' => 'failed', 'error_message' => 'The uploaded file does not appear to be a lab report.']);
+            return $this->error('This file does not appear to be a lab report. Please upload a document containing lab test results.', 422);
+        }
+
+        $this->creditService->debit($user, $cost, 'pdf_interpretation');
+        $draft->update([
+            'confirmation_status' => 'confirmed',
+            'confirmed_by' => $user->id,
+            'confirmed_at' => now(),
+            'extracted_tests' => $confirmedValues,
+        ]);
+
+        $submission->load(['values', 'interpretation']);
+        return $this->success([
+            'submission' => $submission,
+            'interpretation' => $interpretation->fresh(),
+            'has_interpretation' => !is_null($interpText),
+        ], 'Values confirmed and interpretation generated', 201);
+    }
+
     public function submitPdf(Request $request)
     {
         $validated = $request->validate([
@@ -391,7 +537,7 @@ class LabSubmissionController extends BaseController
         try {
             $parser = new \Smalot\PdfParser\Parser();
             $pdf = $parser->parseFile($fullPath);
-            $pdfText = $pdf->getText();
+            $pdfText = $this->cleanUtf8($pdf->getText());
         } catch (\Throwable $e) {
             return $this->error('Could not parse this PDF. The file may be corrupted or not a valid PDF.', 422);
         }
@@ -431,12 +577,167 @@ class LabSubmissionController extends BaseController
             return $this->error('The AI service is currently unavailable. Your credits have not been deducted. Please try again later.', 503);
         }
 
+        // Extract structured values so they can be charted against reference ranges.
+        $this->storePdfExtractedValues($submission, $user, $pdfText);
+
         $submission->load('interpretation');
         return $this->success([
             'submission' => $submission,
             'interpretation' => $interpretation->fresh(),
             'has_interpretation' => !is_null($interpText),
         ], 'PDF report submitted for interpretation', 201);
+    }
+
+    /**
+     * Build chart-ready, classified values for the result screen gauges.
+     *
+     * Leverages the demographic-aware ReferenceRangeService so ranges match the
+     * user's sex/age/pregnancy status and include critical thresholds.
+     */
+    private function buildChartValues($user, iterable $values): array
+    {
+        $profile = $user->healthProfile;
+
+        $sex = $profile?->sex ?? null;
+        $isPregnant = (bool) ($profile?->is_pregnant ?? false);
+
+        $age = null;
+        if ($profile?->date_of_birth) {
+            $age = Carbon::parse($profile->date_of_birth)->age;
+        }
+
+        $chartValues = [];
+
+        foreach ($values as $v) {
+            $testName = $v->test_name ?? $v->test_slug ?? 'Test';
+            $value = (float) $v->value;
+            $unit = $v->unit ?? '';
+
+            $result = $this->referenceRangeService->classify(
+                testName: $testName,
+                value: $value,
+                unit: $unit,
+                sex: $sex,
+                age: $age,
+                isPregnant: $isPregnant,
+            );
+
+            $status = $result['status'] ?? 'unknown';
+            $rangeLow = $result['range_low'];
+            $rangeHigh = $result['range_high'];
+            $criticalLow = $result['critical_low'];
+            $criticalHigh = $result['critical_high'];
+
+            // Skip values with no matched reference range — charts would be
+            // meaningless for them and should not be shown.
+            if ($status === 'unknown' || $rangeLow === null || $rangeHigh === null) {
+                continue;
+            }
+
+            // Position of the value within the full scale (critical boundaries when available).
+            $lo = $criticalLow ?? $rangeLow;
+            $hi = $criticalHigh ?? $rangeHigh;
+
+            $percent = null;
+            if (is_numeric($lo) && is_numeric($hi) && $hi > $lo) {
+                $percent = (($value - $lo) / ($hi - $lo)) * 100;
+                $percent = max(0, min(100, round($percent, 1)));
+            }
+
+            $chartValues[] = [
+                'test_name' => $testName,
+                'test_slug' => $v->test_slug ?? null,
+                'value' => $value,
+                'display_value' => $result['converted_value'] ?? $value,
+                'unit' => $result['unit'] ?? $unit,
+                'status' => $status,
+                'range_low' => $rangeLow,
+                'range_high' => $rangeHigh,
+                'critical_low' => $criticalLow,
+                'critical_high' => $criticalHigh,
+                'confidence' => $result['confidence'] ?? 0,
+                'percent' => $percent,
+            ];
+        }
+
+        return $chartValues;
+    }
+
+    /**
+     * Extract structured values from raw PDF text and persist them so the
+     * result page can chart them against reference ranges.
+     */
+    private function storePdfExtractedValues(LabSubmission $submission, $user, string $pdfText): void
+    {
+        try {
+            $extractor = app(\App\Services\PdfValueExtractor::class);
+            $tests = $extractor->extract($pdfText);
+
+            if (empty($tests)) {
+                return;
+            }
+
+            $profile = $user->healthProfile;
+            $sex = $profile?->sex ?? null;
+            $isPregnant = (bool) ($profile?->is_pregnant ?? false);
+            $age = $profile?->date_of_birth ? Carbon::parse($profile->date_of_birth)->age : null;
+
+            foreach ($tests as $t) {
+                $status = $this->referenceRangeService->classify(
+                    testName: $t['test_name'],
+                    value: (float) $t['value'],
+                    unit: $t['unit'] ?? '',
+                    sex: $sex,
+                    age: $age,
+                    isPregnant: $isPregnant,
+                )['status'];
+
+                LabSubmissionValue::create([
+                    'lab_submission_id' => $submission->id,
+                    'test_slug' => $t['test_code'] ?? \Illuminate\Support\Str::slug($t['test_name']),
+                    'test_name' => $t['test_name'],
+                    'unit' => $t['unit'] ?? '',
+                    'value' => $t['value'],
+                    'flag' => $this->mapStatusToFlag($status),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('storePdfExtractedValues failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Strip invalid UTF-8 byte sequences so the string can be safely
+     * JSON-encoded and stored without crashing responses.
+     */
+    private function cleanUtf8(string $value): string
+    {
+        if ($value === '') return '';
+
+        // mb_scrub() is the canonical way to remove invalid byte sequences.
+        if (function_exists('mb_scrub')) {
+            $scrubbed = mb_scrub($value, 'UTF-8');
+            if ($scrubbed !== false && $scrubbed !== '') {
+                return $scrubbed;
+            }
+        }
+
+        // Fallback: strip invalid UTF-8 byte sequences with a byte-safe regex.
+        $cleaned = preg_replace('/[^\x09\x0A\x0D\x20-\x7E\xC2-\xF4][\x80-\xBF]{0,3}/', '', $value);
+
+        return $cleaned === null ? '' : $cleaned;
+    }
+
+    private function mapStatusToFlag(string $status): string
+    {
+        return match ($status) {
+            'abnormal_low' => 'low',
+            'abnormal_high' => 'high',
+            'critical_low' => 'critical_low',
+            'critical_high' => 'critical_high',
+            'normal' => 'normal',
+            default => 'normal',
+        };
     }
 
     private function buildGuardrailFlags(array $flagged): array

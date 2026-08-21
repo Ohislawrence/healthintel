@@ -15,6 +15,20 @@ class LabSubmission extends Model
         'submitted_at' => 'datetime',
     ];
 
+    /**
+     * Sanitize string attributes to valid UTF-8 on write so stored PDF text
+     * can never crash JSON responses with malformed UTF-8.
+     */
+    public function setAttribute($key, $value)
+    {
+        if (is_string($value)) {
+            $cleaned = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+            $value = $cleaned === false ? '' : $cleaned;
+        }
+
+        return parent::setAttribute($key, $value);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

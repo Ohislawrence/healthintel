@@ -32,11 +32,15 @@ class PdfValueExtractor
         foreach ($knownTests as $test) {
             // Build patterns to find "TestName: 12.5" or "TestName 12.5 g/dL" in text
             $name = preg_quote($test->test_name, '/');
+            $code = preg_quote($test->test_code, '/');
+            // Escape the unit so characters like "/" in "g/dL" don't break the
+            // regular expression delimiter.
+            $unit = preg_quote($test->unit ?? '', '/');
             $patterns = [
                 // "Haemoglobin: 12.5 g/dL" or "Haemoglobin 12.5 g/dL"
-                "/{$name}\s*[:=]?\s*(\d+\.?\d*)\s*({$test->unit})?/i",
+                "/{$name}\s*[:=]?\s*(\d+\.?\d*)\s*({$unit})?/i",
                 // "HB: 12.5" (where test_code might be abbreviated)
-                "/" . preg_quote($test->test_code, '/') . "\s*[:=]?\s*(\d+\.?\d*)\s*({$test->unit})?/i",
+                "/{$code}\s*[:=]?\s*(\d+\.?\d*)\s*({$unit})?/i",
             ];
 
             foreach ($patterns as $pattern) {

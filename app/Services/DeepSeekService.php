@@ -80,7 +80,8 @@ class DeepSeekService
             $body = $response->json();
             $text = $body['choices'][0]['message']['content'] ?? null;
             if (!$text) { $interpretation->update(['status' => 'failed', 'error_message' => 'Empty response from DeepSeek.']); return null; }
-            $interpretation->update(['llm_output' => $body, 'interpretation_text' => $text, 'model_used' => $model, 'status' => 'completed', 'generated_at' => now()]);
+            $text = $this->cleanUtf8($text);
+            $interpretation->update(['llm_output' => $this->sanitizeUtf8Recursively($body), 'interpretation_text' => $text, 'model_used' => $model, 'status' => 'completed', 'generated_at' => now()]);
             return $text;
         } catch (\Throwable $e) {
             $interpretation->update(['status' => 'failed', 'error_message' => 'DeepSeek connection error: ' . $e->getMessage()]);
@@ -113,7 +114,49 @@ class DeepSeekService
             $body = $response->json();
             $text = $body['choices'][0]['message']['content'] ?? null;
             if (!$text) { $interpretation->update(['status' => 'failed', 'error_message' => 'Empty response from DeepSeek.']); return null; }
-            $interpretation->update(['llm_output' => $body, 'interpretation_text' => $text, 'model_used' => $model, 'status' => 'completed', 'generated_at' => now()]);
+            $text = $this->cleanUtf8($text);
+            $interpretation->update(['llm_output' => $this->sanitizeUtf8Recursively($body), 'interpretation_text' => $text, 'model_used' => $model, 'status' => 'completed', 'generated_at' => now()]);
+            return $text;
+        } catch (\Throwable $e) {
+            $interpretation->update(['status' => 'failed', 'error_message' => 'DeepSeek connection error: ' . $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /**
+     * Interpret a narrative clinical report — e.g. radiology, imaging scans
+     * (ultrasound, CT, MRI, X-ray, Doppler), ECG/echocardiogram, and other
+     * findings that are expressed as prose rather than numeric lab tables.
+     */
+    public function interpretNarrative(AiInterpretation $interpretation, string $reportText): ?string
+    {
+        $apiKey = config('services.deepseek.api_key') ?: ($_ENV['DEEPSEEK_API_KEY'] ?? getenv('DEEPSEEK_API_KEY')) ?: null;
+        if (empty($apiKey)) { $interpretation->update(['status' => 'failed', 'error_message' => 'DeepSeek API key not configured.']); return null; }
+
+        $model = config('services.deepseek.model') ?: ($_ENV['DEEPSEEK_MODEL'] ?? getenv('DEEPSEEK_MODEL')) ?: 'deepseek-v4-flash';
+        $baseUrl = config('services.deepseek.base_url', 'https://api.deepseek.com');
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey, 'Content-Type' => 'application/json',
+            ])->timeout(60)->post($baseUrl . '/v1/chat/completions', [
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $this->narrativeSystemPrompt()],
+                    ['role' => 'user', 'content' => "Explain the following medical report in plain language:\n\n" . $reportText],
+                ],
+                'max_tokens' => (int) config('services.deepseek.max_tokens', 4096),
+                'temperature' => (float) config('services.deepseek.temperature', 0.3),
+            ]);
+            if (!$response->successful()) {
+                $interpretation->update(['status' => 'failed', 'error_message' => 'DeepSeek API error: ' . ($response->json('error.message') ?? $response->status())]);
+                return null;
+            }
+            $body = $response->json();
+            $text = $body['choices'][0]['message']['content'] ?? null;
+            if (!$text) { $interpretation->update(['status' => 'failed', 'error_message' => 'Empty response from DeepSeek.']); return null; }
+            $text = $this->cleanUtf8($text);
+            $interpretation->update(['llm_output' => $this->sanitizeUtf8Recursively($body), 'interpretation_text' => $text, 'model_used' => $model, 'status' => 'completed', 'generated_at' => now()]);
             return $text;
         } catch (\Throwable $e) {
             $interpretation->update(['status' => 'failed', 'error_message' => 'DeepSeek connection error: ' . $e->getMessage()]);
@@ -188,6 +231,34 @@ TXT;
         } catch (\Throwable) { return null; }
     }
 
+    /**
+     * Sanitize a string so it contains only valid UTF-8, preventing JSON
+     * encoding failures and DB column encoding errors.
+     */
+    private function cleanUtf8(string $value): string
+    {
+        $cleaned = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+        return $cleaned === false ? '' : $cleaned;
+    }
+
+    /**
+     * Recursively sanitize all string values in an array so the `llm_output`
+     * JSON column never contains invalid UTF-8 (which crashes JSON responses).
+     */
+    private function sanitizeUtf8Recursively(mixed $data): mixed
+    {
+        if (is_string($data)) {
+            return $this->cleanUtf8($data);
+        }
+        if (is_array($data)) {
+            foreach ($data as $key => $value) {
+                $data[$key] = $this->sanitizeUtf8Recursively($value);
+            }
+            return $data;
+        }
+        return $data;
+    }
+
     private function systemPrompt(): string
     {
         return <<<'TXT'
@@ -213,6 +284,45 @@ Quick one-liner: "All other tested values were within normal ranges." or list th
 1-2 simple suggestions (e.g., "Discuss with your doctor," "Repeat in 3 months," "Monitor your diet").
 
 Use grade 7-8 English. No jargon. Every medical term must be explained in parentheses.
+TXT;
+    }
+
+    private function narrativeSystemPrompt(): string
+    {
+        return <<<'TXT'
+You are a medical report interpreter for LabDoc, a Nigerian health-tech platform. Your job is to take the raw text of a clinical report — radiographs, scans and clinical notes such as ultrasound, CT, MRI, X-ray, Doppler, ECG/echocardiogram, obstetric, or pathology reports — and explain it in the plainest possible language so a non-medical person fully understands it.
+
+CRITICAL FIRST CHECK — Validate the content:
+- If the text is clearly NOT any kind of medical or health report (e.g. a receipt, a letter, an invoice, a form, or unrelated text), respond with EXACTLY: "NOT_A_MEDICAL_DOCUMENT"
+- Otherwise, ALWAYS interpret it. These reports are primarily narrative prose, so do NOT reject them just because they lack a table of numeric lab values.
+
+IMPORTANT GUARDRAILS — follow these strictly:
+1. NEVER claim to diagnose a disease or condition definitively. Use phrases like "this may indicate," "this is consistent with," or "the report notes."
+2. NEVER recommend medications or dosages.
+3. ALWAYS include: "This is NOT medical advice. Please consult a licensed healthcare professional for proper diagnosis and treatment."
+4. If the report mentions anything that could be urgent (e.g. "marked stenosis", "effusion", "swelling", "mass", "fracture", "possible malignancy", or severe BP), explicitly add: "Some findings may need urgent medical attention. Please see a doctor soon."
+5. Use VERY simple, everyday English (grade 5-6, like you are talking to a friend with no medical knowledge). Explain EVERY medical term in plain words the first time you use it (e.g. "stenosis (narrowing)"). Avoid jargon completely.
+
+RESPONSE FORMAT — Be warm, clear and scannable using markdown:
+
+## 🩺 What This Report Is
+One short sentence identifying the type of scan/report and the body area.
+
+## ⚠️ Key Findings
+- List any abnormal or notable findings FIRST, each as a bolded short phrase, followed by a one-sentence plain-language explanation of what it means.
+- If everything is normal, say: "The report shows no significant abnormalities. ✅"
+
+## ✅ Normal Findings
+A brief line summarizing the normal parts (so the user is reassured).
+
+## 💡 What This Means (Simple Explanation)
+2-4 plain sentences connecting the findings together in everyday words.
+
+## 📋 Next Steps
+1-2 practical suggestions only (e.g. "Discuss with your doctor," "Repeat the scan in a few months," "Make follow-up lifestyle changes"). Do NOT prescribe medications.
+
+## ℹ️ Disclaimer
+"This is NOT medical advice. Please consult a licensed healthcare professional."
 TXT;
     }
 
