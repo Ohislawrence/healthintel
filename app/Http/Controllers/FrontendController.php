@@ -65,6 +65,11 @@ class FrontendController extends Controller
         return view('frontend.contact');
     }
 
+    public function listYourBusiness()
+    {
+        return view('frontend.list-your-business');
+    }
+
     public function partnerships()
     {
         return view('frontend.partnerships');
@@ -139,10 +144,27 @@ class FrontendController extends Controller
             ['url' => route('for-individuals'), 'priority' => '0.7', 'changefreq' => 'monthly'],
             ['url' => route('for-clinicians'), 'priority' => '0.7', 'changefreq' => 'monthly'],
             ['url' => route('for-labs'), 'priority' => '0.8', 'changefreq' => 'monthly'],
+            ['url' => route('for-insurance'), 'priority' => '0.7', 'changefreq' => 'monthly'],
+            ['url' => route('partnerships'), 'priority' => '0.8', 'changefreq' => 'monthly'],
+            ['url' => route('list-your-business'), 'priority' => '0.8', 'changefreq' => 'monthly'],
             ['url' => route('contact'), 'priority' => '0.6', 'changefreq' => 'monthly'],
             ['url' => route('privacy'), 'priority' => '0.4', 'changefreq' => 'yearly'],
             ['url' => route('terms'), 'priority' => '0.4', 'changefreq' => 'yearly'],
         ];
+
+        // Include published blog posts.
+        $posts = BlogPost::published()
+            ->orderByDesc('published_at')
+            ->get(['slug', 'published_at']);
+
+        foreach ($posts as $post) {
+            $pages[] = [
+                'url' => route('blog.detail', $post->slug),
+                'priority' => '0.6',
+                'changefreq' => 'monthly',
+                'lastmod' => $post->published_at?->toAtomString(),
+            ];
+        }
 
         return response()->view('frontend.sitemap', ['pages' => $pages])
             ->header('Content-Type', 'application/xml');

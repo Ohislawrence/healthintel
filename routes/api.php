@@ -74,6 +74,10 @@ Route::post('/payment/webhook/nomba', [PaymentController::class, 'nombaWebhook']
 Route::post('/partnership-inquiry', [\App\Http\Controllers\Api\PartnershipInquiryController::class, 'store'])
     ->middleware('throttle:5,10');
 
+// Provider listing / ad request (public — from "list your lab/hospital" page)
+Route::post('/provider-listing-request', [\App\Http\Controllers\Api\ProviderListingRequestController::class, 'store'])
+    ->middleware('throttle:5,10');
+
 // Partner portal login (public, access-code based)
 Route::post('/partner/login', [PartnerPortalController::class, 'login'])
     ->middleware('throttle:10,1');
@@ -189,7 +193,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
 
     // Partner Portal (authenticated partner routes)
     Route::get('/partner/dashboard', [PartnerPortalController::class, 'dashboard']);
+    Route::get('/partner/listing', [PartnerPortalController::class, 'myListing']);
     Route::put('/partner/listing', [PartnerPortalController::class, 'updateListing']);
+    Route::get('/partner/listing-requests', [PartnerPortalController::class, 'myRequests']);
+    Route::post('/partner/promotion-request', [PartnerPortalController::class, 'requestPromotion']);
     Route::post('/partner/regenerate-code', [PartnerPortalController::class, 'regenerateAccessCode']);
 
     // Partner Interpretation (B2B lab partners)

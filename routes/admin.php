@@ -139,6 +139,10 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/partnership-inquiries', [AdminController::class, 'partnershipInquiries']);
     Route::put('/partnership-inquiries/{id}', [AdminController::class, 'partnershipInquiryUpdate']);
 
+    // Provider Listing & Ad Requests
+    Route::get('/provider-listing-requests', [AdminController::class, 'providerListingRequests']);
+    Route::put('/provider-listing-requests/{id}', [AdminController::class, 'providerListingRequestUpdate']);
+
     // Referral Program Management
     Route::get('/referral/settings', [AdminController::class, 'referralSettings']);
     Route::put('/referral/settings', [AdminController::class, 'referralSettingsUpdate']);

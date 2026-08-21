@@ -144,7 +144,7 @@ export default function ResultScreen() {
             </div>
             {isCompleted && interpretation?.interpretation_text ? (
                 <div className="card p-5 lg:p-6 border-teal-100 relative">
-                    <div className="flex items-center gap-3 mb-4 pb-4 border-b border-neutral-100"><div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center text-xl text-teal-600">◉</div><p className="text-lg font-extrabold text-neutral-900">AI Interpretation</p></div>
+                    <div className="flex items-center gap-3 mb-4 pb-4 border-b border-neutral-100"><div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center text-xl text-teal-600">◉</div><p className="text-lg font-extrabold text-neutral-900">Interpretation</p></div>
                     {translating && (
                         <div className="flex items-center justify-center gap-3 py-6 text-neutral-500">
                             <span className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />

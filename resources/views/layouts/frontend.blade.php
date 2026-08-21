@@ -1189,6 +1189,7 @@
                 <a href="/blog">Blog</a>
                 <a href="{{ route('about') }}">About</a>
                 <a href="{{ route('contact') }}">Contact</a>
+                <a href="{{ route('list-your-business') }}">List your business</a>
             </nav>
 
             <div class="nav-actions">
@@ -1211,6 +1212,7 @@
         <a href="/blog">Blog</a>
         <a href="{{ route('about') }}">About</a>
         <a href="{{ route('contact') }}">Contact</a>
+        <a href="{{ route('list-your-business') }}">List your business</a>
         
         <div class="mobile-cta">
             @auth

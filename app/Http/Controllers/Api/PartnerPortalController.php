@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\ProviderDirectoryEntry;
+use App\Models\ProviderListingRequest;
 use App\Models\ReferralEvent;
 use App\Services\ReferralService;
 use Illuminate\Http\Request;
@@ -95,6 +96,20 @@ class PartnerPortalController extends BaseController
     }
 
     /**
+     * Fetch the partner's full listing including monetization/ad details.
+     */
+    public function myListing(Request $request)
+    {
+        $provider = $this->resolveProvider($request);
+
+        $provider->load('locations')->append('is_sponsored');
+
+        return $this->success([
+            'provider' => $provider->makeVisible(['access_code']),
+        ]);
+    }
+
+    /**
      * Update provider listing info.
      */
     public function updateListing(Request $request)
@@ -102,6 +117,7 @@ class PartnerPortalController extends BaseController
         $provider = $this->resolveProvider($request);
 
         $validated = $request->validate([
+            'name' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:30',
             'email' => 'nullable|email|max:200',
             'address' => 'nullable|string|max:500',
@@ -111,13 +127,142 @@ class PartnerPortalController extends BaseController
             'bio' => 'nullable|string|max:2000',
             'specialty' => 'nullable|string|max:200',
             'insurance_plans' => 'nullable|array',
+            'logo_url' => 'nullable|string|max:500',
+            'banner_url' => 'nullable|string|max:500',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'locations' => 'nullable|array|max:100',
+            'locations.*.name' => 'nullable|string|max:200',
+            'locations.*.address' => 'nullable|string|max:255',
+            'locations.*.city' => 'nullable|string|max:100',
+            'locations.*.state' => 'nullable|string|max:100',
+            'locations.*.country' => 'nullable|string|max:100',
+            'locations.*.phone' => 'nullable|string|max:50',
+            'locations.*.latitude' => 'nullable|numeric',
+            'locations.*.longitude' => 'nullable|numeric',
+            'locations.*.is_primary' => 'boolean',
         ]);
+
+        $locations = $request->input('locations');
+        unset($validated['locations']);
+
+        // Normalize empty strings to null
+        foreach ($validated as $key => $value) {
+            if ($value === '') {
+                $validated[$key] = null;
+            }
+        }
 
         $provider->update($validated);
 
+        if (is_array($locations)) {
+            $this->syncLocations($provider, $locations);
+        }
+
+        $provider->load('locations')->append('is_sponsored');
+
         return $this->success([
-            'provider' => $provider->fresh()->makeVisible(['access_code']),
+            'provider' => $provider->makeVisible(['access_code']),
         ]);
+    }
+
+    /**
+     * Fetch the partner's own listing/ad requests.
+     */
+    public function myRequests(Request $request)
+    {
+        $provider = $this->resolveProvider($request);
+
+        $requests = ProviderListingRequest::where('contact_email', $provider->email)
+            ->orWhere('provider_id', $provider->id)
+            ->latest()
+            ->get();
+
+        return $this->success(['requests' => $requests]);
+    }
+
+    /**
+     * Partner asks to become a sponsored listing (ad placement request).
+     */
+    public function requestPromotion(Request $request)
+    {
+        $provider = $this->resolveProvider($request);
+
+        $validated = $request->validate([
+            'promotion_plan' => 'nullable|string|max:30',
+            'promotion_budget_naira' => 'nullable|numeric|min:0',
+            'promotion_duration_days' => 'nullable|integer|min:1|max:365',
+            'message' => 'nullable|string|max:2000',
+        ]);
+
+        $budget = null;
+        if (isset($validated['promotion_budget_naira'])) {
+            $budget = (int) round($validated['promotion_budget_naira'] * 100);
+        }
+
+        $listing = ProviderListingRequest::create([
+            'request_type' => 'promotion',
+            'facility_name' => $provider->name,
+            'type' => $provider->type,
+            'specialty' => $provider->specialty,
+            'contact_name' => $provider->name,
+            'contact_email' => $provider->email,
+            'contact_phone' => $provider->phone,
+            'address' => $provider->address,
+            'city' => $provider->city,
+            'state' => $provider->state,
+            'website' => $provider->website,
+            'description' => $validated['message'] ?? null,
+            'promotion_plan' => $validated['promotion_plan'] ?? null,
+            'promotion_budget_kobo' => $budget,
+            'promotion_duration_days' => $validated['promotion_duration_days'] ?? null,
+            'status' => 'pending',
+            'provider_id' => $provider->id,
+        ]);
+
+        return $this->success([
+            'request' => $listing->only(['id', 'request_type', 'facility_name', 'status', 'created_at']),
+        ], 'Ad request submitted. Our team will review and contact you shortly.', 201);
+    }
+
+    /**
+     * Replace a provider's locations with the supplied list.
+     */
+    private function syncLocations(ProviderDirectoryEntry $provider, array $locations): void
+    {
+        $normalized = collect($locations)
+            ->filter(fn($loc) => is_array($loc) && (
+                !empty($loc['name']) || !empty($loc['address']) || !empty($loc['city'])
+            ))
+            ->values()
+            ->map(function ($loc) {
+                $nullIfEmpty = fn ($value) => ($value === '' || $value === null) ? null : $value;
+
+                return [
+                    'name' => $nullIfEmpty($loc['name'] ?? null),
+                    'address' => $nullIfEmpty($loc['address'] ?? null),
+                    'city' => $nullIfEmpty($loc['city'] ?? null),
+                    'state' => $nullIfEmpty($loc['state'] ?? null),
+                    'country' => $loc['country'] ?? 'Nigeria',
+                    'phone' => $nullIfEmpty($loc['phone'] ?? null),
+                    'latitude' => $nullIfEmpty($loc['latitude'] ?? null),
+                    'longitude' => $nullIfEmpty($loc['longitude'] ?? null),
+                    'is_primary' => (bool) ($loc['is_primary'] ?? false),
+                ];
+            });
+
+        // Ensure exactly one primary location when locations exist.
+        if ($normalized->isNotEmpty() && !$normalized->contains('is_primary', true)) {
+            $normalized = $normalized->map(function ($item, $index) {
+                if ($index === 0) $item['is_primary'] = true;
+                return $item;
+            });
+        }
+
+        $provider->locations()->delete();
+        foreach ($normalized as $data) {
+            $provider->locations()->create($data);
+        }
     }
 
     /**

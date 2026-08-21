@@ -18,6 +18,7 @@ export default function AdminLayout() {
         { to: '/admin/providers', label: 'Providers', icon: '🏥' },
         { to: '/admin/partnerships', label: 'Partnerships', icon: '🏢' },
         { to: '/admin/partnership-inquiries', label: 'Partner Inquiries', icon: '📨' },
+        { to: '/admin/listing-requests', label: 'Listing Requests', icon: '🏪' },
         { to: '/admin/testimonials', label: 'Testimonials', icon: '⭐' },
         { to: '/admin/benchmarks', label: 'Benchmarks', icon: '🎯' },
         { to: '/admin/clinical/ranges', label: 'Reference Ranges', icon: '🎯' },

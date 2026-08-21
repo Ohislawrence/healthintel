@@ -1674,4 +1674,117 @@ class AdminController extends BaseController
         $inquiry->update($validated);
         return $this->success(['inquiry' => $inquiry->fresh()]);
     }
+
+    // ── Provider Listing & Ad Requests ──
+
+    public function providerListingRequests(Request $request)
+    {
+        $query = \App\Models\ProviderListingRequest::query();
+
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($type = $request->input('request_type')) {
+            $query->where('request_type', $type);
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('facility_name', 'like', "%{$search}%")
+                  ->orWhere('contact_name', 'like', "%{$search}%")
+                  ->orWhere('contact_email', 'like', "%{$search}%")
+                  ->orWhere('city', 'like', "%{$search}%")
+                  ->orWhere('state', 'like', "%{$search}%");
+            });
+        }
+
+        $requests = $query->latest()->paginate(25);
+
+        return $this->paginated($requests);
+    }
+
+    public function providerListingRequestUpdate(Request $request, int $id)
+    {
+        $listing = \App\Models\ProviderListingRequest::findOrFail($id);
+
+        $validated = $request->validate([
+            'status' => 'sometimes|in:pending,approved,rejected',
+            'admin_notes' => 'nullable|string|max:5000',
+            // Optional: when approving, allow admin to attach/override listing fields
+            'name' => 'sometimes|string|max:255',
+            'type' => 'sometimes|in:lab,hospital,clinic,pharmacy,specialist',
+        ]);
+
+        $status = $validated['status'] ?? null;
+        $notes = $validated['admin_notes'] ?? null;
+        unset($validated['status'], $validated['admin_notes']);
+
+        // Approve: create a provider directory entry if one doesn't exist yet.
+        $provider = null;
+        if ($status === 'approved' && $listing->status !== 'approved') {
+            $provider = $this->createProviderFromListingRequest($listing, $validated);
+        }
+
+        $listing->update([
+            'status' => $status ?? $listing->status,
+            'admin_notes' => $notes,
+            'provider_id' => $provider?->id ?? $listing->provider_id,
+        ]);
+
+        return $this->success([
+            'request' => $listing->fresh()->load('provider'),
+            'provider' => $provider?->fresh(),
+        ]);
+    }
+
+    /**
+     * Create (or reuse) a ProviderDirectoryEntry when a listing request is approved.
+     */
+    private function createProviderFromListingRequest(
+        \App\Models\ProviderListingRequest $listing,
+        array $overrides = []
+    ): ProviderDirectoryEntry {
+        // Reuse existing provider if linked
+        if ($listing->provider_id && $provider = ProviderDirectoryEntry::find($listing->provider_id)) {
+            return $provider;
+        }
+
+        // Reuse by email match to avoid duplicates
+        if (!empty($listing->contact_email)) {
+            $existing = ProviderDirectoryEntry::where('email', $listing->contact_email)->first();
+            if ($existing) {
+                return $existing;
+            }
+        }
+
+        $name = $overrides['name'] ?? $listing->facility_name;
+        $baseSlug = \Illuminate\Support\Str::slug($name);
+        $slug = $baseSlug;
+        $counter = 1;
+        while (ProviderDirectoryEntry::where('slug', $slug)->exists()) {
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+
+        $provider = ProviderDirectoryEntry::create([
+            'name' => $name,
+            'slug' => $slug,
+            'type' => $overrides['type'] ?? $listing->type ?? 'lab',
+            'specialty' => $listing->specialty,
+            'bio' => $listing->description,
+            'phone' => $listing->contact_phone,
+            'email' => $listing->contact_email,
+            'address' => $listing->address,
+            'city' => $listing->city,
+            'state' => $listing->state,
+            'country' => 'NG',
+            'website' => $listing->website,
+            'partner_status' => 'none',
+            'is_verified' => false,
+            'is_active' => true,
+        ]);
+
+        return $provider;
+    }
 }

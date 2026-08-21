@@ -90,6 +90,7 @@ import AdminBlogCategories from './screens/admin/AdminBlogCategories';
 import AdminPartnerships from './screens/admin/AdminPartnerships';
 import AdminPartnershipDetail from './screens/admin/AdminPartnershipDetail';
 import AdminPartnershipInquiries from './screens/admin/AdminPartnershipInquiries';
+import AdminProviderListingRequests from './screens/admin/AdminProviderListingRequests';
 import AdminReferenceRanges from './screens/admin/AdminReferenceRanges';
 import AdminClinicalPanels from './screens/admin/AdminClinicalPanels';
 import AdminMedicationEffects from './screens/admin/AdminMedicationEffects';
@@ -104,6 +105,8 @@ import PartnerLogin from './screens/partner/PartnerLogin';
 import PartnerLayout from './screens/partner/PartnerLayout';
 import PartnerDashboard from './screens/partner/PartnerDashboard';
 import PartnerInterpretations from './screens/partner/PartnerInterpretations';
+import PartnerListing from './screens/partner/PartnerListing';
+import PartnerAds from './screens/partner/PartnerAds';
 
 // Placeholder screens for partner portal (fallback for routes not yet built)
 function PartnerPlaceholder({ title }) {
@@ -351,6 +354,7 @@ function App() {
                         <Route path="clinical/medication-effects" element={<AdminMedicationEffects />} />
                         <Route path="emails" element={<AdminEmails />} />
                         <Route path="partnership-inquiries" element={<AdminPartnershipInquiries />} />
+                        <Route path="listing-requests" element={<AdminProviderListingRequests />} />
                         <Route path="referrals" element={<AdminReferrals />} />
                         <Route path="testimonials" element={<AdminTestimonials />} />
                         <Route path="benchmarks" element={<AdminBenchmarks />} />
@@ -363,6 +367,8 @@ function App() {
                         <Route index element={<Navigate to="/partner/dashboard" replace />} />
                         <Route path="dashboard" element={<PartnerDashboard />} />
                         <Route path="interpretations" element={<PartnerInterpretations />} />
+                        <Route path="listing" element={<PartnerListing />} />
+                        <Route path="ads" element={<PartnerAds />} />
                         <Route path="patients" element={<PartnerPlaceholder title="Patients" />} />
                         <Route path="invoices" element={<PartnerPlaceholder title="Invoices" />} />
                         <Route path="submit" element={<PartnerPlaceholder title="Submit Results" />} />

@@ -3,6 +3,9 @@
 @foreach($pages as $page)
     <url>
         <loc>https://healthintel.app{{ parse_url($page['url'], PHP_URL_PATH) }}</loc>
+        @if(!empty($page['lastmod']))
+        <lastmod>{{ $page['lastmod'] }}</lastmod>
+        @endif
         <changefreq>{{ $page['changefreq'] }}</changefreq>
         <priority>{{ $page['priority'] }}</priority>
     </url>

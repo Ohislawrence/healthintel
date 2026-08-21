@@ -49,7 +49,7 @@
     </div>
 
     {{-- Content --}}
-    <div style="font-size: 1.05rem; line-height: 1.85; color: var(--text);">
+    <div class="prose" style="font-size: 1.05rem; line-height: 1.85; color: var(--text);">
         {!! $post->content !!}
 
         <style>
