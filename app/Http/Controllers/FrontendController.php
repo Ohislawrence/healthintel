@@ -70,6 +70,15 @@ class FrontendController extends Controller
         return view('frontend.list-your-business');
     }
 
+    public function affiliates()
+    {
+        $commission = (int) \App\Models\Setting::getValue('referral.percentage', 10);
+        $maxPayouts = (int) \App\Models\Setting::getValue('referral.max_payouts_per_referral', 3);
+        $minThreshold = (int) \App\Models\Setting::getValue('referral.min_payout_threshold_naira', 5000);
+
+        return view('frontend.affiliates', compact('commission', 'maxPayouts', 'minThreshold'));
+    }
+
     public function partnerships()
     {
         return view('frontend.partnerships');
@@ -147,6 +156,7 @@ class FrontendController extends Controller
             ['url' => route('for-insurance'), 'priority' => '0.7', 'changefreq' => 'monthly'],
             ['url' => route('partnerships'), 'priority' => '0.8', 'changefreq' => 'monthly'],
             ['url' => route('list-your-business'), 'priority' => '0.8', 'changefreq' => 'monthly'],
+            ['url' => route('affiliates'), 'priority' => '0.8', 'changefreq' => 'monthly'],
             ['url' => route('contact'), 'priority' => '0.6', 'changefreq' => 'monthly'],
             ['url' => route('privacy'), 'priority' => '0.4', 'changefreq' => 'yearly'],
             ['url' => route('terms'), 'priority' => '0.4', 'changefreq' => 'yearly'],

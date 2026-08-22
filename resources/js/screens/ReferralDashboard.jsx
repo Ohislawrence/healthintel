@@ -7,25 +7,35 @@ export default function ReferralDashboard() {
   const [summary, setSummary] = useState(null);
   const [earnings, setEarnings] = useState([]);
   const [payouts, setPayouts] = useState([]);
+  const [bankDetails, setBankDetails] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showPayoutForm, setShowPayoutForm] = useState(false);
-  const [payoutForm, setPayoutForm] = useState({
+
+  // Payout confirm modal
+  const [showPayoutConfirm, setShowPayoutConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // One-time bank details modal
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [bankSaving, setBankSaving] = useState(false);
+  const [bankForm, setBankForm] = useState({
     bank_name: '',
     account_number: '',
     account_name: '',
   });
-  const [submitting, setSubmitting] = useState(false);
 
   const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
-      const [summaryRes, earningsRes, payoutsRes] = await Promise.all([
+      const [summaryRes, earningsRes, payoutsRes, bankRes] = await Promise.all([
         api.get('/referral/earnings/summary'),
         api.get('/referral/earnings'),
         api.get('/referral/payouts'),
+        api.get('/referral/bank-details'),
       ]);
       setSummary(summaryRes.data);
       setEarnings(earningsRes.data?.earnings?.data || []);
       setPayouts(payoutsRes.data?.payouts?.data || []);
+      setBankDetails(bankRes.data);
     } catch (err) {
       alert('Failed to load referral data');
     } finally {
@@ -37,17 +47,49 @@ export default function ReferralDashboard() {
     fetchData();
   }, [fetchData]);
 
-  const handlePayoutSubmit = async (e) => {
+  const openBankModal = () => {
+    setBankForm({
+      bank_name: bankDetails?.bank_name || '',
+      account_number: bankDetails?.account_number || '',
+      account_name: bankDetails?.account_name || '',
+    });
+    setShowBankModal(true);
+  };
+
+  const handleBankSave = async (e) => {
     e.preventDefault();
+    setBankSaving(true);
+    try {
+      const res = await api.post('/referral/bank-details', bankForm);
+      setBankDetails({
+        ...res.data,
+        has_bank_details: true,
+      });
+      setShowBankModal(false);
+      alert('Bank details saved.');
+    } catch (err) {
+      alert(err.response?.data?.message || err?.message || 'Failed to save bank details');
+    } finally {
+      setBankSaving(false);
+    }
+  };
+
+  const handlePayoutSubmit = async () => {
     setSubmitting(true);
     try {
-      await api.post('/referral/payout/request', payoutForm);
+      await api.post('/referral/payout/request', {});
       alert('Payout request submitted!');
-      setShowPayoutForm(false);
-      setPayoutForm({ bank_name: '', account_number: '', account_name: '' });
+      setShowPayoutConfirm(false);
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to submit payout request');
+      const message = err.response?.data?.message || err?.message || 'Failed to submit payout request';
+      // If bank details are missing, open the bank details modal.
+      if (/bank details/i.test(message)) {
+        setShowPayoutConfirm(false);
+        openBankModal();
+        return;
+      }
+      alert(message);
     } finally {
       setSubmitting(false);
     }
@@ -57,7 +99,6 @@ export default function ReferralDashboard() {
     if (!user?.referral_code) return;
     const link = `${window.location.origin}/register?ref=${user.referral_code}`;
 
-    // Use Clipboard API if available (HTTPS/localhost), fall back to execCommand for HTTP
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(link).then(
         () => alert('Referral link copied!'),
@@ -107,12 +148,16 @@ export default function ReferralDashboard() {
     );
   };
 
+  const hasBank = !!bankDetails?.has_bank_details;
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Referral Program</h1>
-        <p className="text-gray-500 mt-1">Share your link and earn when friends sign up and buy credits.</p>
+        <p className="text-gray-500 mt-1">
+          Share your link and earn commission when your referrals buy credits.
+        </p>
       </div>
 
       {/* Referral Link Card */}
@@ -156,9 +201,26 @@ export default function ReferralDashboard() {
         </div>
       )}
 
-      {/* Payout Action */}
+      {/* Bank details + payout */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
         <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Payout Account</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              {hasBank
+                ? `${bankDetails.bank_name} — ${bankDetails.account_number} (${bankDetails.account_name})`
+                : 'Add your bank account to receive payouts.'}
+            </p>
+          </div>
+          <button
+            onClick={openBankModal}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+          >
+            {hasBank ? 'Edit Details' : 'Add Bank Details'}
+          </button>
+        </div>
+
+        <div className="mt-5 pt-5 border-t border-gray-100 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Request Payout</h3>
             <p className="text-sm text-gray-500 mt-1">
@@ -166,77 +228,19 @@ export default function ReferralDashboard() {
             </p>
           </div>
           <button
-            onClick={() => setShowPayoutForm(true)}
+            onClick={() => {
+              if (!hasBank) {
+                openBankModal();
+                return;
+              }
+              setShowPayoutConfirm(true);
+            }}
             disabled={!summary?.can_request_payout}
             className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
           >
             Request Payout
           </button>
         </div>
-
-        {/* Payout Form Modal */}
-        {showPayoutForm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-lg max-w-md w-full mx-4 p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Request Payout</h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Requesting payout of ₦{summary?.pending_balance_naira?.toLocaleString() || 0}
-              </p>
-              <form onSubmit={handlePayoutSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={payoutForm.bank_name}
-                    onChange={(e) => setPayoutForm({ ...payoutForm, bank_name: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    placeholder="e.g., Access Bank"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={20}
-                    value={payoutForm.account_number}
-                    onChange={(e) => setPayoutForm({ ...payoutForm, account_number: e.target.value.replace(/\D/g, '') })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    placeholder="10-digit account number"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={payoutForm.account_name}
-                    onChange={(e) => setPayoutForm({ ...payoutForm, account_name: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    placeholder="Account holder name"
-                  />
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowPayoutForm(false)}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"
-                  >
-                    {submitting ? 'Submitting...' : 'Submit Request'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Earnings History */}
@@ -311,6 +315,108 @@ export default function ReferralDashboard() {
           </div>
         )}
       </div>
+
+      {/* Bank details modal (one-time setup) */}
+      {showBankModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full mx-4 p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">
+              {hasBank ? 'Edit Bank Details' : 'Add Bank Details'}
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              {hasBank
+                ? 'Update the account where your payouts will be sent.'
+                : 'Enter your bank account once. We\'ll use it for all future payouts.'}
+            </p>
+            <form onSubmit={handleBankSave} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
+                <input
+                  type="text"
+                  required
+                  value={bankForm.bank_name}
+                  onChange={(e) => setBankForm({ ...bankForm, bank_name: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="e.g., Access Bank"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={20}
+                  value={bankForm.account_number}
+                  onChange={(e) => setBankForm({ ...bankForm, account_number: e.target.value.replace(/\D/g, '') })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="10-digit account number"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
+                <input
+                  type="text"
+                  required
+                  value={bankForm.account_name}
+                  onChange={(e) => setBankForm({ ...bankForm, account_name: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Account holder name"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBankModal(false)}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={bankSaving}
+                  className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"
+                >
+                  {bankSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Payout confirm modal */}
+      {showPayoutConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full mx-4 p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Payout Request</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              You are about to request a payout of <strong>₦{summary?.pending_balance_naira?.toLocaleString() || 0}</strong> to:
+            </p>
+            {hasBank && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-sm">
+                <p><strong>{bankDetails.bank_name}</strong></p>
+                <p className="text-gray-600">{bankDetails.account_number}</p>
+                <p className="text-gray-600">{bankDetails.account_name}</p>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPayoutConfirm(false)}
+                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePayoutSubmit}
+                disabled={submitting}
+                className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"
+              >
+                {submitting ? 'Submitting...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

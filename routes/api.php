@@ -198,6 +198,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::get('/referral/earnings/summary', [\App\Http\Controllers\Api\ReferralController::class, 'summary']);
     Route::get('/referral/payouts', [\App\Http\Controllers\Api\ReferralController::class, 'payoutHistory']);
     Route::post('/referral/payout/request', [\App\Http\Controllers\Api\ReferralController::class, 'requestPayout']);
+    Route::get('/referral/bank-details', [\App\Http\Controllers\Api\ReferralController::class, 'bankDetails']);
+    Route::post('/referral/bank-details', [\App\Http\Controllers\Api\ReferralController::class, 'saveBankDetails']);
 
     // Partner Portal (authenticated partner routes)
     Route::get('/partner/dashboard', [PartnerPortalController::class, 'dashboard']);

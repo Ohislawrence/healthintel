@@ -27,6 +27,43 @@ class ReferralController extends BaseController
     }
 
     /**
+     * Get the user's saved bank details (for one-time payout setup).
+     */
+    public function bankDetails(Request $request)
+    {
+        $user = $request->user();
+
+        return $this->success([
+            'bank_name' => $user->bank_name,
+            'account_number' => $user->account_number,
+            'account_name' => $user->account_name,
+            'has_bank_details' => !empty($user->account_number) && !empty($user->bank_name),
+        ]);
+    }
+
+    /**
+     * Save (or update) the user's bank details — entered once for payouts.
+     */
+    public function saveBankDetails(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'bank_name' => 'required|string|max:100',
+            'account_number' => 'required|string|max:20',
+            'account_name' => 'required|string|max:200',
+        ]);
+
+        $user->update($validated);
+
+        return $this->success([
+            'bank_name' => $user->bank_name,
+            'account_number' => $user->account_number,
+            'account_name' => $user->account_name,
+        ], 'Bank details saved.');
+    }
+
+    /**
      * Get user's earnings history (paginated).
      */
     public function earnings(Request $request)
@@ -126,18 +163,28 @@ class ReferralController extends BaseController
             );
         }
 
+        // Use the user's saved bank details (entered once). Allow an optional
+        // override via the request, but default to the stored details.
         $validated = $request->validate([
-            'bank_name' => 'required|string|max:100',
-            'account_number' => 'required|string|max:20',
-            'account_name' => 'required|string|max:200',
+            'bank_name' => 'nullable|string|max:100',
+            'account_number' => 'nullable|string|max:20',
+            'account_name' => 'nullable|string|max:200',
         ]);
+
+        $bankName = $validated['bank_name'] ?? $user->bank_name;
+        $accountNumber = $validated['account_number'] ?? $user->account_number;
+        $accountName = $validated['account_name'] ?? $user->account_name;
+
+        if (empty($bankName) || empty($accountNumber) || empty($accountName)) {
+            return $this->error('Please add your bank details before requesting a payout.', 422);
+        }
 
         $payout = ReferralPayoutRequest::create([
             'user_id' => $user->id,
             'amount_kobo' => $pendingBalance,
-            'bank_name' => $validated['bank_name'],
-            'account_number' => $validated['account_number'],
-            'account_name' => $validated['account_name'],
+            'bank_name' => $bankName,
+            'account_number' => $accountNumber,
+            'account_name' => $accountName,
             'status' => 'pending',
         ]);
 

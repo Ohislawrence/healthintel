@@ -70,7 +70,7 @@ class ReferralProgramService
             return;
         }
 
-        // Check count-based limit
+        // Check count-based limit (admin-configurable).
         $maxPayouts = (int) \App\Models\Setting::getValue('referral.max_payouts_per_referral', 3);
 
         $existingEarnings = ReferralEarning::where('user_id', $referrer->id)

@@ -17,6 +17,7 @@ Route::get('/for-insurance', [FrontendController::class, 'forInsurance'])->name(
 Route::get('/contact', [FrontendController::class, 'contact'])->name('contact');
 Route::get('/partnerships', [FrontendController::class, 'partnerships'])->name('partnerships');
 Route::get('/list-your-business', [FrontendController::class, 'listYourBusiness'])->name('list-your-business');
+Route::get('/affiliates', [FrontendController::class, 'affiliates'])->name('affiliates');
 Route::get('/blog', [FrontendController::class, 'blog'])->name('blog');
 Route::get('/blog/{slug}', [FrontendController::class, 'blogShow'])->name('blog.detail');
 Route::get('/r/{slug}', [FrontendController::class, 'partnerPatientResults'])->name('partner.results');

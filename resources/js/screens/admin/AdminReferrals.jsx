@@ -299,7 +299,8 @@ export default function AdminReferrals() {
                     <th className="text-left py-3 px-3 font-medium text-gray-500">User</th>
                     <th className="text-left py-3 px-3 font-medium text-gray-500">Amount</th>
                     <th className="text-left py-3 px-3 font-medium text-gray-500">Bank</th>
-                    <th className="text-left py-3 px-3 font-medium text-gray-500">Account</th>
+                    <th className="text-left py-3 px-3 font-medium text-gray-500">Account Number</th>
+                    <th className="text-left py-3 px-3 font-medium text-gray-500">Account Name</th>
                     <th className="text-left py-3 px-3 font-medium text-gray-500">Status</th>
                     <th className="text-left py-3 px-3 font-medium text-gray-500">Date</th>
                     <th className="text-left py-3 px-3 font-medium text-gray-500">Actions</th>
@@ -314,10 +315,8 @@ export default function AdminReferrals() {
                       </td>
                       <td className="py-3 px-3 font-medium">₦{p.amount_naira?.toLocaleString() || 0}</td>
                       <td className="py-3 px-3">{p.bank_name}</td>
-                      <td className="py-3 px-3 text-xs">
-                        <p>{p.account_number}</p>
-                        <p className="text-gray-400">{p.account_name}</p>
-                      </td>
+                      <td className="py-3 px-3">{p.account_number}</td>
+                      <td className="py-3 px-3">{p.account_name}</td>
                       <td className="py-3 px-3">
                         {statusBadge(p.status)}
                         {p.admin_notes && <p className="text-xs text-gray-400 mt-1">{p.admin_notes}</p>}
