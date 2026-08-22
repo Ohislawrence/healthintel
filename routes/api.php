@@ -66,6 +66,14 @@ Route::get('/panels/{slug}', [LabSubmissionController::class, 'panelShow']);
 Route::get('/symptoms', [SymptomCheckerController::class, 'index']);
 
 // Payments (Paystack, Flutterwave & Nomba webhooks are public, require no auth)
+//
+// Providers often send a GET/HEAD "verification ping" when you save a webhook
+// URL. Return 200 for those so the URL is accepted — the actual payment
+// notifications are signed POSTs handled below.
+Route::get('/payment/webhook', fn () => response()->json(['status' => 'ok']));
+Route::get('/payment/webhook/flutterwave', fn () => response()->json(['status' => 'ok']));
+Route::get('/payment/webhook/nomba', fn () => response()->json(['status' => 'ok']));
+
 Route::post('/payment/webhook', [PaymentController::class, 'webhook']);
 Route::post('/payment/webhook/flutterwave', [PaymentController::class, 'flutterwaveWebhook']);
 Route::post('/payment/webhook/nomba', [PaymentController::class, 'nombaWebhook']);

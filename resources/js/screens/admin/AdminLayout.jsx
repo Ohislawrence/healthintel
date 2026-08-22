@@ -25,6 +25,7 @@ export default function AdminLayout() {
         { to: '/admin/clinical/panels', label: 'Clinical Panels', icon: '📊' },
         { to: '/admin/clinical/medication-effects', label: 'Medication Effects', icon: '💊' },
         { to: '/admin/credit-packages', label: 'Credit Packages', icon: '₦' },
+        { to: '/admin/payments', label: 'Payments', icon: '💳' },
         { to: '/admin/blog/posts', label: 'Blog Posts', icon: '📝' },
         { to: '/admin/blog/categories', label: 'Blog Categories', icon: '📂' },
         { to: '/admin/emails', label: 'Email Campaigns', icon: '📧' },

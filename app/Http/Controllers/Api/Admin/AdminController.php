@@ -1866,4 +1866,95 @@ class AdminController extends BaseController
 
         return $provider;
     }
+
+    // ── Payments / Reconciliation ──
+
+    public function payments(Request $request)
+    {
+        $query = Payment::with(['user:id,name,email', 'purchasable']);
+
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($provider = $request->input('provider')) {
+            $query->where('provider', $provider);
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('reference', 'like', "%{$search}%")
+                  ->orWhere('provider_reference', 'like', "%{$search}%")
+                  ->orWhereHas('user', fn($uq) => $uq->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
+            });
+        }
+
+        $payments = $query->latest()->paginate(25)->withQueryString();
+
+        $payments->getCollection()->transform(function ($p) {
+            $credited = \App\Models\CreditLedger::where('reference_type', Payment::class)
+                ->where('reference_id', $p->id)
+                ->exists();
+
+            return [
+                'id' => $p->id,
+                'user' => $p->user ? ['id' => $p->user->id, 'name' => $p->user->name, 'email' => $p->user->email] : null,
+                'provider' => $p->provider,
+                'reference' => $p->reference,
+                'provider_reference' => $p->provider_reference,
+                'amount_naira' => $p->amountNaira(),
+                'currency' => $p->currency,
+                'status' => $p->status,
+                'paid_at' => $p->paid_at?->toISOString(),
+                'credits_granted' => $credited,
+                'package' => $p->purchasable ? [
+                    'name' => $p->purchasable->name ?? 'Credit Package',
+                    'credits' => $p->purchasable->credits ?? 0,
+                ] : null,
+                'created_at' => $p->created_at->toISOString(),
+            ];
+        });
+
+        return $this->paginated($payments);
+    }
+
+    /**
+     * Re-verify a payment and grant missing credits (admin fix for
+     * "payment successful but no credits").
+     */
+    public function paymentReconcile(int $id)
+    {
+        $payment = Payment::findOrFail($id);
+
+        $service = app(\App\Services\PaymentService::class);
+        $payment = $service->reconcile($payment);
+
+        $credited = \App\Models\CreditLedger::where('reference_type', Payment::class)
+            ->where('reference_id', $payment->id)
+            ->exists();
+
+        // Audit
+        \Illuminate\Support\Facades\DB::table('admin_audit_log')->insert([
+            'admin_id' => request()->user()->id,
+            'action' => 'reconcile_payment',
+            'target_type' => 'payment',
+            'target_id' => $payment->id,
+            'metadata' => json_encode([
+                'reference' => $payment->reference,
+                'provider' => $payment->provider,
+                'status' => $payment->status,
+                'credits_granted' => $credited,
+            ]),
+            'created_at' => now(),
+        ]);
+
+        return $this->success([
+            'payment' => [
+                'id' => $payment->id,
+                'reference' => $payment->reference,
+                'status' => $payment->status,
+                'credits_granted' => $credited,
+            ],
+        ], 'Payment reconciled.');
+    }
 }

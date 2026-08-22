@@ -24,6 +24,15 @@ export default function Login() {
                 navigate('/dashboard');
             }
         } catch (err) {
+            // Email not verified — route to verification screen
+            const errors = err?.errors || {};
+            if (errors?.user_id) {
+                navigate('/verify-email', {
+                    replace: true,
+                    state: { user_id: errors.user_id, email },
+                });
+                return;
+            }
             setError(err?.message || 'Login failed. Please check your credentials.');
         } finally {
             setLoading(false);

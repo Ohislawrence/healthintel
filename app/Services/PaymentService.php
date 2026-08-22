@@ -315,6 +315,35 @@ class PaymentService
         }
     }
 
+    /**
+     * Admin reconciliation entry point.
+     *
+     * Re-runs provider verification if the payment isn't marked successful yet,
+     * and (re-)grants the package credits if they are missing. Safe to call
+     * multiple times because crediting is idempotent (see grantCreditsForPayment).
+     */
+    public function reconcile(Payment $payment): Payment
+    {
+        return DB::transaction(function () use ($payment) {
+            $p = Payment::where('id', $payment->id)->lockForUpdate()->first();
+
+            if (!$p) {
+                throw new \Illuminate\Database\Eloquent\ModelNotFoundException('Payment not found.');
+            }
+
+            if ($p->status !== 'success') {
+                return $this->verify($p->reference, $p->provider_reference);
+            }
+
+            // Already marked successful — ensure the credits were actually granted
+            // (covers the "paid but not credited" edge case where a prior
+            // grantCreditsForPayment() call failed or was interrupted).
+            $this->grantCreditsForPayment($p);
+
+            return $p;
+        });
+    }
+
     private function grantCreditsForPayment(Payment $payment): void
     {
         $user = $payment->user;

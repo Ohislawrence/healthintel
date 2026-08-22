@@ -277,12 +277,32 @@ class NombaService
      */
     public function isValidWebhook(string $payload, string $signature): bool
     {
-        if (!$this->isConfigured() || empty($this->webhookSecret) || empty($signature)) {
+        if (!$this->isConfigured()) {
+            Log::warning('Nomba webhook rejected: service not configured (missing NOMBA_CLIENT_ID / NOMBA_SECRET_KEY).');
+            return false;
+        }
+
+        if (empty($this->webhookSecret)) {
+            Log::warning('Nomba webhook rejected: NOMBA_WEBHOOK_SECRET is not set.');
+            return false;
+        }
+
+        if (empty($signature)) {
+            Log::warning('Nomba webhook rejected: no signature header received (expected ' . $this->webhookHeader . ').');
             return false;
         }
 
         $computed = hash_hmac('sha256', $payload, $this->webhookSecret);
 
-        return hash_equals($computed, $signature);
+        if (!hash_equals($computed, $signature)) {
+            Log::warning('Nomba webhook rejected: signature mismatch.', [
+                'expected_header' => $this->webhookHeader,
+                'received_length' => strlen($signature),
+                'computed_length' => strlen($computed),
+            ]);
+            return false;
+        }
+
+        return true;
     }
 }

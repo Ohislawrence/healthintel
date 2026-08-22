@@ -59,6 +59,10 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/feedback', [AdminController::class, 'feedback']);
     Route::put('/feedback/{id}', [AdminController::class, 'feedbackUpdate']);
 
+    // Payments & Reconciliation
+    Route::get('/payments', [AdminController::class, 'payments']);
+    Route::post('/payments/{id}/reconcile', [AdminController::class, 'paymentReconcile']);
+
     // Partner Portal
     Route::post('/providers/{slug}/generate-access-code', [AdminController::class, 'generateProviderAccessCode']);
 

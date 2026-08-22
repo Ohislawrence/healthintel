@@ -91,6 +91,7 @@ import AdminPartnerships from './screens/admin/AdminPartnerships';
 import AdminPartnershipDetail from './screens/admin/AdminPartnershipDetail';
 import AdminPartnershipInquiries from './screens/admin/AdminPartnershipInquiries';
 import AdminProviderListingRequests from './screens/admin/AdminProviderListingRequests';
+import AdminPayments from './screens/admin/AdminPayments';
 import AdminReferenceRanges from './screens/admin/AdminReferenceRanges';
 import AdminClinicalPanels from './screens/admin/AdminClinicalPanels';
 import AdminMedicationEffects from './screens/admin/AdminMedicationEffects';
@@ -339,6 +340,7 @@ function App() {
                         <Route path="symptom-mappings" element={<AdminSymptomMappings />} />
                         <Route path="providers" element={<AdminProviders />} />
                         <Route path="credit-packages" element={<AdminCreditPackages />} />
+                        <Route path="payments" element={<AdminPayments />} />
                         <Route path="notifications" element={<AdminNotifications />} />
                         <Route path="audit-log" element={<AdminAuditLog />} />
                         <Route path="settings" element={<AdminSettings />} />

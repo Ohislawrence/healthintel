@@ -216,6 +216,11 @@ class AuthController extends BaseController
             $this->creditService->grantSignupCredits($user);
         }
 
+        // Google already verified this email, so mark it as verified.
+        if (!$user->email_verified_at) {
+            $user->update(['email_verified_at' => now()]);
+        }
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return $this->success([
@@ -233,6 +238,15 @@ class AuthController extends BaseController
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return $this->error('Invalid credentials', 401);
+        }
+
+        // Enforce email verification before allowing sign-in.
+        // Admins bypass this so they are never locked out of the admin portal.
+        if (!$user->email_verified_at && !$user->hasRole('admin')) {
+            return $this->error('Please verify your email before signing in.', 403, [
+                'email_verified' => false,
+                'user_id' => $user->id,
+            ]);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
