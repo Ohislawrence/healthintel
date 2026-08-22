@@ -28,7 +28,7 @@ $structuredData = [
     <div class="wrap">
         <div class="hero-grid">
             <!-- Left: Copy & CTAs -->
-            <div class="hero-content stagger-children">
+            <div class="hero-content">
                 <div class="hero-badge">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     <span>Trusted by thousands across Nigeria</span>
@@ -61,7 +61,7 @@ $structuredData = [
             </div>
 
             <!-- Right: The "Transformation" Visual -->
-            <div class="hero-visual anim-scale-in" style="animation-delay: 300ms;">
+            <div class="hero-visual">
                 <!-- Background: The "Confusing" Old Lab Report -->
                 <div class="lab-report-bg" aria-hidden="true">
                     <div class="report-line" style="width: 60%"></div>

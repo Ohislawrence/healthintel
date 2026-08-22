@@ -1,0 +1,35 @@
+# HealthIntel
+
+> HealthIntel is a health information platform that helps you understand your lab results in plain language, checked against verified medical reference ranges. You can also check symptoms, find doctors and labs near you, and compare health insurance plans — all in one place.
+
+HealthIntel provides general health information for educational purposes only. It is not a diagnosis and does not replace advice from a licensed healthcare professional.
+
+## Core Pages
+
+- [Home](https://healthintel.app/): Overview of what HealthIntel does and how to get started.
+- [Features](https://healthintel.app/features): The full feature set, including lab result interpretation, symptom checker, provider directory, and insurance comparison.
+- [How it works](https://healthintel.app/how-it-works): The three-step process behind every interpretation.
+- [Clinical Validation](https://healthintel.app/clinical-validation): How interpretations are checked against verified reference data and reviewed with a licensed medical advisor.
+- [About](https://healthintel.app/about): Mission, team, and the story behind HealthIntel.
+- [Blog](https://healthintel.app/blog): Educational articles on understanding lab results and managing your health.
+
+## Audience Pages
+
+- [For Individuals](https://healthintel.app/for-individuals): Tools for understanding your own results and symptoms.
+- [For Clinicians](https://healthintel.app/for-clinicians): How clinicians can use HealthIntel to explain results to patients.
+- [For Labs](https://healthintel.app/for-labs): API and integration options for laboratories and LIMS.
+- [For Insurance](https://healthintel.app/for-insurance): HMO and insurance plan comparison resources.
+
+## Business & Legal
+
+- [Partnerships](https://healthintel.app/partnerships): Partner with HealthIntel.
+- [List Your Business](https://healthintel.app/list-your-business): List a lab, hospital, or clinic in the provider directory.
+- [Affiliates](https://healthintel.app/affiliates): The HealthIntel referral and affiliate program.
+- [Contact](https://healthintel.app/contact): Get in touch with the HealthIntel team.
+- [Privacy Policy](https://healthintel.app/privacy): How HealthIntel handles your data.
+- [Terms of Service](https://healthintel.app/terms): The terms governing use of HealthIntel.
+
+## Notes for AI Crawlers
+
+- HealthIntel content is general educational information and is not a substitute for professional medical advice.
+- Lab result interpretations and reference ranges are provided for informational purposes only.

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <script>document.documentElement.classList.add('js');</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'HealthIntel — Understand your lab results, in plain language')</title>
 <meta name="description" content="@yield('description', 'Your lab results explained in plain language, checked against real reference ranges. Check symptoms, find doctors, and compare insurance — all in one place.')">
@@ -1134,8 +1135,10 @@
             50% { box-shadow: 0 0 0 1px var(--amber), 0 4px 12px rgba(185, 129, 46, 0.3), 0 0 0 8px rgba(185, 129, 46, 0.1); }
         }
 
-        /* Scroll-triggered animation base states */
-        .anim-fade-up, .anim-fade-in, .anim-slide-left, .anim-scale-in {
+        /* Scroll-triggered animation base states.
+           Scoped behind .js so content is NEVER hidden when JavaScript
+           is disabled/slow — avoids NO_LCP and blank sections. */
+        .js .anim-fade-up, .js .anim-fade-in, .js .anim-slide-left, .js .anim-scale-in {
             opacity: 0;
         }
 
@@ -1144,12 +1147,12 @@
         .anim-slide-left.visible { animation: slideInLeft 0.8s var(--ease-out-expo) forwards; }
         .anim-scale-in.visible { animation: scaleIn 0.7s var(--ease-out-expo) forwards; }
 
-        /* Staggered delays for grid children (applied via JS) */
-        .stagger-children > * {
+        /* Staggered delays for grid children (applied via JS). */
+        .js .stagger-children > * {
             opacity: 0;
             transform: translateY(20px);
         }
-        .stagger-children > *.visible {
+        .js .stagger-children > *.visible {
             animation: fadeInUp 0.7s var(--ease-out-expo) forwards;
         }
 
@@ -1164,8 +1167,8 @@
                 animation-iteration-count: 1 !important;
                 transition-duration: 0.01ms !important;
             }
-            .anim-fade-up, .anim-fade-in, .anim-slide-left, .anim-scale-in,
-            .stagger-children > * { 
+            .js .anim-fade-up, .js .anim-fade-in, .js .anim-slide-left, .js .anim-scale-in,
+            .js .stagger-children > * { 
                 opacity: 1; 
                 transform: none !important; 
                 animation: none !important; 
