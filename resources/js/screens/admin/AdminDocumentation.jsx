@@ -66,8 +66,7 @@ const sections = [
           <p className="text-xs text-gray-500 mb-1">Request body (JSON):</p>
           <div className="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs font-mono mb-3 overflow-x-auto">
 {`{
-  "access_code": "abc123...",
-  "provider_email": "lab@hospital.com"
+  "access_code": "abc123..."
 }`}
           </div>
           <p className="text-xs text-gray-500 mb-1">Response contains:</p>
@@ -107,22 +106,29 @@ const sections = [
   "reference_range_low": "12.0",
   "reference_range_high": "16.0",
   "sex": "female",
-  "age": 32,
-  "delivery_method": "sms",
-  "delivery_recipient": "+2348012345678"
+  "age": "32",
+  "delivery_method": "sms"
 }`}
           </div>
-          <p className="text-xs text-gray-500 mb-1">The API returns:</p>
+          <p className="text-xs text-gray-500 mb-1">The API returns (interpretation is generated synchronously):</p>
           <div className="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs font-mono mb-3 overflow-x-auto">
 {`{
   "interpretation": {
-    "status": "pending",  // changes to "completed" after AI processes
-    "interpretation_text": null,  // populates when done
-    "reference_range": "12.0 — 16.0 g/dL",
-    "flag": "normal"
+    "id": 123,
+    "test_name": "Hemoglobin",
+    "value": "13.5",
+    "unit": "g/dL",
+    "interpretation_text": "Your hemoglobin is within the normal range...",
+    "status": "completed"
   }
 }`}
           </div>
+          <p className="text-sm text-gray-600">
+            To actually send the report to a patient, call the separate delivery endpoint{' '}
+            <code className="bg-gray-100 px-1 rounded">POST /api/partner/interpretations/{'{id}'}/deliver</code>{' '}
+            with <code className="bg-gray-100 px-1 rounded">delivery_method</code> and{' '}
+            <code className="bg-gray-100 px-1 rounded">recipient</code>.
+          </p>
         </div>
 
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
@@ -141,7 +147,7 @@ PT-001,WBC,8.2,10^3/uL,female,32,4.0,11.0
 PT-002,Glucose,118,mg/dL,male,45,70,99`}
           </div>
           <p className="text-sm text-gray-600 mb-2">
-            Send via multipart/form-data with the CSV as the <code className="bg-gray-100 px-1 rounded">file</code> field.
+            Send via multipart/form-data with the CSV as the <code className="bg-gray-100 px-1 rounded">csv_file</code> field.
           </p>
         </div>
 
@@ -154,7 +160,15 @@ PT-002,Glucose,118,mg/dL,male,45,70,99`}
             <code>POST /api/partner/v1/hl7</code>
           </div>
           <p className="text-sm text-gray-600">
-            Content-Type: <code className="bg-gray-100 px-1 rounded">text/plain</code> or <code className="bg-gray-100 px-1 rounded">application/hl7-v2</code>. The raw HL7 message goes in the request body.
+            Send the message as JSON with the raw HL7 text in the <code className="bg-gray-100 px-1 rounded">hl7_message</code> field:
+          </p>
+          <div className="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs font-mono mb-3 overflow-x-auto">
+{`{
+  "hl7_message": "MSH|^~\\&|...",
+  "patient_identifier": "PT-2024-001"
+}`}
+          </div>
+          <p className="text-sm text-gray-600">
             Our parser extracts patient demographics, test names, values, units, and reference ranges automatically.
           </p>
         </div>
@@ -263,9 +277,7 @@ result = requests.post(
         "value": "13.5",
         "unit": "g/dL",
         "sex": "female",
-        "age": 32,
-        "delivery_method": "sms",
-        "delivery_recipient": "+2348012345678"
+        "age": 32
     }
 )
 print(result.json())`}
@@ -364,16 +376,15 @@ curl_close($ch);`}
             <tr><th className="text-left px-3 py-2 font-medium text-gray-600 border-b">Field</th><th className="text-left px-3 py-2 font-medium text-gray-600 border-b">Type</th><th className="text-left px-3 py-2 font-medium text-gray-600 border-b">Required</th><th className="text-left px-3 py-2 font-medium text-gray-600 border-b">Description</th></tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            <tr><td className="px-3 py-2 font-mono text-gray-700">patient_identifier</td><td className="px-3 py-2 text-gray-500">string</td><td className="px-3 py-2"><span className="bg-green-100 text-green-700 rounded px-1 text-xs">Yes</span></td><td className="px-3 py-2 text-gray-600">Patient ID, barcode, or file number</td></tr>
+            <tr><td className="px-3 py-2 font-mono text-gray-700">patient_identifier</td><td className="px-3 py-2 text-gray-500">string</td><td className="px-3 py-2">No</td><td className="px-3 py-2 text-gray-600">Patient ID, barcode, or file number (recommended for lookups)</td></tr>
             <tr><td className="px-3 py-2 font-mono text-gray-700">test_name</td><td className="px-3 py-2 text-gray-500">string</td><td className="px-3 py-2"><span className="bg-green-100 text-green-700 rounded px-1 text-xs">Yes</span></td><td className="px-3 py-2 text-gray-600">e.g. "Hemoglobin", "Fasting Blood Glucose"</td></tr>
             <tr><td className="px-3 py-2 font-mono text-gray-700">value</td><td className="px-3 py-2 text-gray-500">string/number</td><td className="px-3 py-2"><span className="bg-green-100 text-green-700 rounded px-1 text-xs">Yes</span></td><td className="px-3 py-2 text-gray-600">The test result value</td></tr>
             <tr><td className="px-3 py-2 font-mono text-gray-700">unit</td><td className="px-3 py-2 text-gray-500">string</td><td className="px-3 py-2">No</td><td className="px-3 py-2 text-gray-600">e.g. "g/dL", "mg/dL", "mmol/L"</td></tr>
             <tr><td className="px-3 py-2 font-mono text-gray-700">reference_range_low</td><td className="px-3 py-2 text-gray-500">string</td><td className="px-3 py-2">No</td><td className="px-3 py-2 text-gray-600">Lower bound of normal range</td></tr>
             <tr><td className="px-3 py-2 font-mono text-gray-700">reference_range_high</td><td className="px-3 py-2 text-gray-500">string</td><td className="px-3 py-2">No</td><td className="px-3 py-2 text-gray-600">Upper bound of normal range</td></tr>
             <tr><td className="px-3 py-2 font-mono text-gray-700">sex</td><td className="px-3 py-2 text-gray-500">string</td><td className="px-3 py-2">No</td><td className="px-3 py-2 text-gray-600">"male", "female", or omit</td></tr>
-            <tr><td className="px-3 py-2 font-mono text-gray-700">age</td><td className="px-3 py-2 text-gray-500">number</td><td className="px-3 py-2">No</td><td className="px-3 py-2 text-gray-600">Patient age in years</td></tr>
-            <tr><td className="px-3 py-2 font-mono text-gray-700">delivery_method</td><td className="px-3 py-2 text-gray-500">string</td><td className="px-3 py-2">No</td><td className="px-3 py-2 text-gray-600">"email", "sms", "whatsapp", or omit</td></tr>
-            <tr><td className="px-3 py-2 font-mono text-gray-700">delivery_recipient</td><td className="px-3 py-2 text-gray-500">string</td><td className="px-3 py-2">No</td><td className="px-3 py-2 text-gray-600">Email or phone for delivery</td></tr>
+            <tr><td className="px-3 py-2 font-mono text-gray-700">age</td><td className="px-3 py-2 text-gray-500">string</td><td className="px-3 py-2">No</td><td className="px-3 py-2 text-gray-600">Patient age (e.g. "32")</td></tr>
+            <tr><td className="px-3 py-2 font-mono text-gray-700">delivery_method</td><td className="px-3 py-2 text-gray-500">string</td><td className="px-3 py-2">No</td><td className="px-3 py-2 text-gray-600">"email", "sms", "whatsapp", "pdf", or omit (stored on the record; send via the deliver endpoint)</td></tr>
           </tbody>
         </table>
         <h4 className="font-semibold text-gray-800 text-sm mt-6 mb-2">Bulk CSV Upload</h4>
@@ -381,7 +392,7 @@ curl_close($ch);`}
         <p className="text-sm text-gray-600 mb-2">Multipart/form-data with CSV file. Headers: patient_id,test_name,value,unit,sex,age,reference_range_low,reference_range_high</p>
         <h4 className="font-semibold text-gray-800 text-sm mt-6 mb-2">Versioned API (stable)</h4>
         <div className="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs font-mono mb-3 overflow-x-auto"><code>POST /api/partner/v1/interpretations</code></div>
-        <p className="text-sm text-gray-600 mb-2">Same payload as standard endpoint but versioned. Use for production integrations.</p>
+        <p className="text-sm text-gray-600 mb-2">Accepts a single interpretation object or an <code className="bg-gray-100 px-1 rounded">interpretations</code> array (up to 500 items) for bulk submissions. Use for production integrations.</p>
       </div>
     ),
   },
@@ -392,7 +403,7 @@ curl_close($ch);`}
       <div>
         <p className="mb-3 text-sm text-gray-700">For labs and hospital information systems (LIS/HIS) that output HL7v2 messages, HealthIntel provides a parsing endpoint:</p>
         <div className="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs font-mono mb-3 overflow-x-auto"><code>POST /api/partner/v1/hl7</code></div>
-        <p className="text-sm text-gray-600 mb-2">Request body: raw HL7v2 message (Content-Type: text/plain or application/hl7-v2).</p>
+        <p className="text-sm text-gray-600 mb-2">Request body: JSON with the raw HL7 text in the <code className="bg-gray-100 px-1 rounded">hl7_message</code> field (optional <code className="bg-gray-100 px-1 rounded">patient_identifier</code>).</p>
         <p className="text-sm text-gray-700 mb-2">The parser extracts:</p>
         <ul className="list-disc pl-6 space-y-1 text-sm text-gray-700 mb-3">
           <li>Patient ID (from PID-3)</li>

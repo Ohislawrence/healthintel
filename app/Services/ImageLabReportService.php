@@ -238,13 +238,24 @@ TXT;
 
         // Normalize the extracted data
         $normalized = [];
+        $seenNames = [];
         foreach ($parsed as $item) {
             if (!is_array($item) || empty($item['test_name'])) {
                 continue;
             }
 
+            $testName = trim($item['test_name']);
+
+            // Skip exact duplicate test names (case-insensitive) so the review
+            // screen never shows the same test more than once.
+            $seenKey = mb_strtolower($testName);
+            if (isset($seenNames[$seenKey])) {
+                continue;
+            }
+            $seenNames[$seenKey] = true;
+
             $normalized[] = [
-                'test_name' => trim($item['test_name']),
+                'test_name' => $testName,
                 'value' => is_numeric($item['value'] ?? null) ? (float) ($item['value']) : ($item['value'] ?? ''),
                 'unit' => trim($item['unit'] ?? '' ?? ''),
                 'ref_range' => trim($item['ref_range'] ?? $item['reference_range'] ?? ''),

@@ -18,8 +18,8 @@ return [
 
     'vapid' => [
         'subject' => env('VAPID_SUBJECT', env('APP_URL', 'https://healthintel.ng')),
-        'public_key' => env('VAPID_PUBLIC_KEY', 'BC9fhZuJfYJpGjjDfj_lOJS8P8oRcoguAcp2KNKITt5Dy-qrkac07fgrdtmcrHCFYmgLDksznSGEeLcDM2uFvN0'),
-        'private_key' => env('VAPID_PRIVATE_KEY', 'L5UfJz7-oQuhLRpFfR6EMI7MH1ON1xw-v6xixlASt8o'),
+        'public_key' => env('VAPID_PUBLIC_KEY'),
+        'private_key' => env('VAPID_PRIVATE_KEY'),
     ],
 
     /*

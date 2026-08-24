@@ -25,11 +25,19 @@ class PdfValueExtractor
         }
 
         $results = [];
+        $seenNames = [];
         $knownTests = \App\Models\ReferenceRange::where('is_active', true)
             ->select('test_name', 'test_code', 'unit')
             ->get();
 
         foreach ($knownTests as $test) {
+            // The same test may exist as multiple rows in the reference_ranges
+            // table (e.g. male/female/pregnancy variants). Only emit it once so
+            // a single value in the PDF does not get duplicated per row.
+            $seenKey = mb_strtolower(trim($test->test_name));
+            if (isset($seenNames[$seenKey])) {
+                continue;
+            }
             // Build patterns to find "TestName: 12.5" or "TestName 12.5 g/dL" in text
             $name = preg_quote($test->test_name, '/');
             $code = preg_quote($test->test_code, '/');
@@ -57,6 +65,7 @@ class PdfValueExtractor
                         'confidence' => $confidence, // 50-100 based on match quality
                     ];
 
+                    $seenNames[$seenKey] = true;
                     break; // one match per test
                 }
             }

@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\BlogCategory;
 use App\Models\BlogPost;
+use App\Models\LabPartnership;
+use App\Models\PartnerInterpretation;
+use App\Models\ProviderDirectoryEntry;
 
 class FrontendController extends Controller
 {
@@ -138,7 +141,32 @@ class FrontendController extends Controller
 
     public function partnerPatientResults($slug)
     {
-        return view('frontend.partner-patient-results', compact('slug'));
+        $provider = ProviderDirectoryEntry::where('slug', $slug)->first();
+
+        if (! $provider) {
+            abort(404);
+        }
+
+        $partnership = LabPartnership::where('provider_id', $provider->id)
+            ->whereIn('status', ['active', 'pilot'])
+            ->first();
+
+        if (! $partnership) {
+            abort(404);
+        }
+
+        $patientId = request('pid');
+
+        $interpretations = collect();
+        if ($patientId) {
+            $interpretations = PartnerInterpretation::where('partnership_id', $partnership->id)
+                ->where('patient_identifier', $patientId)
+                ->where('status', '!=', 'suppressed')
+                ->latest()
+                ->get();
+        }
+
+        return view('frontend.partner-patient-results', compact('provider', 'partnership', 'patientId', 'interpretations'));
     }
 
     public function sitemap()
