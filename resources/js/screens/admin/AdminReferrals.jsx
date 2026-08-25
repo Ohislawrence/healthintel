@@ -7,6 +7,7 @@ export default function AdminReferrals() {
   const [stats, setStats] = useState(null);
   const [earnings, setEarnings] = useState([]);
   const [payouts, setPayouts] = useState([]);
+  const [referrers, setReferrers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
@@ -54,6 +55,18 @@ export default function AdminReferrals() {
     }
   }, []);
 
+  const fetchReferrers = useCallback(async (page = 1) => {
+    setLoading(true);
+    try {
+      const res = await api.get(`/admin/referral/referrers?page=${page}`);
+      setReferrers(res.data?.data || res.data || []);
+    } catch (err) {
+      alert('Failed to load referrers');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSettings();
     fetchStats();
@@ -62,7 +75,8 @@ export default function AdminReferrals() {
   useEffect(() => {
     if (tab === 'earnings') fetchEarnings();
     if (tab === 'payouts') fetchPayouts();
-  }, [tab, fetchEarnings, fetchPayouts]);
+    if (tab === 'referrers') fetchReferrers();
+  }, [tab, fetchEarnings, fetchPayouts, fetchReferrers]);
 
   const handleSaveSettings = async () => {
     setSaving(true);
@@ -120,6 +134,7 @@ export default function AdminReferrals() {
 
   const tabs = [
     { key: 'settings', label: 'Settings' },
+    { key: 'referrers', label: 'Referrers' },
     { key: 'earnings', label: 'Earnings' },
     { key: 'payouts', label: 'Payout Requests' },
   ];
@@ -235,6 +250,64 @@ export default function AdminReferrals() {
               {saving ? 'Saving...' : 'Save Settings'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Referrers Tab */}
+      {tab === 'referrers' && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Referrers & Their Registered Users</h3>
+          <p className="text-sm text-gray-400 mb-4">
+            Users who shared their affiliate link and the people who registered under them.
+          </p>
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+            </div>
+          ) : Array.isArray(referrers) && referrers.length === 0 ? (
+            <p className="text-gray-400 text-sm py-8 text-center">No referrers yet. Once users share their link and people sign up, they will appear here.</p>
+          ) : (
+            <div className="space-y-4">
+              {(Array.isArray(referrers) ? referrers : []).map((r) => (
+                <div key={r.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-gray-900">{r.name || 'N/A'}</p>
+                      <p className="text-xs text-gray-400">{r.email || ''}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-block px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                        {r.total_referrals || 0} referral{(r.total_referrals || 0) === 1 ? '' : 's'}
+                      </span>
+                      <p className="text-xs text-gray-400 mt-1 font-mono">{r.referral_code || '—'}</p>
+                    </div>
+                  </div>
+                  {(r.referred_users || []).length > 0 && (
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-100 text-left text-xs text-gray-400">
+                            <th className="py-2 pr-3 font-medium">Name</th>
+                            <th className="py-2 pr-3 font-medium">Email</th>
+                            <th className="py-2 font-medium">Registered</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {r.referred_users.map((u) => (
+                            <tr key={u.id} className="border-b border-gray-50">
+                              <td className="py-2 pr-3 text-gray-700">{u.name || 'N/A'}</td>
+                              <td className="py-2 pr-3 text-gray-500">{u.email || ''}</td>
+                              <td className="py-2 text-gray-400 text-xs">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

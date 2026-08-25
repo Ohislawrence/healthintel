@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BlogController;
+use App\Http\Controllers\Api\EngagementController;
 use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\HealthProfileController;
 use App\Http\Controllers\Api\HealthScoreController;
@@ -171,6 +172,9 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
 
     // Global Search
     Route::get('/search', \App\Http\Controllers\Api\SearchController::class);
+
+    // Engagement Events (lightweight conversion analytics)
+    Route::post('/engagement/events', [EngagementController::class, 'track']);
 
     // Push Notifications
     Route::post('/push/subscribe', [PushController::class, 'subscribe']);

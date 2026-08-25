@@ -157,6 +157,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('/referral/payout-requests/{id}/approve', [AdminController::class, 'referralPayoutApprove']);
     Route::post('/referral/payout-requests/{id}/reject', [AdminController::class, 'referralPayoutReject']);
     Route::get('/referral/stats', [AdminController::class, 'referralStats']);
+    Route::get('/referral/referrers', [AdminController::class, 'referralReferrers']);
 
     // Settings
     Route::get('/settings', [AdminSettingController::class, 'index']);

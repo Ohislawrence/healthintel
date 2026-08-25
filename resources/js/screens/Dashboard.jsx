@@ -46,6 +46,10 @@ export default function Dashboard() {
     if (todayTrackers.diary) { const diary = todayTrackers.diary; if (diary.foods > 0 || diary.symptoms > 0) trackerChips.push({ icon: '●', label: 'Diary', value: `${diary.foods}f · ${diary.symptoms}s`, color: '#16A34A' }); }
 
     const profileSubtitle = profileComplete ? (() => { const parts = []; const hp = user?.health_profile; if (hp?.sex) parts.push(hp.sex.charAt(0).toUpperCase() + hp.sex.slice(1)); if (hp?.date_of_birth) { const age = new Date().getFullYear() - new Date(hp.date_of_birth).getFullYear(); parts.push(`${age}y`); } if (hp?.blood_type) parts.push(hp.blood_type); return parts.join(' · ') || 'Update your health information for better insights'; })() : 'Set up your profile for personalized results';
+    const credits = Number(user?.credits || 0);
+    const lowCreditThreshold = 3;
+    const creditsLow = credits <= lowCreditThreshold;
+    const likelyReportsLeft = Math.floor(credits / 3);
 
     const featureCards = [
         { icon: '⚛', color: '#0F766E', title: 'Lab Results', subtitle: 'Upload or enter lab values', to: '/lab-results' },
@@ -76,6 +80,30 @@ export default function Dashboard() {
                     <StatPill value={meta?.total || 0} label="Reports" icon="⚛" color="#4F46E5" />
                     <StatPill value={profileComplete ? '✓' : '···'} label="Profile" icon="◉" color={profileComplete ? '#16A34A' : '#D97706'} to="/onboarding" />
                 </div>
+
+                <div className={`card p-4 border ${creditsLow ? 'border-amber-200 bg-amber-50' : 'border-teal-100 bg-teal-50'}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p className={`text-sm font-bold ${creditsLow ? 'text-amber-900' : 'text-teal-900'}`}>
+                                {creditsLow ? 'Low credit balance' : 'You are ready for your next check-in'}
+                            </p>
+                            <p className={`text-xs mt-1 ${creditsLow ? 'text-amber-800' : 'text-teal-800'}`}>
+                                {creditsLow
+                                    ? `You may have ${Math.max(likelyReportsLeft, 0)} lab report${likelyReportsLeft === 1 ? '' : 's'} left at current balance.`
+                                    : `Estimated remaining lab reports: ${likelyReportsLeft}. Keep momentum with a timely top-up.`}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Link to="/credits/buy" className={`text-xs font-bold rounded-lg px-3 py-2 ${creditsLow ? 'bg-amber-500 text-white' : 'bg-teal-600 text-white'}`}>
+                                Buy Credits
+                            </Link>
+                            <Link to="/referral" className="text-xs font-bold rounded-lg px-3 py-2 border border-neutral-300 text-neutral-700 hover:border-teal-300 hover:text-teal-700 transition-colors">
+                                Earn via Referrals
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+
                 <SponsoredBannerCarousel />
                 {/* Health Score */}
                 <Link to="/dashboard" className="block card overflow-hidden border-0 shadow-lg" style={{ boxShadow: '0 6px 24px rgba(15,118,110,0.12)' }}>

@@ -1157,6 +1157,41 @@ class AdminController extends BaseController
             else $bmiDistribution[3]['count']++;
         }
 
+        // ═══════════════════════════════════════════════
+        // 8. CREDIT PURCHASE CONVERSION FUNNEL
+        //    Built from engagement_events (tracked client-side).
+        // ═══════════════════════════════════════════════
+        $funnelKeys = [
+            'buy_credits_viewed',
+            'credit_package_selected',
+            'payment_initialize_started',
+            'payment_verified_success',
+            'payment_verified_failed',
+            'payment_verified_cancelled',
+        ];
+
+        $funnelCounts = \App\Models\EngagementEvent::whereIn('event_key', $funnelKeys)
+            ->selectRaw('event_key, count(*) as total')
+            ->groupBy('event_key')
+            ->pluck('total', 'event_key')
+            ->toArray();
+
+        $funnel = [];
+        foreach ($funnelKeys as $key) {
+            $funnel[$key] = (int) ($funnelCounts[$key] ?? 0);
+        }
+
+        // Conversion rates between sequential funnel stages.
+        $funnel['package_selection_rate'] = $funnel['buy_credits_viewed'] > 0
+            ? round(($funnel['credit_package_selected'] / $funnel['buy_credits_viewed']) * 100, 1)
+            : 0;
+        $funnel['payment_init_rate'] = $funnel['credit_package_selected'] > 0
+            ? round(($funnel['payment_initialize_started'] / $funnel['credit_package_selected']) * 100, 1)
+            : 0;
+        $funnel['payment_success_rate'] = $funnel['payment_initialize_started'] > 0
+            ? round(($funnel['payment_verified_success'] / $funnel['payment_initialize_started']) * 100, 1)
+            : 0;
+
         return $this->success([
             // Time-series
             'submissions_per_day' => $submissionsPerDay,
@@ -1203,6 +1238,9 @@ class AdminController extends BaseController
 
             // Health distribution
             'health_distribution' => $bmiDistribution,
+
+            // Credit purchase conversion funnel
+            'conversion_funnel' => $funnel,
         ]);
     }
 
@@ -1680,6 +1718,47 @@ class AdminController extends BaseController
             'pending_payouts' => $pendingPayouts,
             'total_referrals' => $totalReferrals,
         ]);
+    }
+
+    /**
+     * List referrers (affiliates) with the users who registered under them.
+     */
+    public function referralReferrers(Request $request)
+    {
+        $query = User::query()
+            ->whereHas('referrals')
+            ->with(['referrals' => function ($q) {
+                $q->select('id', 'name', 'email', 'referred_by_user_id', 'created_at')
+                  ->orderByDesc('created_at');
+            }]);
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('referral_code', 'like', "%{$search}%");
+            });
+        }
+
+        $referrers = $query->orderByDesc('id')->paginate(30);
+
+        $referrers->getCollection()->transform(function ($referrer) {
+            return [
+                'id' => $referrer->id,
+                'name' => $referrer->name,
+                'email' => $referrer->email,
+                'referral_code' => $referrer->referral_code,
+                'total_referrals' => $referrer->referrals->count(),
+                'referred_users' => $referrer->referrals->map(fn ($r) => [
+                    'id' => $r->id,
+                    'name' => $r->name,
+                    'email' => $r->email,
+                    'created_at' => $r->created_at?->toISOString(),
+                ])->values()->toArray(),
+            ];
+        });
+
+        return $this->paginated($referrers);
     }
 
     // ── Testimonials CRUD ──

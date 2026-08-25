@@ -36,6 +36,7 @@ export default function AdminAnalytics() {
     const engagement = a.engagement || {};
     const content = a.content || {};
     const health = a.health_distribution || [];
+    const funnel = a.conversion_funnel || {};
 
     const healthMax = Math.max(...health.map(d => d.count), 1);
     const healthColors = ['bg-blue-400', 'bg-green-500', 'bg-amber-500', 'bg-red-500'];
@@ -104,6 +105,42 @@ export default function AdminAnalytics() {
                     <KPI label="Credits Used" value={credits.used_30d || 0} color="text-orange-600" />
                     <KPI label="Net Change" value={(credits.sold_30d || 0) - (credits.used_30d || 0)} color={(credits.sold_30d || 0) >= (credits.used_30d || 0) ? 'text-green-600' : 'text-red-600'} />
                     <KPI label="Avg / User" value={credits.avg_per_user || 0} />
+                </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════ */}
+            {/* SECTION 3b: CREDIT PURCHASE CONVERSION FUNNEL  */}
+            {/* ═══════════════════════════════════════════════ */}
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <h3 className="font-semibold text-gray-900 mb-4">🎯 Credit Purchase Conversion Funnel</h3>
+
+                {/* Stage counts */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <KPI label="Buy Page Viewed" value={funnel.buy_credits_viewed || 0} />
+                    <KPI label="Package Selected" value={funnel.credit_package_selected || 0} color="text-blue-600" />
+                    <KPI label="Payment Started" value={funnel.payment_initialize_started || 0} color="text-indigo-600" />
+                    <KPI label="Payment Success" value={funnel.payment_verified_success || 0} color="text-green-600" />
+                    <KPI label="Payment Failed" value={funnel.payment_verified_failed || 0} color="text-red-600" />
+                    <KPI label="Payment Cancelled" value={funnel.payment_verified_cancelled || 0} color="text-amber-600" />
+                </div>
+
+                {/* Conversion rates */}
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <ConversionRate
+                        label="Package Selection Rate"
+                        hint="Selected a package after viewing the buy page"
+                        value={funnel.package_selection_rate}
+                    />
+                    <ConversionRate
+                        label="Payment Init Rate"
+                        hint="Started payment after selecting a package"
+                        value={funnel.payment_init_rate}
+                    />
+                    <ConversionRate
+                        label="Payment Success Rate"
+                        hint="Completed payment after starting"
+                        value={funnel.payment_success_rate}
+                    />
                 </div>
             </div>
 
@@ -229,6 +266,23 @@ function KPI({ label, value, color = 'text-gray-900' }) {
         <div className="bg-gray-50 rounded-xl p-3">
             <p className="text-[10px] text-gray-500 uppercase tracking-wide">{label}</p>
             <p className={`mt-1 text-lg font-bold ${color}`}>{value ?? '—'}</p>
+        </div>
+    );
+}
+
+function ConversionRate({ label, hint, value }) {
+    const pct = typeof value === 'number' ? Math.min(100, Math.max(0, value)) : 0;
+    const color = pct >= 60 ? 'bg-green-500' : pct >= 30 ? 'bg-amber-500' : 'bg-red-400';
+    return (
+        <div className="bg-gray-50 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-1">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wide">{label}</p>
+                <span className="text-sm font-bold text-gray-900">{typeof value === 'number' ? `${value}%` : '—'}</span>
+            </div>
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1.5 leading-snug">{hint}</p>
         </div>
     );
 }

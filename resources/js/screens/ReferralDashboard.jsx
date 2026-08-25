@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import useAuthStore from '../stores/authStore';
 import api from '../lib/api';
+import { trackEngagement } from '../lib/engagement';
 
 export default function ReferralDashboard() {
   const { user } = useAuthStore();
@@ -78,6 +79,9 @@ export default function ReferralDashboard() {
     setSubmitting(true);
     try {
       await api.post('/referral/payout/request', {});
+      trackEngagement('referral_payout_requested', 'referral_dashboard', {
+        amount_naira: summary?.pending_balance_naira || 0,
+      });
       alert('Payout request submitted!');
       setShowPayoutConfirm(false);
       fetchData();
@@ -98,6 +102,10 @@ export default function ReferralDashboard() {
   const copyReferralLink = () => {
     if (!user?.referral_code) return;
     const link = `${window.location.origin}/register?ref=${user.referral_code}`;
+    trackEngagement('referral_link_copied', 'referral_dashboard', {
+      referrals_total: summary?.total_referrals || 0,
+      pending_balance_naira: summary?.pending_balance_naira || 0,
+    });
 
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(link).then(
@@ -163,6 +171,9 @@ export default function ReferralDashboard() {
       {/* Referral Link Card */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Your Referral Link</h3>
+        <p className="text-sm text-gray-500 mb-3">
+          Share this link after you top up credits or after a successful interpretation for better conversion.
+        </p>
         <div className="flex items-center gap-3">
           <code className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 break-all">
             {`${window.location.origin}/register?ref=${user?.referral_code || '...'}`}
@@ -177,6 +188,11 @@ export default function ReferralDashboard() {
         <p className="text-xs text-gray-400 mt-3">
           Your referral code: <strong>{user?.referral_code || 'Generating...'}</strong>
         </p>
+
+        <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">High-converting share moments</p>
+          <p className="text-sm text-emerald-900 mt-1">After a friend asks about your result, after they see your dashboard, or right after they get a successful interpretation.</p>
+        </div>
       </div>
 
       {/* Stats Cards */}

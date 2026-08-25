@@ -81,6 +81,7 @@ export default function ReviewLabValues() {
 
     const validRows = rows.filter((r) => r.test_name.trim() && r.value !== '' && !isNaN(parseFloat(r.value)));
     const isNarrative = rows.length === 0;
+    const creditsNeeded = Math.max(cost - balance, 0);
 
     const handleConfirm = () => {
         setError(null);
@@ -221,13 +222,33 @@ export default function ReviewLabValues() {
                 </span>
             </div>
 
+            {balance < cost ? (
+                <div className="card p-4 border-amber-200 bg-amber-50">
+                    <p className="text-sm font-bold text-amber-900">You need {creditsNeeded} more credit{creditsNeeded > 1 ? 's' : ''} to finish this report.</p>
+                    <p className="text-sm text-amber-800 mt-1 leading-relaxed">
+                        Top up once, then continue immediately from this report without losing progress.
+                    </p>
+                    <div className="mt-3 h-2 rounded-full bg-amber-100 overflow-hidden">
+                        <div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.min((balance / cost) * 100, 100)}%` }} />
+                    </div>
+                </div>
+            ) : (
+                <div className="card p-4 border-teal-100 bg-teal-50">
+                    <p className="text-sm font-bold text-teal-900">You have enough credits to continue now.</p>
+                    <p className="text-sm text-teal-800 mt-1 leading-relaxed">
+                        Confirm the values below and get your interpretation right away.
+                    </p>
+                </div>
+            )}
+
             {/* Actions */}
             {balance < cost ? (
                 <Link
                     to="/credits/buy"
-                    className="btn w-full py-4 text-base font-bold text-center transition-all bg-neutral-300 text-white"
+                    state={{ from: 'lab-review', neededCredits: creditsNeeded, cost, balance }}
+                    className="btn w-full py-4 text-base font-bold text-center transition-all bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-200"
                 >
-                    Need {cost} credits — Top up
+                    Top up to continue
                 </Link>
             ) : (
                 <button

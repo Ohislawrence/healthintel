@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import useAuthStore from '../../stores/authStore';
 
+const REF_STORAGE_KEY = 'referral_ref';
+
 export default function Register() {
+    const [searchParams] = useSearchParams();
     const [form, setForm] = useState({
         name: '',
         email: '',
@@ -10,10 +13,27 @@ export default function Register() {
         password_confirmation: '',
         consent_ndpr: false,
     });
+    const [refCode, setRefCode] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
     const register = useAuthStore((s) => s.register);
     const navigate = useNavigate();
+
+    // Capture the affiliate referral code from the URL (?ref=CODE). Prefer the
+    // URL value (freshest) but fall back to a persisted value so attribution
+    // still works if the user browsed away and returned to the signup page.
+    useEffect(() => {
+        const urlRef = searchParams.get('ref');
+        if (urlRef) {
+            localStorage.setItem(REF_STORAGE_KEY, urlRef);
+            setRefCode(urlRef);
+            return;
+        }
+        const stored = localStorage.getItem(REF_STORAGE_KEY);
+        if (stored) {
+            setRefCode(stored);
+        }
+    }, [searchParams]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -33,7 +53,13 @@ export default function Register() {
         }
         setLoading(true);
         try {
-            const res = await register(form);
+            const payload = { ...form };
+            if (refCode) {
+                payload.ref = refCode;
+            }
+            const res = await register(payload);
+            // Clear persisted referral code once a registration is attempted
+            localStorage.removeItem(REF_STORAGE_KEY);
             // Navigate to email verification
             navigate('/verify-email', { state: { user_id: res?.user_id } });
         } catch (err) {
