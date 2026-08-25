@@ -78,7 +78,7 @@ export default function AdminEmails() {
             [{ 'color': [] }, { 'background': [] }],
             [{ 'list': 'ordered'}, { 'list': 'bullet' }],
             ['blockquote'],
-            ['link'],
+            ['link', 'image'],
             [{ 'align': [] }],
             ['clean']
           ];

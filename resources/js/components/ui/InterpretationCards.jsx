@@ -41,16 +41,9 @@ function parseSections(text) {
         const titleLower = headingTitle.toLowerCase();
 
         let section;
-        if (titleLower.includes('key finding') || titleLower.includes('summary') || titleLower.includes('overview') || titleLower.includes('abnormal')) {
-            section = {
-                title: headingTitle,
-                icon: '★',
-                color: 'warning',
-                bgColor: 'bg-warning-50',
-                borderColor: 'border-warning-200',
-                content: rawContent,
-            };
-        } else if (titleLower.includes('simple explanation') || titleLower.includes('explanation') || titleLower.includes('what this means')) {
+        // Emoji markers are preserved across translations (see TranslationService),
+        // so detect section role by emoji first and fall back to English keywords.
+        if (titleLower.includes('💡') || titleLower.includes('simple explanation') || titleLower.includes('explanation') || titleLower.includes('what this means')) {
             section = {
                 title: 'Explanation',
                 icon: '⬡',
@@ -59,7 +52,17 @@ function parseSections(text) {
                 borderColor: 'border-info-200',
                 content: rawContent,
             };
+        } else if (titleLower.includes('⚠') || titleLower.includes('🔸') || titleLower.includes('key finding') || titleLower.includes('summary') || titleLower.includes('overview') || titleLower.includes('abnormal')) {
+            section = {
+                title: headingTitle,
+                icon: '★',
+                color: 'warning',
+                bgColor: 'bg-warning-50',
+                borderColor: 'border-warning-200',
+                content: rawContent,
+            };
         } else if (
+            titleLower.includes('📋') ||
             titleLower.includes('what to do') || titleLower.includes('recommend') ||
             titleLower.includes('next step') || titleLower.includes('action') || titleLower.includes('follow-up')
         ) {
@@ -71,7 +74,7 @@ function parseSections(text) {
                 borderColor: 'border-success-200',
                 content: rawContent,
             };
-        } else if (titleLower.includes('normal')) {
+        } else if (titleLower.includes('✅') || titleLower.includes('normal')) {
             section = {
                 title: headingTitle,
                 icon: '✓',
@@ -80,7 +83,7 @@ function parseSections(text) {
                 borderColor: 'border-success-200',
                 content: rawContent,
             };
-        } else if (titleLower.includes('disclaimer')) {
+        } else if (titleLower.includes('ℹ') || titleLower.includes('disclaimer')) {
             section = {
                 title: headingTitle,
                 icon: 'ℹ',
@@ -103,16 +106,18 @@ function parseSections(text) {
         sections.push(section);
     }
 
-    // Reorder: Explanation before Key Findings, remove Disclaimer
+    // Reorder: Explanation first, then Key Findings/Abnormal, then the rest.
+    // Keying off the emoji markers keeps this correct even when the heading
+    // text has been translated into another language.
     const priority = (s) => {
         const t = s.title.toLowerCase();
-        if (t.includes('explanation') || t.includes('what this means')) return 0;
-        if (t.includes('key finding') || t.includes('summary') || t.includes('overview') || t.includes('abnormal')) return 1;
+        if (t.includes('💡') || t.includes('explanation') || t.includes('what this means')) return 0;
+        if (t.includes('⚠') || t.includes('🔸') || t.includes('key finding') || t.includes('summary') || t.includes('overview') || t.includes('abnormal')) return 1;
         return 2;
     };
 
     return sections
-        .filter(s => !s.title.toLowerCase().includes('disclaimer'))
+        .filter(s => !s.title.toLowerCase().includes('disclaimer') && !s.title.toLowerCase().includes('ℹ'))
         .sort((a, b) => priority(a) - priority(b));
 }
 
