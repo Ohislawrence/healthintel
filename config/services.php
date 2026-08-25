@@ -74,7 +74,7 @@ return [
         'initialize_path' => env('NOMBA_INITIALIZE_PATH', '/v1/checkout/order'),
         'verify_path' => env('NOMBA_VERIFY_PATH', '/v1/checkout/transaction'),
         'webhook_secret' => env('NOMBA_WEBHOOK_SECRET'),
-        'webhook_header' => env('NOMBA_WEBHOOK_HEADER', 'x-nomba-signature'),
+        'webhook_header' => env('NOMBA_WEBHOOK_HEADER', 'nomba-signature'),
     ],
 
     'google' => [

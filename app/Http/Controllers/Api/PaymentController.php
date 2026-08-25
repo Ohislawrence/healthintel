@@ -133,11 +133,14 @@ class PaymentController extends BaseController
     public function nombaWebhook(Request $request)
     {
         $payload = $request->getContent();
-        $signature = $request->header(
-            config('services.nomba.webhook_header', 'x-nomba-signature')
-        );
 
-        if (!app(\App\Services\NombaService::class)->isValidWebhook($payload, $signature ?? '')) {
+        // Nomba sends the signature in `nomba-signature` (also mirrored as
+        // `nomba-sig-value`) and the timestamp used in the HMAC in `nomba-timestamp`.
+        $signature = $request->header('nomba-signature')
+            ?? $request->header('nomba-sig-value');
+        $timestamp = $request->header('nomba-timestamp', '');
+
+        if (!app(\App\Services\NombaService::class)->isValidWebhook($payload, $signature ?? '', $timestamp)) {
             return response()->json(['status' => 'invalid_signature'], 401);
         }
 

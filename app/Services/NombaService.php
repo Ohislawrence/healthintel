@@ -35,7 +35,7 @@ class NombaService
         $this->clientId = $this->env('NOMBA_CLIENT_ID', config('services.nomba.client_id'));
         $this->accountId = $this->env('NOMBA_PUBLIC_KEY', config('services.nomba.account_id'));
         $this->webhookSecret = $this->env('NOMBA_WEBHOOK_SECRET', config('services.nomba.webhook_secret'));
-        $this->webhookHeader = $this->env('NOMBA_WEBHOOK_HEADER', config('services.nomba.webhook_header', 'x-nomba-signature'));
+        $this->webhookHeader = $this->env('NOMBA_WEBHOOK_HEADER', config('services.nomba.webhook_header', 'nomba-signature'));
     }
 
     /**
@@ -273,9 +273,16 @@ class NombaService
     }
 
     /**
-     * Validate Nomba webhook signature (HMAC-SHA256 over raw body).
+     * Validate a Nomba webhook signature.
+     *
+     * Nomba signs a colon-joined payload built from specific fields (NOT the raw
+     * JSON body) using HMAC-SHA256, then Base64-encodes the digest. The signature
+     * is sent in the `nomba-signature` header (also mirrored as `nomba-sig-value`),
+     * and the `nomba-timestamp` header is one of the hashed fields.
+     *
+     * @see https://developer.nomba.com/docs/api-basics/webhook
      */
-    public function isValidWebhook(string $payload, string $signature): bool
+    public function isValidWebhook(string $payload, string $signature, string $timestamp = ''): bool
     {
         if (!$this->isConfigured()) {
             Log::warning('Nomba webhook rejected: service not configured (missing NOMBA_CLIENT_ID / NOMBA_SECRET_KEY).');
@@ -288,15 +295,14 @@ class NombaService
         }
 
         if (empty($signature)) {
-            Log::warning('Nomba webhook rejected: no signature header received (expected ' . $this->webhookHeader . ').');
+            Log::warning('Nomba webhook rejected: no signature header received (expected nomba-signature).');
             return false;
         }
 
-        $computed = hash_hmac('sha256', $payload, $this->webhookSecret);
+        $computed = $this->generateSignature($payload, $this->webhookSecret, $timestamp);
 
-        if (!hash_equals($computed, $signature)) {
+        if (!hash_equals(strtolower($computed), strtolower($signature))) {
             Log::warning('Nomba webhook rejected: signature mismatch.', [
-                'expected_header' => $this->webhookHeader,
                 'received_length' => strlen($signature),
                 'computed_length' => strlen($computed),
             ]);
@@ -304,5 +310,49 @@ class NombaService
         }
 
         return true;
+    }
+
+    /**
+     * Recreate the Nomba webhook signature.
+     *
+     * The hashed string is the colon-joined concatenation of:
+     * event_type:requestId:userId:walletId:transactionId:transactionType:transactionTime:transactionResponseCode:timestamp
+     */
+    private function generateSignature(string $payload, string $secret, string $timestamp): string
+    {
+        $requestPayload = json_decode($payload, true) ?? [];
+        $data = $requestPayload['data'] ?? [];
+        $merchant = $data['merchant'] ?? [];
+        $transaction = $data['transaction'] ?? [];
+
+        $eventType = (string) ($requestPayload['event_type'] ?? '');
+        $requestId = (string) ($requestPayload['requestId'] ?? '');
+        $userId = (string) ($merchant['userId'] ?? '');
+        $walletId = (string) ($merchant['walletId'] ?? '');
+        $transactionId = (string) ($transaction['transactionId'] ?? '');
+        $transactionType = (string) ($transaction['type'] ?? '');
+        $transactionTime = (string) ($transaction['time'] ?? '');
+        $transactionResponseCode = (string) ($transaction['responseCode'] ?? '');
+
+        if ($transactionResponseCode === 'null') {
+            $transactionResponseCode = '';
+        }
+
+        $hashingPayload = sprintf(
+            '%s:%s:%s:%s:%s:%s:%s:%s:%s',
+            $eventType,
+            $requestId,
+            $userId,
+            $walletId,
+            $transactionId,
+            $transactionType,
+            $transactionTime,
+            $transactionResponseCode,
+            $timestamp
+        );
+
+        $hash = hash_hmac('sha256', $hashingPayload, $secret, true);
+
+        return base64_encode($hash);
     }
 }
