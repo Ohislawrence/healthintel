@@ -10,12 +10,18 @@ class Appointment extends Model
     protected $fillable = [
         'user_id',
         'provider_id',
+        'patient_name',
+        'patient_phone',
         'title',
         'description',
         'appointment_date',
         'appointment_time',
         'status',
         'notes',
+        'provider_notes',
+        'confirmed_at',
+        'credits_charged',
+        'refunded_at',
         'reminder_enabled',
         'reminder_minutes_before',
         'reminder_sent_at',
@@ -26,6 +32,9 @@ class Appointment extends Model
         'reminder_enabled' => 'boolean',
         'reminder_minutes_before' => 'integer',
         'reminder_sent_at' => 'datetime',
+        'confirmed_at' => 'datetime',
+        'credits_charged' => 'integer',
+        'refunded_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

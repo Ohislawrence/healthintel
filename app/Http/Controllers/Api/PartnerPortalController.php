@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\ProviderDirectoryEntry;
 use App\Models\ProviderListingRequest;
 use App\Models\ReferralEvent;
+use App\Services\BookingService;
 use App\Services\ReferralService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -13,6 +14,7 @@ class PartnerPortalController extends BaseController
 {
     public function __construct(
         private ReferralService $referralService,
+        private BookingService $bookingService,
     ) {}
 
     /**
@@ -266,6 +268,82 @@ class PartnerPortalController extends BaseController
     }
 
     /**
+     * List booking requests for this provider.
+     */
+    public function appointments(Request $request)
+    {
+        $provider = $this->resolveProvider($request);
+
+        $status = $request->query('status');
+
+        $appointments = \App\Models\Appointment::where('provider_id', $provider->id)
+            ->with('user:id,name,email,phone')
+            ->when($status && in_array($status, ['pending', 'confirmed', 'declined', 'completed', 'cancelled']), fn ($q) => $q->where('status', $status))
+            ->orderBy('appointment_date', 'desc')
+            ->orderBy('appointment_time', 'desc')
+            ->get();
+
+        return $this->success([
+            'appointments' => $appointments,
+            'counts' => [
+                'pending' => \App\Models\Appointment::where('provider_id', $provider->id)->where('status', 'pending')->count(),
+                'confirmed' => \App\Models\Appointment::where('provider_id', $provider->id)->where('status', 'confirmed')->count(),
+            ],
+        ]);
+    }
+
+    /**
+     * Confirm or decline a booking request.
+     */
+    public function appointmentDecision(Request $request, int $id)
+    {
+        $provider = $this->resolveProvider($request);
+
+        $validated = $request->validate([
+            'decision' => 'required|in:confirm,decline',
+            'provider_notes' => 'nullable|string|max:2000',
+        ]);
+
+        $appointment = \App\Models\Appointment::where('id', $id)
+            ->where('provider_id', $provider->id)
+            ->firstOrFail();
+
+        if ($appointment->status !== 'pending') {
+            return $this->error('This request has already been handled.', 422);
+        }
+
+        if ($validated['decision'] === 'confirm') {
+            $appointment->update([
+                'status' => 'confirmed',
+                'confirmed_at' => now(),
+                'provider_notes' => $validated['provider_notes'] ?? null,
+            ]);
+
+            // Schedule the patient reminder now that it's confirmed.
+            if ($appointment->reminder_enabled) {
+                $appointmentDateTime = \Carbon\Carbon::parse(
+                    $appointment->appointment_date->format('Y-m-d') . ' ' . ($appointment->appointment_time ?? '00:00')
+                );
+                $reminderAt = $appointmentDateTime->copy()->subMinutes($appointment->reminder_minutes_before);
+                \App\Jobs\SendAppointmentReminder::dispatch($appointment->id)
+                    ->delay($reminderAt->isFuture() ? $reminderAt : null);
+            }
+        } else {
+            $appointment->update([
+                'status' => 'declined',
+                'provider_notes' => $validated['provider_notes'] ?? null,
+            ]);
+
+            // Refund any credits charged for the booking.
+            $this->bookingService->refund($appointment->fresh());
+        }
+
+        $this->bookingService->notifyPatient($appointment->fresh(), $validated['decision'] === 'confirm', $validated['provider_notes'] ?? null);
+
+        return $this->success($appointment->load('user:id,name'), $validated['decision'] === 'confirm' ? 'Booking confirmed' : 'Booking declined');
+    }
+
+    /**
      * Generate or regenerate an access code.
      */
     public function regenerateAccessCode(Request $request)
@@ -282,9 +360,6 @@ class PartnerPortalController extends BaseController
         ]);
     }
 
-    /**
-     * Resolve the provider from the Sanctum token.
-     */
     private function resolveProvider(Request $request): ProviderDirectoryEntry
     {
         // The authenticated model is ProviderDirectoryEntry (via Sanctum's HasApiTokens)

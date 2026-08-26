@@ -24,6 +24,13 @@ export default function ProviderDetail() {
     const reviewCount = reviewsData?.data?.review_count ?? 0;
     const reviews = reviewsData?.data?.reviews || [];
 
+    const { data: bookingCostData } = useQuery({
+        queryKey: ['booking-cost'],
+        queryFn: () => api.get('/appointments/booking-cost'),
+        staleTime: 60000,
+    });
+    const bookingCreditCost = bookingCostData?.data?.credit_cost ?? 0;
+
     const clickOutMutation = useMutation({
         mutationFn: (action) => api.post(`/providers/${slug}/click-out`, { action }),
     });
@@ -82,21 +89,22 @@ export default function ProviderDetail() {
         mutationFn: (payload) => api.post('/appointments', payload),
         onSuccess: () => {
             queryClient.invalidateQueries(['appointments']);
-            setBookingSuccess('Appointment booked — check your tracker.');
+            setBookingSuccess('Booking request sent — the provider will confirm shortly.');
             setShowBooking(false);
             setBooking({ appointment_date: '', appointment_time: '', notes: '' });
         },
-        onError: (err) => setBookingError(err?.message || 'Failed to book appointment'),
+        onError: (err) => setBookingError(err?.message || 'Failed to send booking request'),
     });
 
     const submitBooking = () => {
         if (!booking.appointment_date) { setBookingError('Please pick a date.'); return; }
+        if (!booking.appointment_time) { setBookingError('Please pick a time.'); return; }
         setBookingError('');
         setBookingSuccess('');
         bookMutation.mutate({
             title: `Visit to ${provider.name}`,
             appointment_date: booking.appointment_date,
-            appointment_time: booking.appointment_time || undefined,
+            appointment_time: booking.appointment_time,
             notes: booking.notes.trim() || undefined,
             provider_id: provider.id,
             reminder_enabled: true,
@@ -332,6 +340,11 @@ export default function ProviderDetail() {
                     <button onClick={submitBooking} disabled={bookMutation.isPending} className="btn w-full bg-indigo-600 hover:bg-indigo-700 text-white">
                         {bookMutation.isPending ? 'Booking…' : 'Confirm Booking'}
                     </button>
+                    {bookingCreditCost > 0 && (
+                        <p className="text-xs text-neutral-400 text-center">
+                            🔒 {bookingCreditCost} credit{bookingCreditCost > 1 ? 's' : ''} will be reserved when you book. Refunded if the provider declines.
+                        </p>
+                    )}
                 </div>
             )}
 

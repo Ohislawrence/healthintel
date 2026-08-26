@@ -14,6 +14,7 @@ use App\Models\Symptom;
 use App\Models\TestPanel;
 use App\Models\User;
 use App\Models\UserHealthMetric;
+use App\Services\BookingService;
 use App\Services\EmailService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -962,6 +963,43 @@ class AdminController extends BaseController
             'notes', 'status', 'reminder_enabled', 'reminder_minutes_before',
         ]));
         return $this->success(['appointment' => $appointment->fresh()], 'Appointment updated');
+    }
+
+    /**
+     * Admin override: confirm or decline a pending booking request.
+     */
+    public function appointmentDecision(Request $request, int $id)
+    {
+        $bookingService = app(BookingService::class);
+
+        $validated = $request->validate([
+            'decision' => 'required|in:confirm,decline',
+            'provider_notes' => 'nullable|string|max:2000',
+        ]);
+
+        $appointment = Appointment::findOrFail($id);
+
+        if ($appointment->status !== 'pending') {
+            return $this->error('This request has already been handled.', 422);
+        }
+
+        if ($validated['decision'] === 'confirm') {
+            $appointment->update([
+                'status' => 'confirmed',
+                'confirmed_at' => now(),
+                'provider_notes' => $validated['provider_notes'] ?? null,
+            ]);
+        } else {
+            $appointment->update([
+                'status' => 'declined',
+                'provider_notes' => $validated['provider_notes'] ?? null,
+            ]);
+            $bookingService->refund($appointment->fresh());
+        }
+
+        $bookingService->notifyPatient($appointment->fresh(), $validated['decision'] === 'confirm', $validated['provider_notes'] ?? null);
+
+        return $this->success(['appointment' => $appointment->fresh()], $validated['decision'] === 'confirm' ? 'Booking confirmed' : 'Booking declined');
     }
 
     // ── User Feedback ──
@@ -1965,6 +2003,50 @@ class AdminController extends BaseController
     }
 
     // ── Payments / Reconciliation ──
+
+    /**
+     * List captured client-side error reports.
+     */
+    public function errorReports(Request $request)
+    {
+        $query = \App\Models\ErrorReport::query();
+
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+        if ($source = $request->input('source')) {
+            $query->where('source', $source);
+        }
+        if ($level = $request->input('level')) {
+            $query->where('level', $level);
+        }
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('message', 'like', "%{$search}%")
+                  ->orWhere('type', 'like', "%{$search}%")
+                  ->orWhere('url', 'like', "%{$search}%");
+            });
+        }
+
+        $reports = $query->latest('last_seen_at')->paginate(30);
+
+        return $this->paginated($reports);
+    }
+
+    /**
+     * Update an error report status.
+     */
+    public function errorReportUpdate(Request $request, int $id)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:open,resolved,ignored',
+        ]);
+
+        $report = \App\Models\ErrorReport::findOrFail($id);
+        $report->update(['status' => $validated['status']]);
+
+        return $this->success(['report' => $report->fresh()], 'Report updated');
+    }
 
     public function payments(Request $request)
     {

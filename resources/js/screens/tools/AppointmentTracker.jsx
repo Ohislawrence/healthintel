@@ -5,8 +5,11 @@ import api from '../../lib/api';
 
 const STATUS_OPTIONS = ['upcoming', 'completed', 'cancelled'];
 const STATUS_COLORS = {
+  pending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  confirmed: { bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500' },
   upcoming: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
   completed: { bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500' },
+  declined: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' },
   cancelled: { bg: 'bg-neutral-100', text: 'text-neutral-500', dot: 'bg-neutral-400' },
 };
 
@@ -35,6 +38,11 @@ export default function AppointmentTracker() {
 
   const updateMut = useMutation({
     mutationFn: ({ id, payload }) => api.put(`/appointments/${id}`, payload),
+    onSuccess: () => queryClient.invalidateQueries(['appointments']),
+  });
+
+  const cancelMut = useMutation({
+    mutationFn: (id) => api.post(`/appointments/${id}/cancel`),
     onSuccess: () => queryClient.invalidateQueries(['appointments']),
   });
 
@@ -157,12 +165,21 @@ export default function AppointmentTracker() {
                   </div>
                 </div>
                 {/* Actions */}
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-neutral-100">
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-neutral-100 flex-wrap">
+                  {(a.status === 'upcoming' || a.status === 'confirmed') && (
+                    <button onClick={() => handleStatusChange(a.id, 'completed')} className="text-xs font-bold text-green-600 hover:text-green-700">Mark Done</button>
+                  )}
                   {a.status === 'upcoming' && (
-                    <>
-                      <button onClick={() => handleStatusChange(a.id, 'completed')} className="text-xs font-bold text-green-600 hover:text-green-700">Mark Done</button>
-                      <button onClick={() => handleStatusChange(a.id, 'cancelled')} className="text-xs font-bold text-neutral-400 hover:text-neutral-600">Cancel</button>
-                    </>
+                    <button onClick={() => handleStatusChange(a.id, 'cancelled')} className="text-xs font-bold text-neutral-400 hover:text-neutral-600">Cancel</button>
+                  )}
+                  {(a.status === 'pending' || a.status === 'confirmed') && (
+                    <button
+                      onClick={() => { if (window.confirm('Cancel this booking request?')) cancelMut.mutate(a.id); }}
+                      disabled={cancelMut.isPending}
+                      className="text-xs font-bold text-amber-600 hover:text-amber-700"
+                    >
+                      {a.status === 'pending' ? 'Cancel request' : 'Cancel booking'}
+                    </button>
                   )}
                   <button onClick={() => handleDelete(a.id)} className="text-xs font-bold text-red-400 hover:text-red-600 ml-auto">Delete</button>
                 </div>

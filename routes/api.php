@@ -93,6 +93,10 @@ Route::post('/partnership-inquiry', [\App\Http\Controllers\Api\PartnershipInquir
 Route::post('/provider-listing-request', [\App\Http\Controllers\Api\ProviderListingRequestController::class, 'store'])
     ->middleware('throttle:5,10');
 
+// Client-side error reporting (fire-and-forget from the SPA)
+Route::post('/error-report', [\App\Http\Controllers\Api\ErrorReportController::class, 'store'])
+    ->middleware('throttle:30,1');
+
 // Partner portal login (public, access-code based)
 Route::post('/partner/login', [PartnerPortalController::class, 'login'])
     ->middleware('throttle:10,1');
@@ -172,10 +176,12 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::put('/feedback/{id}', [FeedbackController::class, 'update']);
 
     // Appointments
+    Route::get('/appointments/booking-cost', [AppointmentController::class, 'bookingCost']);
     Route::get('/appointments', [AppointmentController::class, 'index']);
     Route::get('/appointments/{id}', [AppointmentController::class, 'show']);
     Route::post('/appointments', [AppointmentController::class, 'store']);
     Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
+    Route::post('/appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
     Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
 
     // User Notifications (in-app)
@@ -226,6 +232,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::get('/partner/listing-requests', [PartnerPortalController::class, 'myRequests']);
     Route::post('/partner/promotion-request', [PartnerPortalController::class, 'requestPromotion']);
     Route::post('/partner/regenerate-code', [PartnerPortalController::class, 'regenerateAccessCode']);
+    Route::get('/partner/appointments', [PartnerPortalController::class, 'appointments']);
+    Route::post('/partner/appointments/{id}/decision', [PartnerPortalController::class, 'appointmentDecision']);
 
     // Partner Interpretation (B2B lab partners)
     Route::get('/partner/stats', [\App\Http\Controllers\Api\Partner\PartnerInterpretationController::class, 'stats']);

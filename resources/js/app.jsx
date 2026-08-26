@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import useAuthStore from './stores/authStore';
 import usePartnerAuthStore from './stores/partnerAuthStore';
 import { initPWA, subscribeToPush, isInstalled, isOnline, hasNotificationPermission } from './lib/pwa';
+import { initErrorReporting } from './lib/errorReporting';
 import AppLayout from './layouts/AppLayout';
 import { useNavigate } from 'react-router-dom';
 
@@ -101,6 +102,7 @@ import AdminDocumentation from './screens/admin/AdminDocumentation';
 import AdminReferrals from './screens/admin/AdminReferrals';
 import AdminTestimonials from './screens/admin/AdminTestimonials';
 import AdminBenchmarks from './screens/admin/AdminBenchmarks';
+import AdminErrorReports from './screens/admin/AdminErrorReports';
 import BlogList from './screens/BlogList';
 import BlogPostDetail from './screens/BlogPostDetail';
 import PartnerLogin from './screens/partner/PartnerLogin';
@@ -109,6 +111,7 @@ import PartnerDashboard from './screens/partner/PartnerDashboard';
 import PartnerInterpretations from './screens/partner/PartnerInterpretations';
 import PartnerListing from './screens/partner/PartnerListing';
 import PartnerAds from './screens/partner/PartnerAds';
+import PartnerAppointments from './screens/partner/PartnerAppointments';
 
 // Placeholder screens for partner portal (fallback for routes not yet built)
 function PartnerPlaceholder({ title }) {
@@ -270,6 +273,10 @@ function App() {
     const fetchUser = useAuthStore((s) => s.fetchUser);
 
     useEffect(() => {
+        initErrorReporting();
+    }, []);
+
+    useEffect(() => {
         fetchUser();
     }, [fetchUser]);
 
@@ -362,6 +369,7 @@ function App() {
                         <Route path="referrals" element={<AdminReferrals />} />
                         <Route path="testimonials" element={<AdminTestimonials />} />
                         <Route path="benchmarks" element={<AdminBenchmarks />} />
+                        <Route path="error-reports" element={<AdminErrorReports />} />
                         <Route path="documentation" element={<AdminDocumentation />} />
                     </Route>
 
@@ -373,6 +381,7 @@ function App() {
                         <Route path="interpretations" element={<PartnerInterpretations />} />
                         <Route path="listing" element={<PartnerListing />} />
                         <Route path="ads" element={<PartnerAds />} />
+                        <Route path="appointments" element={<PartnerAppointments />} />
                         <Route path="patients" element={<PartnerPlaceholder title="Patients" />} />
                         <Route path="invoices" element={<PartnerPlaceholder title="Invoices" />} />
                         <Route path="submit" element={<PartnerPlaceholder title="Submit Results" />} />

@@ -55,6 +55,7 @@ const NAV_SECTIONS = [
   {
     title: 'System',
     links: [
+      { to: '/admin/error-reports', label: 'Error Logs', icon: '🐞' },
       { to: '/admin/documentation', label: 'Documentation', icon: '📖' },
       { to: '/admin/settings', label: 'Settings', icon: '⚙' },
     ],

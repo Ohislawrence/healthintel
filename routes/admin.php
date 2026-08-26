@@ -54,6 +54,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // Appointments
     Route::get('/appointments', [AdminController::class, 'appointments']);
     Route::put('/appointments/{id}', [AdminController::class, 'appointmentUpdate']);
+    Route::post('/appointments/{id}/decision', [AdminController::class, 'appointmentDecision']);
 
     // User Feedback
     Route::get('/feedback', [AdminController::class, 'feedback']);
@@ -158,6 +159,10 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('/referral/payout-requests/{id}/reject', [AdminController::class, 'referralPayoutReject']);
     Route::get('/referral/stats', [AdminController::class, 'referralStats']);
     Route::get('/referral/referrers', [AdminController::class, 'referralReferrers']);
+
+    // Error Reports
+    Route::get('/error-reports', [AdminController::class, 'errorReports']);
+    Route::put('/error-reports/{id}', [AdminController::class, 'errorReportUpdate']);
 
     // Settings
     Route::get('/settings', [AdminSettingController::class, 'index']);
