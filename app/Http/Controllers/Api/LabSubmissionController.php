@@ -36,6 +36,16 @@ class LabSubmissionController extends BaseController
         return $this->success(['panels' => $panels]);
     }
 
+    /**
+     * Public cost of a PDF report interpretation (configurable).
+     */
+    public function pdfCost()
+    {
+        return $this->success([
+            'credit_cost' => (int) config('credits.costs.pdf_interpretation', 3),
+        ]);
+    }
+
     public function panelShow(string $slug)
     {
         $panel = TestPanel::where('slug', $slug)->where('is_active', true)->firstOrFail();
@@ -270,12 +280,19 @@ class LabSubmissionController extends BaseController
             $pdf = $parser->parseFile($fullPath);
             $pdfText = $this->cleanUtf8($pdf->getText());
         } catch (\Throwable) {
+            // Delete the uploaded file on parse failure — files are never stored.
+            Storage::delete($path);
             return $this->error('Could not parse this PDF.', 422);
         }
 
         if (empty(trim($pdfText))) {
+            Storage::delete($path);
             return $this->error('No text could be extracted from this PDF.', 422);
         }
+
+        // Values extracted — delete the original file immediately. Only the
+        // extracted text/values are retained, never the uploaded document.
+        Storage::delete($path);
 
         $extractor = app(\App\Services\PdfValueExtractor::class);
         $extractedTests = $extractor->extract($pdfText);
@@ -285,7 +302,7 @@ class LabSubmissionController extends BaseController
             'raw_ocr_text' => $pdfText,
             'extracted_tests' => $extractedTests,
             'confirmation_status' => 'pending',
-            'pdf_path' => $path,
+            'pdf_path' => null, // file already deleted after extraction
         ]);
 
         return $this->success([
@@ -539,18 +556,23 @@ class LabSubmissionController extends BaseController
             $pdf = $parser->parseFile($fullPath);
             $pdfText = $this->cleanUtf8($pdf->getText());
         } catch (\Throwable $e) {
+            Storage::delete($path);
             return $this->error('Could not parse this PDF. The file may be corrupted or not a valid PDF.', 422);
         }
 
         if (empty(trim($pdfText))) {
+            Storage::delete($path);
             return $this->error('No text could be extracted from this PDF. The file may be scanned or image-based. Please try a text-based PDF.', 422);
         }
+
+        // Values extracted — delete the original file immediately.
+        Storage::delete($path);
 
         $submission = LabSubmission::create([
             'user_id' => $user->id,
             'submission_type' => 'pdf',
             'credits_used' => $cost,
-            'pdf_report_url' => $path,
+            'pdf_report_url' => null, // file deleted after extraction; not stored
             'pdf_text' => $pdfText,
             'submitted_at' => now(),
         ]);

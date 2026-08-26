@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
@@ -29,9 +29,17 @@ export default function Dashboard() {
     const firstName = user?.name?.split(' ')[0] || '';
     const profileComplete = !!user?.health_profile?.profile_completed;
 
-    const { data: submissionsData, isLoading } = useQuery({ queryKey: ['recent-submissions'], queryFn: () => api.get('/submissions', { params: { per_page: 5 } }) });
-    const submissions = submissionsData?.data || [];
-    const meta = submissionsData?.meta || {};
+    const [activityType, setActivityType] = useState('all');
+
+    const { data: activityData, isLoading } = useQuery({
+        queryKey: ['recent-activity', activityType],
+        queryFn: () => api.get('/activity', { params: { limit: 5, type: activityType === 'all' ? undefined : activityType } }),
+    });
+    const activities = activityData?.data?.activities || [];
+    const activityTotal = activityData?.data?.total || activities.length;
+    const activityCounts = activityData?.data?.counts || {};
+    const reportCount = activityCounts.lab ?? 0;
+    const symptomCount = activityCounts.symptom ?? 0;
 
     const { data: scoreData } = useQuery({ queryKey: ['health-score'], queryFn: () => api.get('/health-score'), staleTime: 1000 * 60 * 2 });
     const scoreRes = scoreData?.data;
@@ -77,7 +85,7 @@ export default function Dashboard() {
                 {/* Stats */}
                 <div className="flex gap-3">
                     <StatPill value={user?.credits ?? 0} label="Credits" icon="◆" color="#0F766E" to="/credits" />
-                    <StatPill value={meta?.total || 0} label="Reports" icon="⚛" color="#4F46E5" />
+                    <StatPill value={reportCount} label="Reports" icon="⚛" color="#4F46E5" />
                     <StatPill value={profileComplete ? '✓' : '···'} label="Profile" icon="◉" color={profileComplete ? '#16A34A' : '#D97706'} to="/onboarding" />
                 </div>
 
@@ -120,8 +128,62 @@ export default function Dashboard() {
                 <div><p className="text-base font-bold text-neutral-900 mb-3">Quick Actions</p><div className="grid grid-cols-2 gap-3">{featureCards.map((f) => (<FeatureCard key={f.title} {...f} />))}</div></div>
                 {/* Recent Activity */}
                 <div>
-                    <div className="flex items-center justify-between mb-3"><p className="text-base font-bold text-neutral-900">Recent Activity</p>{meta?.total > 0 && <Link to="/credits" className="text-sm font-semibold text-teal-700 hover:text-teal-800">See all ({meta.total})</Link>}</div>
-                    {isLoading ? (<div className="card p-8 text-center"><div className="skeleton h-4 w-3/4 mx-auto rounded mb-3" /><div className="skeleton h-3 w-1/2 mx-auto rounded" /></div>) : submissions.length === 0 ? (<div className="card p-8 text-center border-dashed"><div className="w-16 h-16 rounded-2xl bg-teal-50 flex items-center justify-center text-2xl mx-auto mb-3">⚛</div><p className="text-sm font-bold text-neutral-900 mb-1">No lab reports yet</p><p className="text-xs text-neutral-500 mb-4">Upload your first lab result to start tracking your health</p><Link to="/lab-results" className="btn btn-primary text-sm">Upload Lab Report</Link></div>) : (<div className="card overflow-hidden">{submissions.map((s, index) => (<Link key={s.id} to={`/lab-results/submission/${s.id}`} className={`flex items-center gap-3 px-4 py-3 hover:bg-neutral-25 transition-colors ${index < submissions.length - 1 ? 'border-b border-neutral-100' : ''}`}><div className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center text-base text-teal-600">{s.submission_type === 'pdf' ? '⚛' : '▼'}</div><div className="flex-1"><p className="text-sm font-semibold text-neutral-900">{s.submission_type === 'pdf' ? 'PDF Upload' : s.test_panel?.name || 'Lab Result'}</p><p className="text-xs text-neutral-400 mt-0.5">{new Date(s.submitted_at || s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{' · '}{s.credits_used} credit{s.credits_used > 1 ? 's' : ''}</p></div><span className={`badge ${s.interpretation?.status === 'completed' ? 'badge-success' : s.interpretation?.status === 'failed' ? 'badge-danger' : 'badge-pending'}`}><span className={`w-1.5 h-1.5 rounded-full ${s.interpretation?.status === 'completed' ? 'bg-success-500' : s.interpretation?.status === 'failed' ? 'bg-danger-500' : 'bg-warning-500'}`} />{s.interpretation?.status === 'completed' ? 'Done' : s.interpretation?.status === 'failed' ? 'Failed' : 'Pending'}</span></Link>))}</div>)}
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-base font-bold text-neutral-900">Recent Activity</p>
+                    </div>
+
+                    {/* Type filter */}
+                    <div className="flex gap-2 mb-3">
+                        {[
+                            { key: 'all', label: 'All', count: activityCounts.all ?? 0 },
+                            { key: 'lab', label: 'Lab Reports', count: activityCounts.lab ?? 0 },
+                            { key: 'symptom', label: 'Symptom Checks', count: activityCounts.symptom ?? 0 },
+                        ].map((f) => (
+                            <button
+                                key={f.key}
+                                onClick={() => setActivityType(f.key)}
+                                className={`text-xs font-semibold rounded-full px-3 py-1.5 transition-colors ${activityType === f.key ? 'bg-teal-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}
+                            >
+                                {f.label}{f.count > 0 && <span className="opacity-70"> ({f.count})</span>}
+                            </button>
+                        ))}
+                    </div>
+
+                    {isLoading ? (
+                        <div className="card p-8 text-center"><div className="skeleton h-4 w-3/4 mx-auto rounded mb-3" /><div className="skeleton h-3 w-1/2 mx-auto rounded" /></div>
+                    ) : activities.length === 0 ? (
+                        <div className="card p-8 text-center border-dashed">
+                            <div className="w-16 h-16 rounded-2xl bg-teal-50 flex items-center justify-center text-2xl mx-auto mb-3">⚛</div>
+                            <p className="text-sm font-bold text-neutral-900 mb-1">No recent activity</p>
+                            <p className="text-xs text-neutral-500 mb-4">Upload a lab result or run a symptom check to get started.</p>
+                            <Link to="/lab-results" className="btn btn-primary text-sm">Upload Lab Report</Link>
+                        </div>
+                    ) : (
+                        <div className="card overflow-hidden">
+                            {activities.map((a, index) => (
+                                <Link key={`${a.type}-${a.id}`} to={a.route} className={`flex items-center gap-3 px-4 py-3 hover:bg-neutral-25 transition-colors ${index < activities.length - 1 ? 'border-b border-neutral-100' : ''}`}>
+                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-base ${a.type === 'symptom' ? 'bg-indigo-50 text-indigo-600' : 'bg-teal-50 text-teal-600'}`}>
+                                        {a.type === 'symptom' ? '♡' : a.type === 'pdf' ? '⚛' : '▼'}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-neutral-900 truncate">{a.title}</p>
+                                        <p className="text-xs text-neutral-400 mt-0.5">
+                                            {new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                            {a.subtitle ? ` · ${a.subtitle}` : ''}
+                                        </p>
+                                    </div>
+                                    {a.type === 'lab' && (
+                                        <span className={`badge ${a.status === 'completed' ? 'badge-success' : a.status === 'failed' ? 'badge-danger' : 'badge-pending'}`}>
+                                            {a.status === 'completed' ? 'Done' : a.status === 'failed' ? 'Failed' : 'Pending'}
+                                        </span>
+                                    )}
+                                    {a.type === 'symptom' && (
+                                        <span className="badge badge-warning">Checked</span>
+                                    )}
+                                </Link>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -29,7 +29,7 @@ class ImageLabReportService
             return ['success' => false, 'error' => 'Invalid or corrupted image data.'];
         }
 
-        // Save the image for record-keeping
+        // Save the image temporarily — deleted right after extraction.
         $fileName = ($imageName ?? 'lab-report') . '_' . time() . '.jpg';
         $path = 'lab-reports/images/' . $fileName;
         Storage::put($path, base64_decode($processedImage));
@@ -41,12 +41,17 @@ class ImageLabReportService
         $extractedTests = $this->parseVisionResponse($extractedJson);
 
         if (empty($extractedTests)) {
-            // Fallback: try traditional OCR approach
+            // Delete the uploaded image on failure — files are never stored.
+            Storage::delete($path);
             return [
                 'success' => false,
                 'error' => 'Could not extract test values from this image. Please try taking a clearer photo, or enter values manually.',
             ];
         }
+
+        // Values extracted — delete the original image immediately. Only the
+        // extracted text/values are retained, never the uploaded document.
+        Storage::delete($path);
 
         // Save draft for user confirmation
         $draft = PdfSubmissionDraft::create([
@@ -54,7 +59,7 @@ class ImageLabReportService
             'raw_ocr_text' => json_encode($extractedJson),
             'extracted_tests' => $extractedTests,
             'confirmation_status' => 'pending',
-            'pdf_path' => $path,
+            'pdf_path' => null, // file already deleted after extraction
         ]);
 
         return [

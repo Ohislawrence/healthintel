@@ -68,6 +68,7 @@ Route::get('/insurance/hmos', [ProviderDirectoryController::class, 'insuranceLis
 // Test panels (public)
 Route::get('/panels', [LabSubmissionController::class, 'panels']);
 Route::get('/panels/{slug}', [LabSubmissionController::class, 'panelShow']);
+Route::get('/submissions/pdf-cost', [LabSubmissionController::class, 'pdfCost']);
 
 // Symptoms (public listing)
 Route::get('/symptoms', [SymptomCheckerController::class, 'index']);
@@ -189,6 +190,9 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::get('/notifications/unread-count', [\App\Http\Controllers\Api\UserNotificationController::class, 'unreadCount']);
     Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\UserNotificationController::class, 'markRead']);
     Route::post('/notifications/mark-all-read', [\App\Http\Controllers\Api\UserNotificationController::class, 'markAllRead']);
+
+    // Recent Activity (unified feed: lab submissions + symptom checks)
+    Route::get('/activity', [\App\Http\Controllers\Api\ActivityController::class, 'index']);
 
     // Global Search
     Route::get('/search', \App\Http\Controllers\Api\SearchController::class);

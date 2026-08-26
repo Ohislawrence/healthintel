@@ -133,6 +133,16 @@ export default function PanelPicker() {
                 </p>
             </div>
 
+            {/* ── Privacy disclosure ─────────────────────── */}
+            <div className="flex items-start gap-2.5 rounded-xl border border-teal-100 bg-teal-50 p-3 text-xs leading-relaxed text-teal-700">
+                <span className="text-base leading-none mt-0.5">🔒</span>
+                <p>
+                    Your files are <strong>not saved or stored</strong>. We read the file just long enough to
+                    extract your test values, then delete it immediately. Only the extracted numbers and
+                    the plain-language explanation are kept on your account.
+                </p>
+            </div>
+
             {/* ── Method selector ─────────────────────────── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
