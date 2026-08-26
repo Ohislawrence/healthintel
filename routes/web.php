@@ -21,6 +21,7 @@ Route::get('/affiliates', [FrontendController::class, 'affiliates'])->name('affi
 Route::get('/blog', [FrontendController::class, 'blog'])->name('blog');
 Route::get('/blog/{slug}', [FrontendController::class, 'blogShow'])->name('blog.detail');
 Route::get('/r/{slug}', [FrontendController::class, 'partnerPatientResults'])->name('partner.results');
+Route::get('/directory/{slug}', [FrontendController::class, 'providerDetail'])->name('provider.detail');
 Route::get('/privacy', [FrontendController::class, 'privacy'])->name('privacy');
 Route::get('/terms', [FrontendController::class, 'terms'])->name('terms');
 Route::get('/sitemap.xml', [FrontendController::class, 'sitemap']);

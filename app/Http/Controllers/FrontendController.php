@@ -139,6 +139,33 @@ class FrontendController extends Controller
         return view('frontend.blog-detail', compact('post', 'related'));
     }
 
+    public function providerDetail($slug)
+    {
+        $provider = ProviderDirectoryEntry::where('slug', $slug)
+            ->where('is_active', true)
+            ->with('locations')
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
+            ->first();
+
+        if (!$provider) {
+            abort(404);
+        }
+
+        $provider->append(['is_sponsored', 'is_open_now']);
+
+        $ratingAvg = round((float) ($provider->reviews_avg_rating ?? 0), 1);
+        $ratingCount = (int) ($provider->reviews_count ?? 0);
+
+        $reviews = $provider->reviews()
+            ->with('user:id,name')
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        return view('frontend.provider-detail', compact('provider', 'ratingAvg', 'ratingCount', 'reviews'));
+    }
+
     public function partnerPatientResults($slug)
     {
         $provider = ProviderDirectoryEntry::where('slug', $slug)->first();
@@ -201,6 +228,19 @@ class FrontendController extends Controller
                 'priority' => '0.6',
                 'changefreq' => 'monthly',
                 'lastmod' => $post->published_at?->toAtomString(),
+            ];
+        }
+
+        // Include active provider directory entries.
+        $providers = ProviderDirectoryEntry::where('is_active', true)
+            ->get(['slug', 'updated_at']);
+
+        foreach ($providers as $provider) {
+            $pages[] = [
+                'url' => route('provider.detail', $provider->slug),
+                'priority' => '0.5',
+                'changefreq' => 'monthly',
+                'lastmod' => $provider->updated_at?->toAtomString(),
             ];
         }
 

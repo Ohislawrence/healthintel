@@ -49,6 +49,7 @@ import CreditHistory from './screens/credits/CreditHistory';
 import SymptomChecker from './screens/symptoms/SymptomChecker';
 import ProviderDirectory from './screens/directory/ProviderDirectory';
 import ProviderDetail from './screens/directory/ProviderDetail';
+import ProviderFavorites from './screens/directory/ProviderFavorites';
 import InsuranceComparison from './screens/insurance/InsuranceComparison';
 import HealthTools from './screens/tools/HealthTools';
 import BMICalculator from './screens/tools/BMICalculator';
@@ -305,6 +306,7 @@ function App() {
                     <Route path="/payment/callback" element={<PaymentCallback />} />
                     <Route path="/symptom-checker" element={<ProtectedRoute><AppLayout><SymptomChecker /></AppLayout></ProtectedRoute>} />
                     <Route path="/directory" element={<ProtectedRoute><AppLayout><ProviderDirectory /></AppLayout></ProtectedRoute>} />
+                    <Route path="/providers/favorites" element={<ProtectedRoute><AppLayout><ProviderFavorites /></AppLayout></ProtectedRoute>} />
                     <Route path="/providers/:slug" element={<ProtectedRoute><AppLayout><ProviderDetail /></AppLayout></ProtectedRoute>} />
                     <Route path="/insurance" element={<ProtectedRoute><AppLayout><InsuranceComparison /></AppLayout></ProtectedRoute>} />
 <Route path="/health-tools" element={<ProtectedRoute><AppLayout><HealthTools /></AppLayout></ProtectedRoute>} />

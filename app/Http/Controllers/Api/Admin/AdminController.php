@@ -232,12 +232,19 @@ class AdminController extends BaseController
 
     public function providerStore(Request $request)
     {
+        // Normalize empty strings to null BEFORE validation — the API middleware
+        // group does not run ConvertEmptyStringsToNull, so "" sent from the form
+        // would otherwise fail integer/in/numeric rules (e.g. monetization_* and
+        // location latitude/longitude).
+        $this->normalizeEmptyStringsToNull($request);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'type' => 'required|in:hospital,clinic,lab,pharmacy,specialist,insurance',
             'specialty' => 'nullable|string|max:255',
             'bio' => 'nullable|string',
             'phone' => 'nullable|string|max:50',
+            'whatsapp' => 'nullable|string|max:30',
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|string|max:500',
             'city' => 'nullable|string|max:100',
@@ -246,6 +253,9 @@ class AdminController extends BaseController
             'partner_status' => 'nullable|in:none,affiliate,sponsored',
             'referral_link' => 'nullable|url|max:500',
             'insurance_plans' => 'nullable|array',
+            'services' => 'nullable|array',
+            'opening_hours' => 'nullable|array',
+            'gallery' => 'nullable|array',
             'is_verified' => 'boolean',
             'is_active' => 'boolean',
             'latitude' => 'nullable|numeric',
@@ -269,15 +279,6 @@ class AdminController extends BaseController
             'locations.*.longitude' => 'nullable|numeric',
             'locations.*.is_primary' => 'boolean',
         ]);
-
-        // Normalize empty strings to null. The API middleware group does not run
-        // ConvertEmptyStringsToNull, so JSON submissions with "" would otherwise
-        // reach integer/decimal columns and fail MySQL strict mode.
-        foreach ($validated as $key => $value) {
-            if ($value === '') {
-                $validated[$key] = null;
-            }
-        }
 
         $locations = $request->input('locations', []);
         unset($validated['locations']);
@@ -316,6 +317,9 @@ class AdminController extends BaseController
     {
         $provider = ProviderDirectoryEntry::where('slug', $slug)->firstOrFail();
 
+        // Normalize empty strings to null BEFORE validation (see providerStore).
+        $this->normalizeEmptyStringsToNull($request);
+
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
             'type' => 'nullable|in:hospital,clinic,lab,pharmacy,specialist,insurance',
@@ -340,20 +344,15 @@ class AdminController extends BaseController
         ]);
 
         $updateData = $request->only([
-            'name', 'type', 'specialty', 'bio', 'phone', 'email',
+            'name', 'type', 'specialty', 'bio', 'phone', 'whatsapp', 'email',
             'address', 'city', 'state', 'website', 'partner_status',
             'referral_link', 'insurance_plans', 'is_verified', 'is_active',
             'latitude', 'longitude',
             'monetization_type', 'monetization_rate', 'monetization_amount',
             'monetization_limit_type', 'monetization_limit_value',
             'banner_url', 'logo_url',
+            'services', 'opening_hours', 'gallery',
         ]);
-
-        foreach ($updateData as $key => $value) {
-            if ($value === '') {
-                $updateData[$key] = null;
-            }
-        }
 
         // If monetization is being activated or changed, reset tracking
         if (!empty($updateData['monetization_type']) && $updateData['monetization_type'] !== 'none') {
@@ -425,6 +424,25 @@ class AdminController extends BaseController
         foreach ($normalized as $data) {
             $provider->locations()->create($data);
         }
+    }
+
+    /**
+     * Recursively convert empty-string request values to null.
+     *
+     * The api middleware group does not apply ConvertEmptyStringsToNull, so JSON
+     * form submissions that leave optional numeric fields blank send "" which
+     * would otherwise fail integer/numeric validation rules. This must run
+     * BEFORE $request->validate().
+     */
+    private function normalizeEmptyStringsToNull(Request $request): void
+    {
+        $input = $request->all();
+        array_walk_recursive($input, function (&$value) {
+            if ($value === '') {
+                $value = null;
+            }
+        });
+        $request->merge($input);
     }
 
     /**

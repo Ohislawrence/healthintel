@@ -2,14 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../../lib/api';
 
+const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const EMPTY_OPENING_HOURS = Object.fromEntries(DAYS.map((d) => [d, null]));
+
 const EMPTY_FORM = {
-    name: '', type: 'hospital', specialty: '', bio: '', phone: '', email: '',
+    name: '', type: 'hospital', specialty: '', bio: '', phone: '', whatsapp: '', email: '',
     address: '', city: '', state: '', website: '',
     partner_status: 'none', referral_link: '', is_verified: false, is_active: true,
     monetization_type: '', monetization_rate: '', monetization_amount: '',
     monetization_limit_type: 'time', monetization_limit_value: '',
     banner_url: '',
     logo_url: '',
+    services: '',
+    gallery: '',
+    opening_hours: { ...EMPTY_OPENING_HOURS },
     locations: [],
 };
 
@@ -89,7 +95,8 @@ export default function AdminProviders() {
             slug: p.slug,
             form: {
                 name: p.name, type: p.type, specialty: p.specialty || '', bio: p.bio || '',
-                phone: p.phone || '', email: p.email || '', address: p.address || '',
+                phone: p.phone || '', whatsapp: p.whatsapp || '', email: p.email || '',
+                address: p.address || '',
                 city: p.city || '', state: p.state || '', website: p.website || '',
                 partner_status: p.partner_status || 'none', referral_link: p.referral_link || '',
                 is_verified: !!p.is_verified, is_active: !!p.is_active,
@@ -100,6 +107,9 @@ export default function AdminProviders() {
                 monetization_limit_value: p.monetization_limit_value ?? '',
                 banner_url: p.banner_url || '',
                 logo_url: p.logo_url || '',
+                services: Array.isArray(p.services) ? p.services.join(', ') : '',
+                gallery: Array.isArray(p.gallery) ? p.gallery.join('\n') : '',
+                opening_hours: { ...EMPTY_OPENING_HOURS, ...(p.opening_hours || {}) },
                 locations: Array.isArray(p.locations) ? p.locations.map((l) => ({
                     name: l.name || '', address: l.address || '', city: l.city || '',
                     state: l.state || '', country: l.country || 'Nigeria',
@@ -140,12 +150,39 @@ export default function AdminProviders() {
         },
     }));
 
+    const normalizePayload = (form) => {
+        const payload = { ...form };
+        // services: "Cardiology, Pathology" → ["Cardiology", "Pathology"]
+        payload.services = typeof form.services === 'string'
+            ? form.services.split(',').map((s) => s.trim()).filter(Boolean)
+            : form.services;
+        // gallery: one URL per line → array
+        payload.gallery = typeof form.gallery === 'string'
+            ? form.gallery.split('\n').map((s) => s.trim()).filter(Boolean)
+            : form.gallery;
+        // opening_hours: normalize each day's slot or null for closed
+        const hours = {};
+        DAYS.forEach((d) => {
+            const slot = form.opening_hours?.[d];
+            if (slot && slot.open && slot.close) {
+                hours[d] = { open: slot.open, close: slot.close };
+            } else if (slot && slot.closed) {
+                hours[d] = null;
+            } else {
+                hours[d] = null;
+            }
+        });
+        payload.opening_hours = hours;
+        return payload;
+    };
+
     const handleSave = () => {
         if (!modal) return;
+        const payload = normalizePayload(modal.form);
         if (modal.type === 'edit') {
-            updateMutation.mutate({ slug: modal.slug, payload: modal.form });
+            updateMutation.mutate({ slug: modal.slug, payload });
         } else {
-            createMutation.mutate(modal.form);
+            createMutation.mutate(payload);
         }
     };
 
@@ -424,6 +461,10 @@ function ProviderForm({ form, setField: set, onSubmit, onCancel, saving, error, 
                     <input className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="Phone number" />
                 </div>
                 <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">WhatsApp</label>
+                    <input className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm" value={form.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="e.g. 0803 000 0000" />
+                </div>
+                <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
                     <input className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="Email address" />
                 </div>
@@ -479,6 +520,58 @@ function ProviderForm({ form, setField: set, onSubmit, onCancel, saving, error, 
             <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Bio / Description</label>
                 <textarea className="w-full rounded border border-gray-300 px-3 py-2 text-sm" rows={3} value={form.bio} onChange={(e) => set('bio', e.target.value)} placeholder="Short description about this provider…" />
+            </div>
+
+            {/* Services, Gallery & Opening Hours */}
+            <div className="border-t border-teal-200 pt-4 mt-4">
+                <h4 className="text-xs font-semibold text-teal-700 mb-3">🏥 Listing Details</h4>
+                <div className="space-y-3">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Services / Tests offered (comma-separated)</label>
+                        <input
+                            className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm"
+                            value={form.services}
+                            onChange={(e) => set('services', e.target.value)}
+                            placeholder="e.g. Malaria Test, Blood Count, X-Ray"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Gallery (one image URL per line)</label>
+                        <textarea
+                            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                            rows={3}
+                            value={form.gallery}
+                            onChange={(e) => set('gallery', e.target.value)}
+                            placeholder={"/storage/provider-assets/photo1.jpg\n/storage/provider-assets/photo2.jpg"}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">Opening Hours (leave blank = closed)</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                            {DAYS.map((day) => {
+                                const slot = form.opening_hours?.[day] || {};
+                                return (
+                                    <div key={day} className="flex items-center gap-2">
+                                        <span className="w-10 text-xs font-semibold capitalize text-gray-500">{day}</span>
+                                        <input
+                                            type="time"
+                                            className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
+                                            value={slot.open || ''}
+                                            onChange={(e) => set('opening_hours', { ...form.opening_hours, [day]: { ...slot, open: e.target.value } })}
+                                        />
+                                        <span className="text-xs text-gray-400">–</span>
+                                        <input
+                                            type="time"
+                                            className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
+                                            value={slot.close || ''}
+                                            onChange={(e) => set('opening_hours', { ...form.opening_hours, [day]: { ...slot, close: e.target.value } })}
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Monetization */}

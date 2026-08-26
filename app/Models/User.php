@@ -56,6 +56,11 @@ class User extends Authenticatable
     {
         return $this->hasMany(ReferralPayoutRequest::class, 'user_id');
     }
+
+    public function providerFavorites(): HasMany
+    {
+        return $this->hasMany(ProviderFavorite::class, 'user_id');
+    }
     /**
      * Get the attributes that should be cast.
      *

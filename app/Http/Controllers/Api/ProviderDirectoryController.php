@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\ProviderDirectoryEntry;
 use App\Services\ReferralService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ProviderDirectoryController extends BaseController
 {
@@ -13,14 +14,14 @@ class ProviderDirectoryController extends BaseController
     ) {}
 
     /**
-     * List providers with optional filtering and proximity search.
+     * List providers with optional filtering, proximity search, and sorting.
      */
     public function index(Request $request)
     {
-        $query = ProviderDirectoryEntry::where('is_active', true);
-
-        // Auto-expire sponsored listings that have run out
+        // Auto-expire sponsored listings that have run out.
         $this->expireStaleSponsorships();
+
+        $query = ProviderDirectoryEntry::where('is_active', true);
 
         if ($request->filled('specialty')) {
             $query->where('specialty', 'like', '%' . $request->input('specialty') . '%');
@@ -30,7 +31,7 @@ class ProviderDirectoryController extends BaseController
             $city = $request->input('city');
             $query->where(function ($q) use ($city) {
                 $q->where('city', 'like', '%' . $city . '%')
-                  ->orWhereHas('locations', fn($lq) => $lq->where('city', 'like', '%' . $city . '%'));
+                  ->orWhereHas('locations', fn ($lq) => $lq->where('city', 'like', '%' . $city . '%'));
             });
         }
 
@@ -38,7 +39,7 @@ class ProviderDirectoryController extends BaseController
             $state = $request->input('state');
             $query->where(function ($q) use ($state) {
                 $q->where('state', $state)
-                  ->orWhereHas('locations', fn($lq) => $lq->where('state', $state));
+                  ->orWhereHas('locations', fn ($lq) => $lq->where('state', $state));
             });
         }
 
@@ -48,6 +49,11 @@ class ProviderDirectoryController extends BaseController
 
         if ($request->filled('partner')) {
             $query->where('partner_status', $request->input('partner'));
+        }
+
+        // Filter by accepted insurance plan/HMO (JSON column).
+        if ($request->filled('insurance')) {
+            $query->whereJsonContains('insurance_plans', $request->input('insurance'));
         }
 
         if ($request->filled('search')) {
@@ -64,42 +70,59 @@ class ProviderDirectoryController extends BaseController
             });
         }
 
-        // Proximity search
-        if ($request->filled('latitude') && $request->filled('longitude')) {
+        $query->with('locations')
+            ->withCount('locations')
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews');
+
+        $hasCoords = $request->filled('latitude') && $request->filled('longitude');
+
+        if ($hasCoords) {
+            // DB-side Haversine — scales without loading all rows into memory.
             $lat = (float) $request->input('latitude');
             $lng = (float) $request->input('longitude');
             $radiusKm = (float) $request->input('radius', 10);
 
-            $providers = $query->with('locations')->get()
-                ->map(function ($p) use ($lat, $lng) {
-                    if ($p->latitude && $p->longitude) {
-                        $p->distance_km = $this->referralService->haversineDistance($lat, $lng, $p->latitude, $p->longitude);
-                    } else {
-                        $p->distance_km = null;
-                    }
-                    return $p;
-                })
-                ->filter(fn($p) => !is_null($p->distance_km) && $p->distance_km <= $radiusKm)
-                ->sortBy('distance_km')
-                ->values();
+            $query->select('*')
+                ->selectRaw(
+                    '(6371 * acos(least(1.0, cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))) as distance_km',
+                    [$lat, $lng, $lat],
+                )
+                ->whereNotNull('latitude')
+                ->whereNotNull('longitude')
+                ->having('distance_km', '<=', $radiusKm)
+                ->orderBy('distance_km');
+        } else {
+            $sort = $request->input('sort', 'relevance');
 
-            return $this->success(['data' => $providers]);
+            if ($sort === 'rating') {
+                $query->orderByDesc('reviews_avg_rating')
+                    ->orderByDesc('reviews_count')
+                    ->orderBy('name');
+            } elseif ($sort === 'name') {
+                $query->orderBy('name');
+            } else {
+                $query->orderByRaw("
+                    CASE
+                        WHEN partner_status = 'sponsored' AND monetization_type IS NOT NULL THEN 0
+                        WHEN partner_status = 'affiliate' THEN 1
+                        ELSE 2
+                    END
+                ")
+                ->orderBy('is_verified', 'desc')
+                ->orderBy('name');
+            }
         }
 
-        // Sort: sponsored first (still valid), then verified, then alphabetical
-        $providers = $query
-            ->with('locations')
-            ->withCount('locations')
-            ->orderByRaw("
-                CASE 
-                    WHEN partner_status = 'sponsored' AND monetization_type IS NOT NULL THEN 0
-                    WHEN partner_status = 'affiliate' THEN 1
-                    ELSE 2
-                END
-            ")
-            ->orderBy('is_verified', 'desc')
-            ->orderBy('name')
-            ->paginate(15);
+        $providers = $query->paginate(15);
+
+        // Expose computed statuses + rating aggregates in each item.
+        $providers->getCollection()->transform(function ($p) {
+            $p->append(['is_sponsored', 'is_open_now']);
+            $p->rating_avg = round((float) ($p->reviews_avg_rating ?? 0), 1);
+            $p->rating_count = (int) ($p->reviews_count ?? 0);
+            return $p;
+        });
 
         return $this->paginated($providers);
     }
@@ -124,8 +147,8 @@ class ProviderDirectoryController extends BaseController
             );
         }
 
-        // Expose computed sponsored status in the API payload.
-        $provider->append('is_sponsored');
+        // Expose computed sponsored + open-now status in the API payload.
+        $provider->append(['is_sponsored', 'is_open_now']);
 
         return $this->success(['provider' => $provider]);
     }
@@ -159,9 +182,13 @@ class ProviderDirectoryController extends BaseController
      */
     public function insuranceList()
     {
-        $hmoList = ProviderDirectoryEntry::where('type', 'insurance')
-            ->where('is_active', true)
-            ->get();
+        $hmoList = Cache::remember('providers:insurance-list', 300, function () {
+            return ProviderDirectoryEntry::where('type', 'insurance')
+                ->where('is_active', true)
+                ->get()
+                ->map(fn ($p) => $p->toArray())
+                ->all();
+        });
 
         return $this->success(['hmo_list' => $hmoList]);
     }
@@ -221,42 +248,84 @@ class ProviderDirectoryController extends BaseController
             $query->whereIn('type', ['lab', 'hospital', 'clinic']);
         }
 
-        $providers = $query->get()
-            ->map(function ($p) use ($lat, $lng) {
-                $p->distance_km = $this->referralService->haversineDistance(
-                    $lat, $lng, $p->latitude, $p->longitude
-                );
-                return $p;
-            })
-            ->filter(fn($p) => $p->distance_km <= 50)
-            ->sortBy(function ($p) {
-                // Sort priority: sponsored (0) → affiliate (1) → others (2), then by distance
-                $partnerOrder = $p->partner_status === 'sponsored' && $p->is_sponsored ? 0
-                    : ($p->partner_status === 'affiliate' ? 1 : 2);
-                return sprintf('%d-%06.1f', $partnerOrder, $p->distance_km);
-            })
-            ->take($limit)
-            ->values();
+        $providers = $query
+            ->select('*')
+            ->selectRaw(
+                '(6371 * acos(least(1.0, cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))) as distance_km',
+                [$lat, $lng, $lat],
+            )
+            ->having('distance_km', '<=', 50)
+            ->orderByRaw("
+                CASE
+                    WHEN partner_status = 'sponsored' AND monetization_type IS NOT NULL THEN 0
+                    WHEN partner_status = 'affiliate' THEN 1
+                    ELSE 2
+                END
+            ")
+            ->orderBy('distance_km')
+            ->limit($limit)
+            ->get();
+
+        $providers->transform(function ($p) {
+            $p->append('is_sponsored');
+            return $p;
+        });
 
         return $this->success(['providers' => $providers]);
     }
 
     public function specialties()
     {
-        return $this->success([
-            'specialties' => ProviderDirectoryEntry::where('is_active', true)
+        $items = Cache::remember('providers:specialties', 300, function () {
+            return ProviderDirectoryEntry::where('is_active', true)
                 ->whereNotNull('specialty')->distinct()
-                ->pluck('specialty')->sort()->values(),
-        ]);
+                ->pluck('specialty')->sort()->values()->all();
+        });
+
+        return $this->success(['specialties' => $items]);
     }
 
     public function states()
     {
-        return $this->success([
-            'states' => ProviderDirectoryEntry::where('is_active', true)
+        $items = Cache::remember('providers:states', 300, function () {
+            return ProviderDirectoryEntry::where('is_active', true)
                 ->whereNotNull('state')->distinct()
-                ->pluck('state')->sort()->values(),
-        ]);
+                ->pluck('state')->sort()->values()->all();
+        });
+
+        return $this->success(['states' => $items]);
+    }
+
+    public function cities()
+    {
+        $items = Cache::remember('providers:cities', 300, function () {
+            return ProviderDirectoryEntry::where('is_active', true)
+                ->whereNotNull('city')->distinct()
+                ->pluck('city')->sort()->values()->all();
+        });
+
+        return $this->success(['cities' => $items]);
+    }
+
+    /**
+     * Distinct list of accepted insurance plans/HMOs across providers.
+     */
+    public function insurers()
+    {
+        $plans = Cache::remember('providers:insurers', 300, function () {
+            return ProviderDirectoryEntry::where('is_active', true)
+                ->whereNotNull('insurance_plans')
+                ->pluck('insurance_plans')
+                ->flatten()
+                ->unique()
+                ->filter()
+                ->map(fn ($p) => is_string($p) ? $p : (is_array($p) ? ($p['name'] ?? null) : null))
+                ->filter()
+                ->values()
+                ->all();
+        });
+
+        return $this->success(['insurers' => $plans]);
     }
 
     public function types()
@@ -272,43 +341,49 @@ class ProviderDirectoryController extends BaseController
     {
         $this->expireStaleSponsorships();
 
-        $sponsored = ProviderDirectoryEntry::where('is_active', true)
-            ->whereIn('partner_status', ['sponsored', 'affiliate'])
-            ->where(function ($q) {
-                $q->where('partner_status', 'affiliate')
-                  ->orWhere(function ($q2) {
-                      $q2->where('partner_status', 'sponsored')
-                         ->whereNotNull('monetization_type');
-                  });
-            })
-            ->select([
-                'id', 'name', 'slug', 'type', 'specialty', 'city', 'state',
-                'banner_url', 'logo_url', 'partner_status',
-                'latitude', 'longitude',
-            ])
-            ->get();
+        $cacheKey = 'providers:banners:' . md5(json_encode($request->only(['latitude', 'longitude'])));
 
-        // If user provided coordinates, sort by proximity (closest first)
-        if ($request->filled('latitude') && $request->filled('longitude')) {
-            $lat = (float) $request->input('latitude');
-            $lng = (float) $request->input('longitude');
-
-            $sponsored = $sponsored
-                ->map(function ($p) use ($lat, $lng) {
-                    if ($p->latitude && $p->longitude) {
-                        $p->distance_km = $this->referralService->haversineDistance(
-                            $lat, $lng, $p->latitude, $p->longitude
-                        );
-                    } else {
-                        $p->distance_km = null;
-                    }
-                    return $p;
+        $banners = Cache::remember($cacheKey, 300, function () use ($request) {
+            $sponsored = ProviderDirectoryEntry::where('is_active', true)
+                ->whereIn('partner_status', ['sponsored', 'affiliate'])
+                ->where(function ($q) {
+                    $q->where('partner_status', 'affiliate')
+                      ->orWhere(function ($q2) {
+                          $q2->where('partner_status', 'sponsored')
+                             ->whereNotNull('monetization_type');
+                      });
                 })
-                ->sortBy(fn($p) => $p->distance_km ?? PHP_FLOAT_MAX)
-                ->values();
-        }
+                ->select([
+                    'id', 'name', 'slug', 'type', 'specialty', 'city', 'state',
+                    'banner_url', 'logo_url', 'partner_status',
+                    'latitude', 'longitude',
+                ])
+                ->get();
 
-        return $this->success(['banners' => $sponsored]);
+            // If user provided coordinates, sort by proximity (closest first)
+            if ($request->filled('latitude') && $request->filled('longitude')) {
+                $lat = (float) $request->input('latitude');
+                $lng = (float) $request->input('longitude');
+
+                $sponsored = $sponsored
+                    ->map(function ($p) use ($lat, $lng) {
+                        if ($p->latitude && $p->longitude) {
+                            $p->distance_km = $this->referralService->haversineDistance(
+                                $lat, $lng, $p->latitude, $p->longitude
+                            );
+                        } else {
+                            $p->distance_km = null;
+                        }
+                        return $p;
+                    })
+                    ->sortBy(fn ($p) => $p->distance_km ?? PHP_FLOAT_MAX)
+                    ->values();
+            }
+
+            return $sponsored->map(fn ($p) => $p->toArray())->values()->all();
+        });
+
+        return $this->success(['banners' => $banners]);
     }
 
     /**

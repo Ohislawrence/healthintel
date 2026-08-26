@@ -169,7 +169,7 @@ $structuredData = [
             <div class="feature-card">
                 <div class="feature-dot" aria-hidden="true"></div>
                 <h3>Find care nearby</h3>
-                <p>A directory of hospitals, doctors, and labs, filterable by specialty and distance.</p>
+                <p>Hospitals, labs, pharmacies and specialists — filter by specialty, insurance, and opening hours, with ratings, reviews and appointments.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-dot" aria-hidden="true"></div>

@@ -10,7 +10,7 @@ class ProviderDirectoryEntry extends Model
 {
     use HasApiTokens;
     protected $fillable = [
-        'name', 'slug', 'type', 'specialty', 'bio', 'phone', 'email',
+        'name', 'slug', 'type', 'specialty', 'bio', 'phone', 'whatsapp', 'email',
         'address', 'city', 'state', 'country', 'website',
         'latitude', 'longitude', 'partner_status', 'referral_link',
         'insurance_plans', 'access_code', 'access_code_generated_at', 'is_verified', 'is_active',
@@ -18,6 +18,7 @@ class ProviderDirectoryEntry extends Model
         'monetization_limit_type', 'monetization_limit_value',
         'monetization_started_at', 'monetization_expires_at',
         'monetization_views_used', 'banner_url', 'logo_url',
+        'services', 'opening_hours', 'gallery',
     ];
 
     protected $hidden = [
@@ -31,6 +32,9 @@ class ProviderDirectoryEntry extends Model
         'latitude' => 'float',
         'longitude' => 'float',
         'insurance_plans' => 'array',
+        'services' => 'array',
+        'opening_hours' => 'array',
+        'gallery' => 'array',
         'monetization_rate' => 'integer',
         'monetization_amount' => 'integer',
         'monetization_limit_value' => 'integer',
@@ -47,6 +51,16 @@ class ProviderDirectoryEntry extends Model
     public function locations(): HasMany
     {
         return $this->hasMany(ProviderLocation::class, 'provider_id');
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(ProviderReview::class, 'provider_id');
+    }
+
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(ProviderFavorite::class, 'provider_id');
     }
 
     public const TYPES = ['hospital', 'clinic', 'lab', 'pharmacy', 'specialist', 'insurance'];
@@ -76,6 +90,36 @@ class ProviderDirectoryEntry extends Model
         }
 
         return true;
+    }
+
+    /**
+     * Whether the provider is currently open based on its structured
+     * opening_hours. Returns null when hours are unknown (not supplied).
+     *
+     * Expected shape:
+     *   { "mon": {"open":"08:00","close":"17:00"}, "tue": null, ... }
+     * where a null value means "closed that day".
+     */
+    public function getIsOpenNowAttribute(): ?bool
+    {
+        if (empty($this->opening_hours)) {
+            return null;
+        }
+
+        $day = strtolower(now()->format('D')); // mon..sun
+
+        if (!array_key_exists($day, $this->opening_hours)) {
+            return null;
+        }
+
+        $slot = $this->opening_hours[$day];
+        if (!$slot || empty($slot['open'] ?? null) || empty($slot['close'] ?? null)) {
+            return false;
+        }
+
+        $now = now()->format('H:i');
+
+        return $now >= $slot['open'] && $now <= $slot['close'];
     }
 
     /** Increment view counter for sponsored listings. */

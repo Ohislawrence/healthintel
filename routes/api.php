@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\LabSubmissionController;
 use App\Http\Controllers\Api\PartnerPortalController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProviderDirectoryController;
+use App\Http\Controllers\Api\ProviderFavoriteController;
+use App\Http\Controllers\Api\ProviderReviewController;
 use App\Http\Controllers\Api\PushController;
 use App\Http\Controllers\Api\SymptomCheckerController;
 use Illuminate\Support\Facades\Route;
@@ -51,9 +53,13 @@ Route::get('/blog/categories', [BlogController::class, 'categories']);
 // Specific routes must come BEFORE the wildcard {slug} route
 Route::get('/providers/specialties', [ProviderDirectoryController::class, 'specialties']);
 Route::get('/providers/states', [ProviderDirectoryController::class, 'states']);
+Route::get('/providers/cities', [ProviderDirectoryController::class, 'cities']);
+Route::get('/providers/insurers', [ProviderDirectoryController::class, 'insurers']);
 Route::get('/providers/types', [ProviderDirectoryController::class, 'types']);
 Route::get('/providers/insurance/list', [ProviderDirectoryController::class, 'insuranceList']);
 Route::get('/providers/nearby-recommended', [ProviderDirectoryController::class, 'nearbyRecommended']);
+Route::get('/providers/favorites', [ProviderFavoriteController::class, 'index'])->middleware('auth:sanctum');
+Route::get('/providers/{slug}/reviews', [ProviderReviewController::class, 'index']);
 Route::get('/providers/{slug}', [ProviderDirectoryController::class, 'show']);
 
 // Insurance/HMO comparison (public read-only)
@@ -141,6 +147,14 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     // Provider Directory (actions requiring auth)
     Route::post('/providers/{slug}/click-out', [ProviderDirectoryController::class, 'clickOut']);
     Route::post('/providers/insurance/enquire', [ProviderDirectoryController::class, 'insuranceEnquire']);
+
+    // Provider Reviews
+    Route::post('/providers/{slug}/reviews', [ProviderReviewController::class, 'store']);
+    Route::delete('/providers/{slug}/reviews', [ProviderReviewController::class, 'destroy']);
+
+    // Provider Favorites
+    Route::get('/providers/{slug}/favorite', [ProviderFavoriteController::class, 'check']);
+    Route::post('/providers/{slug}/favorite', [ProviderFavoriteController::class, 'toggle']);
 
     // Insurance/HMO comparison (actions requiring auth)
     Route::post('/insurance/enquire', [ProviderDirectoryController::class, 'insuranceEnquire']);

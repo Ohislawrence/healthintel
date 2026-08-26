@@ -25,7 +25,7 @@
             <div class="feature-card anim-fade-up d3">
                 <div class="feature-dot" aria-hidden="true"></div>
                 <h3>Provider Directory</h3>
-                <p>Search hospitals, clinics, labs, pharmacies, and specialists across Nigeria. Filter by specialty, location, and insurance accepted. Verified listings with contact details.</p>
+                <p>Search hospitals, clinics, labs, pharmacies, and specialists across Nigeria. Filter by specialty, location, opening hours, and insurance accepted. Save favourites, see ratings & reviews, and book appointments.</p>
             </div>
             <div class="feature-card anim-fade-up d4">
                 <div class="feature-dot" aria-hidden="true"></div>
