@@ -11,7 +11,7 @@ class CreditService
 
     public function __construct()
     {
-        $this->signupCredits = \App\Models\Setting::getValue('credits.signup_bonus', 3);
+        $this->signupCredits = \App\Models\Setting::getValue('credits.signup_bonus', 2);
     }
 
     /**

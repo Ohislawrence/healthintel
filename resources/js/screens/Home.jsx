@@ -259,7 +259,7 @@ export default function Home() {
                     </div>
                     <div className="grid gap-8 md:grid-cols-3">
                         {[
-                            { step: '01', title: 'Create an account', body: 'Sign up in seconds. You get 3 free credits to start.' },
+                            { step: '01', title: 'Create an account', body: 'Sign up in seconds. You get 2 free credits to start.' },
                             { step: '02', title: 'Upload or enter results', body: 'Upload a PDF lab report or enter your values manually.' },
                             { step: '03', title: 'Get your explanation', body: 'Our AI reads your results and explains them in plain, simple language.' },
                         ].map((item) => (
