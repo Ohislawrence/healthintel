@@ -19,7 +19,7 @@ return [
     | Signup / Promotional Credits
     |--------------------------------------------------------------------------
     */
-    'signup_bonus' => 2,              // Free credits on registration
+    'signup_bonus' => 3,              // Free credits on registration
     'first_interpretation_free' => true, // First interpretation is free for new users
 
     /*

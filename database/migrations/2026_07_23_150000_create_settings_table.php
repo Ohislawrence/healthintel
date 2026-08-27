@@ -32,7 +32,7 @@ return new class extends Migration
     {
         $defaults = [
             // Credits
-            ['key' => 'credits.signup_bonus', 'value' => '2', 'type' => 'integer', 'group' => 'credits', 'label' => 'Signup Bonus Credits', 'description' => 'Number of free credits given to new users upon registration'],
+            ['key' => 'credits.signup_bonus', 'value' => '3', 'type' => 'integer', 'group' => 'credits', 'label' => 'Signup Bonus Credits', 'description' => 'Number of free credits given to new users upon registration'],
             ['key' => 'credits.lab_interpretation', 'value' => '2', 'type' => 'integer', 'group' => 'credits', 'label' => 'Manual Lab Interpretation Cost', 'description' => 'Credits required to submit a lab panel manually'],
             ['key' => 'credits.pdf_interpretation', 'value' => '3', 'type' => 'integer', 'group' => 'credits', 'label' => 'PDF Upload Interpretation Cost', 'description' => 'Credits required to upload and interpret a PDF lab report'],
             ['key' => 'credits.symptom_check', 'value' => '1', 'type' => 'integer', 'group' => 'credits', 'label' => 'Symptom Check Cost', 'description' => 'Credits required for AI-powered symptom checking'],

@@ -84,7 +84,7 @@ export default function Register() {
                     <h2 className="text-xl font-bold text-neutral-900 text-center">Create your account</h2>
                     <div className="mt-2 flex items-center justify-center">
                         <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-3 py-1 text-xs font-semibold text-teal-700">
-                            ✨ Get 2 free credits
+                            ✨ Get 3 free credits
                         </span>
                     </div>
 
