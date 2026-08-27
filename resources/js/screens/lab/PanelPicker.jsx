@@ -7,8 +7,8 @@ import CameraUpload from '../../components/upload/CameraUpload';
 /**
  * Step 1 — Choose how to share the lab report.
  *
- * Two clear paths (photo / PDF) lead to a single review screen before any
- * credits are charged. Manual entry is kept as a secondary option.
+ * PDF uploads are interpreted directly (credits are charged on submit).
+ * Photo uploads lead to a review screen. Manual entry is a secondary option.
  */
 
 const COST = 3;
@@ -28,6 +28,7 @@ export default function PanelPicker() {
     const [showPanels, setShowPanels] = useState(false);
 
     const balance = user?.credits ?? 0;
+    const creditsNeeded = Math.max(COST - balance, 0);
 
     // ── PDF: read file and extract via draft endpoint (no charge) ──
     const readPdfFile = (picked) => {
@@ -60,21 +61,24 @@ export default function PanelPicker() {
             setError('Please select a PDF file first.');
             return;
         }
+        if (creditsNeeded > 0) {
+            setError(`You need ${creditsNeeded} more credit${creditsNeeded > 1 ? 's' : ''} to interpret this report.`);
+            return;
+        }
         setUploading(true);
         setError(null);
         try {
-            const res = await api.post('/submissions/pdf/draft', {
+            const res = await api.post('/submissions/pdf', {
                 pdf_base64: fileBase64,
                 pdf_name: file?.name || 'report.pdf',
             });
-            // res = { ok, message, data: { draft_id, extracted_tests, ... } }
-            navigate('/lab-results/review', {
-                state: {
-                    draft_id: res.data.draft_id,
-                    extracted_tests: res.data.extracted_tests || [],
-                    is_image: false,
-                },
-            });
+            await fetchUser();
+            const id = res?.data?.submission?.id;
+            if (id) {
+                navigate(`/lab-results/submission/${id}`, { replace: true });
+            } else {
+                setError('Something went wrong. Please try again.');
+            }
         } catch (err) {
             setError(err?.message || 'Could not read this PDF. Please try again.');
         } finally {
@@ -252,9 +256,9 @@ export default function PanelPicker() {
 
                     <button
                         onClick={handleUploadPdf}
-                        disabled={!fileBase64 || uploading}
+                        disabled={!fileBase64 || uploading || creditsNeeded > 0}
                         className={`btn w-full py-4 text-base font-bold transition-all ${
-                            fileBase64 && !uploading
+                            fileBase64 && !uploading && creditsNeeded === 0
                                 ? 'gradient-teal text-white shadow-lg shadow-teal-200 hover:shadow-xl'
                                 : 'bg-neutral-300 text-white cursor-not-allowed'
                         }`}
@@ -270,6 +274,33 @@ export default function PanelPicker() {
                             </span>
                         )}
                     </button>
+
+                    {file && (
+                        creditsNeeded > 0 ? (
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                                <p className="text-sm font-bold text-amber-900">
+                                    You need {creditsNeeded} more credit{creditsNeeded > 1 ? 's' : ''} to interpret this report.
+                                </p>
+                                <p className="text-sm text-amber-800 mt-1 leading-relaxed">
+                                    Top up now and you can continue straight from here without losing your uploaded PDF.
+                                </p>
+                                <Link
+                                    to="/credits/buy"
+                                    state={{ from: 'lab-upload', neededCredits: creditsNeeded, cost: COST, balance }}
+                                    className="btn w-full mt-3 py-3 text-sm font-bold text-center bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-200"
+                                >
+                                    Buy credits
+                                </Link>
+                            </div>
+                        ) : (
+                            <div className="rounded-xl border border-teal-100 bg-teal-50 p-4">
+                                <p className="text-sm font-bold text-teal-900">This report costs {COST} credits.</p>
+                                <p className="text-sm text-teal-800 mt-1 leading-relaxed">
+                                    Your balance is {balance} credits — you can continue.
+                                </p>
+                            </div>
+                        )
+                    )}
                 </div>
             )}
 

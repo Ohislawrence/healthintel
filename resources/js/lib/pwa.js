@@ -135,8 +135,11 @@ export async function registerSW() {
       }
     });
 
-    // If there's already a pending subscription, re-sync it
+    // If there's already a pending subscription, re-sync it.
+    // Guard against environments where pushManager is unavailable
+    // (iOS Safari < 16.4, or insecure contexts) to avoid a TypeError.
     navigator.serviceWorker.ready.then((registration) => {
+      if (!registration.pushManager) return;
       registration.pushManager.getSubscription().then((sub) => {
         if (sub) {
           notifyServerOfSubscription(sub);
@@ -239,7 +242,12 @@ export async function subscribeToPush() {
       return null;
     }
 
-    // Check existing subscription
+    // Check existing subscription.
+    // Guard against registration.pushManager being undefined.
+    if (!registration.pushManager) {
+      console.warn('[PWA] pushManager unavailable on registration');
+      return null;
+    }
     let subscription = await registration.pushManager.getSubscription();
 
     // Detect whether the existing subscription was created under a different
@@ -301,6 +309,10 @@ export async function unsubscribeFromPush() {
   try {
     const registration =
       swRegistration || (await navigator.serviceWorker.ready);
+
+    if (!registration.pushManager) {
+      return true;
+    }
 
     const subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
